@@ -354,3 +354,83 @@ function lib4ridora_form_islandora_ingest_form_alter(&$form, &$form_state) {
     $form['next']['#value'] = t('I Agree');
   }
 }
+
+/**
+ * Implements hook_islandora_solr_search_rss_item_alter().
+ */
+function lib4ridora_islandora_solr_search_rss_item_alter(&$item, $doc) {
+  if (isset($doc['content_models']) && in_array('info:fedora/ir:citationCModel', $doc['content_models'])) {
+    $citation = islandora_object_load($doc['PID']);
+    $dc_namespace = 'http://purl.org/dc/elements/1.1/';
+    if (isset($citation['MODS'])) {
+      $item['description'] = citeproc_bibliography_from_mods(
+        citeproc_default_style(),
+        $citation['MODS']->content
+      );
+      $mods_doc = new DOMDocument();
+      $mods_doc->loadXML($citation['MODS']->content);
+      $mods_xpath = new DOMXPath($mods_doc);
+      $mods_xpath->registerNamespace('mods', 'http://www.loc.gov/mods/v3');
+      $mods_results = $mods_xpath->query('//mods:titleInfo/mods:title');
+      if ($mods_results->length) {
+        $item['title'] = $mods_results->item(0)->nodeValue;
+      }
+    }
+    $dc_doc = new DOMDocument();
+    $dc_doc->loadXML($citation['DC']->content);
+    $dc_xpath = new DOMXPath($dc_doc);
+    $dc_xpath->registerNamespace('dc', $dc_namespace);
+
+    $dc_contributor_results = $dc_xpath->query('//dc:contributor');
+    $creator = '';
+    foreach ($dc_contributor_results as $dc_contributor) {
+      $creator .= "{$dc_contributor->nodeValue} ";
+    }
+    if ($creator) {
+      $item['items'][] = array(
+        'value' => trim($creator),
+        'key' => 'dc:creator',
+        'attributes' => array('xmlns:dc' => $dc_namespace),
+      );
+    }
+
+    $dc_date_results = $dc_xpath->query('//dc:date');
+    if ($dc_date_results->length) {
+      $item['items'][] = array(
+        'value' => $dc_date_results->item(0)->nodeValue,
+        'key' => 'dc:date',
+        'attributes' => array('xmlns:dc' => $dc_namespace),
+      );
+    }
+
+    $dc_relation_results = $dc_xpath->query('//dc:relation');
+    if ($dc_relation_results->length) {
+      $item['items'][] = array(
+        'value' => $dc_relation_results->item(0)->nodeValue,
+        'key' => 'dc:relation',
+        'attributes' => array('xmlns:dc' => $dc_namespace),
+      );
+    }
+
+    $dc_type_results = $dc_xpath->query('//dc:type');
+    if ($dc_type_results->length) {
+      $item['items'][] = array(
+        'value' => $dc_type_results->item(0)->nodeValue,
+        'key' => 'dc:type',
+        'attributes' => array('xmlns:dc' => $dc_namespace),
+      );
+    }
+
+    $dc_identifier_results = $dc_xpath->query('//dc:identifier');
+    if ($dc_identifier_results->length) {
+      $identifier = $dc_identifier_results->item(0)->nodeValue;
+      if (strpos($identifier, 'doi:') === 0) {
+        $item['items'][] = array(
+          'value' => $identifier,
+          'key' => 'dc:identifier',
+          'attributes' => array('xmlns:dc' => $dc_namespace),
+        );
+      }
+    }
+  }
+}
