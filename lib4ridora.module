@@ -583,3 +583,22 @@ function lib4ridora_ir_citationcmodel_mods_islandora_datastream_alter(AbstractOb
     }
   }
 }
+
+/**
+ * Implements hook_form_alter().
+ *
+ * Add hidden submit button "Next" or "Ingest" at the top of the form so it
+ * triggers first if a user hits enter on the form, instead of "Prev" button.
+ */
+function lib4ridora_form_alter(&$form, &$form_state, $form_id) {
+  // Check to see if there is a next button in the form and if the form is
+  // an islandora ingest form.
+  if (isset($form['next']) && $form_id == 'islandora_ingest_form') {
+    if ($form['next']['#name'] == 'next' || $form['next']['#name'] == 'ingest') {
+      $form['hidden_next'] = $form['next'];
+      $form['hidden_next']['#weight'] = -99;
+      $form['hidden_next']['#prefix'] = '<div style="display:none;">';
+      $form['hidden_next']['#suffix'] = '</div>';
+    }
+  }
+}
