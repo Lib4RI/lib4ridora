@@ -69,6 +69,12 @@ function lib4ridora_impact_factor_batch_process($year, $delimiter, $csv, &$conte
   }
   $context['finished'] = 0;
   list($identifier, $factor) = $csv_line;
+
+  // Set an error if there is no impact factor provided.
+  if (empty($factor)) {
+    $factor = "no value";
+  }
+
   // Set an error if no journal found.
   $journal = lib4ridora_get_journal($identifier);
   if (!$journal) {
