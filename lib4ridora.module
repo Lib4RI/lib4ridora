@@ -630,3 +630,65 @@ function lib4ridora_views_api($module = NULL, $api = NULL) {
     'path' => drupal_get_path('module', 'lib4ridora') . '/views',
   );
 }
+
+/**
+ * Implements hook_block_info().
+ */
+function lib4ridora_block_info() {
+  return array(
+    'lib4ridora_organizational_units' => array(
+      'info' => t('Lib4ri Organizational Units'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function lib4ridora_block_view($delta) {
+  $block = array();
+  switch ($delta) {
+    case 'lib4ridora_organizational_units':
+      module_load_include('inc', 'lib4ridora', 'includes/block');
+      $block['subject'] = t('Organizational Unit');
+      $block['content'] = array(
+        'organizations' => lib4ridora_get_organizational_block_content(),
+      );
+      break;
+
+    default:
+      break;
+  }
+  return $block;
+}
+
+/**
+ * Implements hook_block_configure().
+ */
+function lib4ridora_block_configure($delta) {
+  switch ($delta) {
+    case 'lib4ridora_organizational_units':
+      module_load_include('inc', 'lib4ridora', 'includes/block');
+      return lib4ridora_organizational_block_configuration_form();
+      break;
+
+    default:
+      break;
+  }
+}
+
+/**
+ * Implements hook_block_save().
+ */
+function lib4ridora_block_save($delta = '', $edit = array()) {
+  switch ($delta) {
+    case 'lib4ridora_organizational_units':
+      variable_set('lib4ridora_organization_block_namespace_filter', $edit['namespace']);
+      variable_set('lib4ridora_organization_block_organization_field', $edit['field']);
+      break;
+
+    default:
+      break;
+  }
+
+}
