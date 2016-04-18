@@ -17,13 +17,10 @@ function lib4ridora_update_full_text(AbstractObject $object) {
   $is_open = NULL;
   $accepted_or_published = FALSE;
   $pdf_datastreams = lib4ridora_retrieve_filtered_pdfs($object);
-  dsm($pdf_datastreams);
   foreach ($pdf_datastreams as $datastream) {
     $info = lib4ridora_get_embargo_info($datastream);
-        dsm($info, "info");
     if (in_array($info['document_version'], array('accepted version', 'published version'))) {
       $accepted_or_published = TRUE;
-      dsm($accepted_or_published, "Accecpted or Published");
     }
     if (is_null($info['availability']) && $accepted_or_published) {
       $is_open = TRUE;
@@ -38,7 +35,6 @@ function lib4ridora_update_full_text(AbstractObject $object) {
   else {
     $relationship_value = 'Restricted';
   }
-dsm($relationship_value, "relationship value");
   $object->relationships->autoCommit = FALSE;
   $object->relationships->remove(
     LIB4RIDORA_RELS_EXT_NAMESPACE,
