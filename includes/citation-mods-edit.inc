@@ -51,7 +51,31 @@ function lib4ridora_citation_select_mods_edit_form($form, &$form_state, Abstract
   // Fallback to load the ingest form if there is no current association so that
   // an association can be set.
   form_load_include($form_state, 'inc', 'lib4ridora', 'includes/ingest-selector.form');
-  $form = lib4ridora_ingest_selector_form($form, $form_state, $object);
+    foreach (lib4ridora_citation_form_subtypes() as $type => $info) {
+      module_load_include('inc', 'lib4ridora', 'includes/citation.subtypes');
+      $subtypes = lib4ridora_determine_subtypes($object);
+      $subtypes = reset($subtypes);
+      if (in_array($subtypes['name'], $info['genres'])) {
+        foreach (xml_form_builder_get_associations(array($info['form']), array(), array('MODS')) as $key => $association) {
+          // Update the content_model to be ir:citationCModel so that regardless
+          // of the form used it will only have the ir:citationCModel.
+          $association['content_model'] = "ir:citationCModel";
+          // Load the form builder form.
+          $metadata_form = xml_form_builder_get_form(array(), $form_state, $association['form_name'], $object['MODS']->content, array());
+          // Need to make the #type markup because forms within forms are bad.
+          $metadata_form['#type'] = 'markup';
+          $metadata_form['submit'] = array(
+            '#type' => 'submit',
+            '#value' => t('Update'),
+          );
+          $form_state['association'] = $association;
+          return $metadata_form;
+        }
+      }
+      else {
+        $form = lib4ridora_ingest_selector_form($form, $form_state, $object);
+      }
+    }
   return $form;
 }
 

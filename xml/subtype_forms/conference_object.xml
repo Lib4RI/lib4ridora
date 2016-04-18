@@ -43,7 +43,7 @@
           <multiple>FALSE</multiple>
           <options>
             <index key="Proceedings Paper">Proceedings Paper</index>
-            <index key="Other Conference Item">Other Conference Item</index>
+            <index key="Conference Item">Conference Item</index>
           </options>
           <required>FALSE</required>
           <resizable>FALSE</resizable>
