@@ -206,6 +206,11 @@ function lib4ridora_determine_form_name(AbstractObject $object) {
   module_load_include('inc', 'lib4ridora', 'includes/citation.subtypes');
   $subtypes = lib4ridora_determine_subtypes($object);
   $first = reset($subtypes);
+  foreach (lib4ridora_citation_form_subtypes() as $type => $info) {
+    if (in_array($first['name'], $info['genres'])) {
+      $first['form'] = $info['name'];
+    }
+  }
   return $first ? $first['form'] : NULL;
 }
 
