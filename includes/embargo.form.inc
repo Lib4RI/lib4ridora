@@ -128,7 +128,6 @@ function lib4ridora_get_embargo_info(AbstractDatastream $datastream) {
       }
     }
   }
-
   return $to_return;
 }
 
