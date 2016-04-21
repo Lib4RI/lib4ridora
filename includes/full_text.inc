@@ -19,12 +19,19 @@ function lib4ridora_update_full_text(AbstractObject $object) {
   $pdf_datastreams = lib4ridora_retrieve_filtered_pdfs($object);
   foreach ($pdf_datastreams as $datastream) {
     $info = lib4ridora_get_embargo_info($datastream);
-    if (is_null($info['availability']) && in_array($info['document_version'], array('accepted version', 'published version'))) {
-      $is_open = TRUE;
-      break;
-    }
-    elseif (in_array($info['document_version'], array('accepted version', 'published version'))) {
+    if (in_array($info['document_version'], array('accepted version', 'published version'))) {
       $accepted_or_published = TRUE;
+    }
+    if (is_null($info['availability']) && $accepted_or_published) {
+      $is_open = TRUE;
+    }
+    if($info['availability'] == 'date') {
+      $embargo_date = $datastream->relationships->get(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('embargo_date'));
+      $embargo_date = reset($embargo_date);
+      // Check if embargo date has passed.
+      if (REQUEST_TIME > strtotime($embargo_date['object']['value'])) {
+        $is_open = TRUE;
+      }
     }
   }
   if (!$pdf_datastreams || !$accepted_or_published) {
@@ -36,7 +43,6 @@ function lib4ridora_update_full_text(AbstractObject $object) {
   else {
     $relationship_value = 'Restricted';
   }
-
   $object->relationships->autoCommit = FALSE;
   $object->relationships->remove(
     LIB4RIDORA_RELS_EXT_NAMESPACE,

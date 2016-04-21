@@ -61,11 +61,18 @@ function template_process_lib4ridora_pdf_link(&$variables) {
     elseif ($availability == 'date') {
       // Need to get a human readable month.
       $date = new DateTime();
-      $availability_text = t('Intranet Only until @day @month @year', array(
+      $embargo =  gmdate('Y-m-d\TH:i:s\Z', gmmktime(0, 0, 0,  $values['embargo_date']['month'], $values['embargo_date']['day'], $values['embargo_date']['year']));
+      // Check if embargo date has passed.
+      if (REQUEST_TIME > $embargo) {
+        $availability_text = t('Open Access');
+      }
+      else{
+        $availability_text = t('Intranet Only until @day @month @year', array(
         '@day' => $values['embargo_date']['day'],
         '@month' => date_format($date->createFromFormat('!m', $values['embargo_date']['month']), 'F'),
         '@year' => $values['embargo_date']['year'],
       ));
+      }
     }
     elseif ($availability == 'private') {
       $availability_text = t('Private');
