@@ -25,6 +25,14 @@ function lib4ridora_update_full_text(AbstractObject $object) {
     if (is_null($info['availability']) && $accepted_or_published) {
       $is_open = TRUE;
     }
+    if($info['availability'] == 'date') {
+      $embargo_date = $datastream->relationships->get(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('embargo_date'));
+      $embargo_date = reset($embargo_date);
+      // Check if embargo date has passed.
+      if (REQUEST_TIME > strtotime($embargo_date['object']['value'])) {
+        $is_open = TRUE;
+      }
+    }
   }
   if (!$pdf_datastreams || !$accepted_or_published) {
     $relationship_value = 'No Full Text';
