@@ -124,7 +124,6 @@ function lib4ridora_islandora_xml_form_builder_form_associations() {
       'form_name' => $info['name'],
     );
   }
-
   return $associations;
 }
 
@@ -1132,7 +1131,6 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#prefix' => '<div id="lib4ri-advanced-search-full-text">',
     '#suffix' => '</div>',
   );
-
   $form['controls']['#weight'] = 100;
   $form['#validate'][] = 'lib4ridora_solr_advanced_search_form_validate';
   $form['#submit'][] = 'lib4ridora_solr_advanced_search_form_submit';
@@ -1184,7 +1182,6 @@ function lib4ridora_solr_advanced_search_form_validate($form, &$form_state) {
  */
 function lib4ridora_solr_advanced_search_form_submit($form, &$form_state) {
   module_load_include('inc', 'lib4ridora', 'includes/advanced_search');
-
   $filters = array(
     lib4ridora_construct_year_filter($form_state),
     lib4ridora_construct_publication_type_filter($form_state),
@@ -1193,7 +1190,6 @@ function lib4ridora_solr_advanced_search_form_submit($form, &$form_state) {
     lib4ridora_construct_full_text_filter($form_state),
   );
   $filters = array_filter($filters);
-
   if ($filters) {
     // Jam our filters into the redirect.
     $form_state['redirect'][1] = array_merge_recursive($form_state['redirect'][1], array(
@@ -1201,6 +1197,7 @@ function lib4ridora_solr_advanced_search_form_submit($form, &$form_state) {
         'f' => $filters,
       ),
     ));
+
   }
 }
 
@@ -1416,6 +1413,21 @@ function lib4ridora_process_islandora_solr_facet(&$variables) {
  * Implements hook_CMODEL_PID_islandora_object_ingested().
  */
 function lib4ridora_ir_citationCModel_islandora_object_ingested($object) {
+  module_load_include('inc', 'lib4ridora', 'includes/full_text');
+  lib4ridora_update_full_text($object);
+}
+
+/**
+ * Implements hook_cmodel_pid_islandora_datastream_modified().
+ */
+function lib4ridora_ir_citationCModel_islandora_datastream_modified($object, $datastream) {
+  module_load_include('inc', 'lib4ridora', 'includes/full_text');
+  lib4ridora_update_full_text($object);
+}
+/**
+ * Implements hook_cmodel_pid_dsid_islandora_datastream_ingested().
+ */
+function lib4ridora_ir_citationCModel_PDF_islandora_datastream_ingested($object, $datastream) {
   module_load_include('inc', 'lib4ridora', 'includes/full_text');
   lib4ridora_update_full_text($object);
 }
