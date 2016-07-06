@@ -1027,11 +1027,7 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
         );
       }
     }
-    $rendered['citation.tab']['abstract'] = array(
-      '#type' => 'item',
-      '#markup' => $xpath->evaluate('string(//mods:abstract)'),
-      '#weight' => -9,
-    );
+
     // Decode for human readability.
     $persistent_url = urldecode(url("islandora/object/{$object->id}", array('absolute' => TRUE)));
     $rendered['citation.tab']['persistent_url'] = array(
@@ -1334,6 +1330,10 @@ function lib4ridora_form_islandora_solr_metadata_config_field_form_alter(&$form,
  * Implements hook_islandora_solr_metadata_display_elements_alter().
  */
 function lib4ridora_islandora_solr_metadata_display_elements_alter(&$elements) {
+  lib4ridora_metadata_display_elements(&$elements);
+}
+
+function lib4ridora_metadata_display_elements($elements) {
   if (in_array('ir:citationCModel', $elements['islandora_object']->models)) {
     module_load_include('inc', 'lib4ridora', 'includes/citation.subtypes');
     $display = NULL;
@@ -1360,6 +1360,10 @@ function lib4ridora_islandora_solr_metadata_display_elements_alter(&$elements) {
 
     $elements['associations'][] = array('configuration_id' => $config_id);
   }
+}
+
+function lib4ridora_islandora_solr_metadata_description_elements_alter(&$elements) {
+  lib4ridora_metadata_display_elements($elements);
 }
 
 /**
