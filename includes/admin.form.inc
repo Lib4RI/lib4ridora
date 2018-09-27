@@ -194,5 +194,13 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	    '#size' => ( ( @isset($_GET['all']) || @isset($_GET['prepo']) ) ? 128 : $textfield_size ),
 	  );
   }
+  $form['lib4ridora_mods_query_author_id'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Author MODS xpath query'),
+      '#description' => t(''),
+      '#default_value' => variable_get('lib4ridora_mods_query_author_id', 'mods:nameIdentifier[@type="authorId"]'),
+      '#required' => TRUE,
+      '#size' => $textfield_size,
+  );
   return system_settings_form($form);
 }
