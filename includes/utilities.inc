@@ -189,7 +189,7 @@ function lib4ridora_get_author_info(AbstractObject $object) {
     $info = array(
       'author' => array(
         'name' => $xpath->evaluate('normalize-space(concat(mods:namePart[@type="family"], ", ", mods:namePart[@type="given"]))', $person),
-        'id' => $xpath->evaluate('string(mods:nameIdentifier[@type="authorId"]/text())', $person),
+          'id' => $xpath->evaluate('string(/'.variable_get('lib4ridora_mods_query_author_id', 'mods:nameIdentifier[@type="authorId"]').'/text())', $person),
       ),
       'org' => array(
         'name' => $xpath->evaluate('normalize-space(mods:affiliation)', $person),
