@@ -145,6 +145,7 @@ function lib4ridora_get_factor_with_fallback(AbstractObject $object, $issued_yea
   return array($factor, $factor_year);
 }
 
+
 /*
  * Function to return an array where the keys are the names of the PDF datastreams, and each key will carry an array with document-version and availability as defined in RELS-INT
  *
@@ -152,11 +153,12 @@ function lib4ridora_get_factor_with_fallback(AbstractObject $object, $issued_yea
 function lib4ridora_get_embargo_data( $relsIntCode, $dsPdfAry ) {		// $dsPdfAry may be: array( 'PDF2', 'PDF', 'PDF_PDF-A', 'PDF2_PDF-A' )
 
 	// very important: the array we are going to return must have as many key as there were items inside the input array!
-	$dataAry = array_flip($dsPdfAry);		// to be: array( 'PDF' => array( 'doc_ver' => "Published", 'avail' => "intranet"), 'PDF2' => array...
+	$dataAry = array_flip($dsPdfAry);
 
 	// DOM/XML tweak (to help with minus signs and colons):
 	$repList = array( "rdf_" => "rdf:", "dora_lib4ri" => "dora:lib4ri", "_multi_embargo_" => "-multi-embargo-" );
 	foreach( $repList as $new => $orig ) { $relsIntCode = str_replace($orig,$new,$relsIntCode); }
+
 	$xmlObj = new SimpleXMLElement($relsIntCode);
 	
 	// now going through RELS-INT looking for information about the PDF datastreams:
@@ -174,7 +176,7 @@ function lib4ridora_get_embargo_data( $relsIntCode, $dsPdfAry ) {		// $dsPdfAry 
 			}
 		}
 	}
-	return $dataAry;
+	return $dataAry;		// array( 'PDF' => array( 'doc_ver' => "Published", 'avail' => "intranet"), 'PDF2' => array...
 }
 
 
@@ -196,18 +198,21 @@ function lib4ridora_retrieve_filtered_pdfs(AbstractObject $object) {
 
 	// 2018-10-17: get the desired order for PDFs (corresponding to possible 'document versions' in RELS-INT), see also Redmine-Issue #79.
 	$orderAry = explode(",", strtr( variable_get('lib4ridora_pdf_order','pub,acc,sup,err,uns') ,"/", "," ) );
-	if ( !empty( trim( implode("",$orderAry) ) ) ) {		// safety check
-		$dsPdfAry = lib4ridora_get_embargo_data( $object['RELS-INT']->content, array_keys($dses) );
-		$dsesAry = array();
-		while( sizeof($orderAry) ) {
-			$wanted = trim( strtolower( array_shift($orderAry) ) );
-			foreach( $dsPdfAry as $pIdx => $pAry ) {			// $pIdx may be 'PDF3' or 'PDF2_PDF-A', etc., $pAry may be array( 'doc_ver' => "Erratum", 'avail' => "intranet" )
-				if ( gettype($pAry) != "array" ) { continue; }
-				if ( substr($pIdx,-5) == "PDF-A" && stristr($pAry['avail'],"privat") ) { continue; }
-				if ( substr(strtolower($pAry['doc_ver']),0,strlen($wanted)) == $wanted ) { $dsesAry[$pIdx] = $dses[$pIdx]; }
+	if ( !empty( trim( implode("",$orderAry) ) ) && @isset($object['RELS-INT']) ) {		// safety check
+		$relsIntCode = $object['RELS-INT']->content;
+		if ( !empty($relsIntCode) ) {
+			$dsPdfAry = lib4ridora_get_embargo_data( $relsIntCode, array_keys($dses) );	// array_keys() for array( 0 => 'PDF', 1 => "PDF_PDF-A", 2 => "PDF...
+			$dsesAry = array();
+			while( sizeof($orderAry) ) {
+				$wanted = trim( strtolower( array_shift($orderAry) ) );
+				foreach( $dsPdfAry as $pIdx => $pAry ) {			// $pIdx may be 'PDF3' or 'PDF2_PDF-A', etc., $pAry may be array( 'doc_ver' => "Erratum", 'avail' => "intranet" )
+					if ( gettype($pAry) != "array" ) { continue; }
+					if ( substr($pIdx,-5) == "PDF-A" && stristr($pAry['avail'],"privat") ) { continue; }
+					if ( substr(strtolower($pAry['doc_ver']),0,strlen($wanted)) == $wanted ) { $dsesAry[$pIdx] = $dses[$pIdx]; }
+				}
 			}
+			return $dsesAry;
 		}
-		return $dsesAry;
 	}
 
   ksort($dses);
