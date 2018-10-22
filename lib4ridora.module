@@ -311,6 +311,9 @@ function lib4ridora_islandora_datastream_access($op, AbstractDatastream $datastr
  *   TRUE if the IP is in an allowed range; otherwise, FALSE.
  */
 function lib4ridora_check_ip($ip_address = NULL) {
+  if ( @isset($_GET['far-away']) ) {
+  	return FALSE;		// consider the intranet IP as failed, as a test/employee option to see how it looks like beyond intranet.
+  }
   if (!$ip_address) {
     $ip_address = ip_address();
   }

@@ -192,12 +192,13 @@ function lib4ridora_get_embargo_data( $relsIntCode, $dsPdfAry ) {		// $dsPdfAry 
  * Note: this function SHOULD BE also effective for 'Recent Additions' via lib4ridora-citation-solr-results.tpl.php / template_preprocess_lib4ridora_citation_solr_results() / template_preprocess_lib4ridora_pdf_materials(&$variables)
  */
 function lib4ridora_retrieve_filtered_pdfs(AbstractObject $object) {
-  module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+  module_load_include('inc', 'lib4ridora', 'includes/embargo.form');			// providing lib4ridora_multi_pdf_get_options()
   $dses = iterator_to_array($object);
   $dses = array_filter($dses, 'lib4ridora_multi_embargo_pdf_filter');		// function lib4ridora_multi_embargo_pdf_filter() in embargo.form.inc, just looking for DS beginning the 'PDF'
 
-	// 2018-10-17: get the desired order for PDFs (corresponding to possible 'document versions' in RELS-INT), see also Redmine-Issue #79.
-	$orderAry = explode(",", strtr( variable_get('lib4ridora_pdf_order','pub,acc,sup,err,uns') ,"/", "," ) );
+	// 2018-Oct-17: get the desired order for PDFs (corresponding to possible 'document versions' in RELS-INT), see also Redmine-Issue #79.
+	$lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options( TRUE /* true to get the PDF link order as required for Lib4RI */ );
+	$orderAry = explode(",", variable_get('lib4ridora_multi_pdf_link_order', implode( ", ", array_map( function($ver) { return strtok(ltrim($ver),' '); }, $lib4ridora_multi_pdf_options['document_version'] ) ) );
 	if ( !empty( trim( implode("",$orderAry) ) ) && @isset($object['RELS-INT']) ) {		// safety check
 		$relsIntCode = $object['RELS-INT']->content;
 		if ( !empty($relsIntCode) ) {
@@ -206,8 +207,8 @@ function lib4ridora_retrieve_filtered_pdfs(AbstractObject $object) {
 			while( sizeof($orderAry) ) {
 				$wanted = trim( strtolower( array_shift($orderAry) ) );
 				foreach( $dsPdfAry as $pIdx => $pAry ) {			// $pIdx may be 'PDF3' or 'PDF2_PDF-A', etc., $pAry may be array( 'doc_ver' => "Erratum", 'avail' => "intranet" )
-					if ( gettype($pAry) != "array" ) { continue; }
-					if ( substr($pIdx,-5) == "PDF-A" && stristr($pAry['avail'],"privat") ) { continue; }
+					if ( gettype($pAry) == "array" ) { continue; }
+					if ( substr($pIdx,-5) == "PDF-A" && stristr($pAry['avail'],"privat") ) { continue; /* skipping PDF/A files as long as they are set to private */ }
 					if ( substr(strtolower($pAry['doc_ver']),0,strlen($wanted)) == $wanted ) { $dsesAry[$pIdx] = $dses[$pIdx]; }
 				}
 			}

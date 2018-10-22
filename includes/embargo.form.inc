@@ -328,7 +328,7 @@ function lib4ridora_multi_pdf_get_options($sort = FALSE) {
     $document_versions = array(
       'published version' => t('Published Version'),
       'accepted version' => t('Accepted Version'),
-      'updated version' => t('Updated Version'),
+ /*   'updated version' => t('Updated Version'),		<== not needed anymore, see PDF_Fix_Order.pdf ( http://lib-dora-dev1.emp-eaw.ch:3000/issues/79 ) */
       'erratum' => t('Erratum'),
       'supplemental material' => t('Supplemental Material'),
       'unspecified' => t('Unspecified PDF'),
@@ -338,7 +338,7 @@ function lib4ridora_multi_pdf_get_options($sort = FALSE) {
     $document_versions = array(
       'accepted version' => t('Accepted Version'),
       'published version' => t('Published Version'),
-      'updated version' => t('Updated Version'),
+ /*   'updated version' => t('Updated Version'),		<== not needed anymore, see PDF_Fix_Order.pdf ( http://lib-dora-dev1.emp-eaw.ch:3000/issues/79 ) */
       'erratum' => t('Erratum'),
       'supplemental material' => t('Supplemental Material'),
       'unspecified' => t('Unspecified PDF'),
