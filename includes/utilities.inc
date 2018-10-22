@@ -179,15 +179,6 @@ function lib4ridora_get_embargo_data( $relsIntCode, $dsPdfAry ) {		// $dsPdfAry 
 	return $dataAry;		// array( 'PDF' => array( 'doc_ver' => "Published", 'avail' => "intranet"), 'PDF2' => array...
 }
 
-
-
-function lib4ridora_dpm_frank($info) {
-	global $user;
-	$username = $user->name;
-	if ( strtolower($username) == "frank" || strchr($_SERVER['HTTP_HOST'],"localhost") ) { dpm($info); }
-}
-
-
 /**
  * Retrieve PDFs.
  *

@@ -323,7 +323,7 @@ function lib4ridora_multi_pdf_defaults_properties() {
  * @return array
  *   An array containing the options used in the form.
  */
-function lib4ridora_multi_pdf_get_options($sort = FALSE) {
+function lib4ridora_multi_pdf_get_options($sort = TRUE) {
   if ($sort) {
     $document_versions = array(
       'published version' => t('Published Version'),
