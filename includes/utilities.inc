@@ -180,6 +180,14 @@ function lib4ridora_get_embargo_data( $relsIntCode, $dsPdfAry ) {		// $dsPdfAry 
 }
 
 
+
+function lib4ridora_dpm_frank($info) {
+	global $user;
+	$username = $user->name;
+	if ( strtolower($username) == "frank" || strchr($_SERVER['HTTP_HOST'],"localhost") ) { dpm($info); }
+}
+
+
 /**
  * Retrieve PDFs.
  *
@@ -207,21 +215,19 @@ function lib4ridora_retrieve_filtered_pdfs(AbstractObject $object) {
 			$dsPdfAry = lib4ridora_get_embargo_data( $relsIntCode, array_keys($dses) );	// array_keys() for array( 0 => 'PDF', 1 => "PDF_PDF-A", 2 => "PDF...
 			if ( sizeof($dses) == sizeof($dsPdfAry) ) {		// for safety
 				$rankAry = array();	// for all index of PDFs that have a version label that is inside our order list
-				$missAry = array();	// for all index of PDFs that have a version label that is not inside our order list
-				foreach( $dses as $eIdx => $eItem ) {
-					$is_ranked = false;
-					foreach( $orderAry as $oWanted ) {
-						$oWanted = trim( strtolower( $oWanted ) );
-						if ( substr(strtolower($dsPdfAry[$eIdx]['doc_ver']),0,strlen($oWanted)) == $oWanted ) {
-							$rankAry[] = $eIdx;
-							$is_ranked = true;
+				while( sizeof($orderAry) ) {
+					$wanted = trim( strtolower( array_shift($orderAry) ) );
+					foreach( $dsPdfAry as $pIdx => $pAry ) {			// $pIdx may be 'PDF3' or 'PDF2_PDF-A', etc., $pAry may be array( 'doc_ver' => "Erratum", 'avail' => "intranet" )
+						if ( gettype($pAry) == "array" && substr(strtolower($pAry['doc_ver']),0,strlen($wanted)) == $wanted ) {
+							$rankAry[$pIdx] = $pIdx;
 							break;
 						}
 					}
-					if ( !$is_ranked ) { $missAry[] = $eIdx; }
 				}
-				$rankAry = array_merge( $rankAry, $missAry );
-				if ( sizeof($dses) == sizeof($rankAry) ) {		// for safety
+				foreach( $dsPdfAry as $pIdx => $pAry ) {		// add PDFs possibly missed because they matched no item in the order list
+					if ( @!isset($rankAry[$pIdx]) ) { $rankAry[$pIdx] = $pIdx; }
+				}
+				if ( sizeof($dses) == sizeof($rankAry) ) {	// for safety
 					$dsesAry = array();
 					foreach( $rankAry as $pIdx ) {
 						if ( substr($pIdx,-5) == "PDF-A" && stristr($dsPdfAry[$pIdx]['avail'],"privat") ) { continue; /* skipping PDF/A files as long as they are set to private */ }
