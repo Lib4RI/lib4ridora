@@ -201,9 +201,6 @@ function lib4ridora_retrieve_filtered_pdfs(AbstractObject $object) {
 	$default_list = implode( ", ", array_map( function($ver) { return strtok(ltrim($ver),' '); }, $lib4ridora_multi_pdf_options['document_version'] ) );
 	$orderAry = explode(",", variable_get('lib4ridora_multi_pdf_link_order', /* 'Published, Accepted, Supplemental, Erratum, Unspecified' */ $default_list ) );
 
-
-
-
 	if ( !empty( trim( implode("",$orderAry) ) ) && @isset($object['RELS-INT']) ) {		// safety check
 		$relsIntCode = $object['RELS-INT']->content;
 		if ( !empty($relsIntCode) ) {
