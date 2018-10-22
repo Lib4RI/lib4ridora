@@ -198,21 +198,41 @@ function lib4ridora_retrieve_filtered_pdfs(AbstractObject $object) {
 
 	// 2018-Oct-17: get the desired order for PDFs (corresponding to possible 'document versions' in RELS-INT), see also Redmine-Issue #79.
 	$lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options( TRUE /* true to get the PDF link order as required for Lib4RI */ );
-	$orderAry = explode(",", variable_get('lib4ridora_multi_pdf_link_order', implode( ", ", array_map( function($ver) { return strtok(ltrim($ver),' '); }, $lib4ridora_multi_pdf_options['document_version'] ) ) );
+	$default_list = implode( ", ", array_map( function($ver) { return strtok(ltrim($ver),' '); }, $lib4ridora_multi_pdf_options['document_version'] ) );
+	$orderAry = explode(",", variable_get('lib4ridora_multi_pdf_link_order', /* 'Published, Accepted, Supplemental, Erratum, Unspecified' */ $default_list ) );
+
+
+
+
 	if ( !empty( trim( implode("",$orderAry) ) ) && @isset($object['RELS-INT']) ) {		// safety check
 		$relsIntCode = $object['RELS-INT']->content;
 		if ( !empty($relsIntCode) ) {
 			$dsPdfAry = lib4ridora_get_embargo_data( $relsIntCode, array_keys($dses) );	// array_keys() for array( 0 => 'PDF', 1 => "PDF_PDF-A", 2 => "PDF...
-			$dsesAry = array();
-			while( sizeof($orderAry) ) {
-				$wanted = trim( strtolower( array_shift($orderAry) ) );
-				foreach( $dsPdfAry as $pIdx => $pAry ) {			// $pIdx may be 'PDF3' or 'PDF2_PDF-A', etc., $pAry may be array( 'doc_ver' => "Erratum", 'avail' => "intranet" )
-					if ( gettype($pAry) == "array" ) { continue; }
-					if ( substr($pIdx,-5) == "PDF-A" && stristr($pAry['avail'],"privat") ) { continue; /* skipping PDF/A files as long as they are set to private */ }
-					if ( substr(strtolower($pAry['doc_ver']),0,strlen($wanted)) == $wanted ) { $dsesAry[$pIdx] = $dses[$pIdx]; }
+			if ( sizeof($dses) == sizeof($dsPdfAry) ) {		// for safety
+				$rankAry = array();	// for all index of PDFs that have a version label that is inside our order list
+				$missAry = array();	// for all index of PDFs that have a version label that is not inside our order list
+				foreach( $dses as $eIdx => $eItem ) {
+					$is_ranked = false;
+					foreach( $orderAry as $oWanted ) {
+						$oWanted = trim( strtolower( $oWanted ) );
+						if ( substr(strtolower($dsPdfAry[$eIdx]['doc_ver']),0,strlen($oWanted)) == $oWanted ) {
+							$rankAry[] = $eIdx;
+							$is_ranked = true;
+							break;
+						}
+					}
+					if ( !$is_ranked ) { $missAry[] = $eIdx; }
+				}
+				$rankAry = array_merge( $rankAry, $missAry );
+				if ( sizeof($dses) == sizeof($rankAry) ) {		// for safety
+					$dsesAry = array();
+					foreach( $rankAry as $pIdx ) {
+						if ( substr($pIdx,-5) == "PDF-A" && stristr($dsPdfAry[$pIdx]['avail'],"privat") ) { continue; /* skipping PDF/A files as long as they are set to private */ }
+						$dsesAry[$pIdx] = $dses[$pIdx];
+					}
+					return $dsesAry;
 				}
 			}
-			return $dsesAry;
 		}
 	}
 
