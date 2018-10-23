@@ -53,7 +53,7 @@ function lib4ridora_multi_embargo_pdf_filter(AbstractDatastream $datastream) {	/
     // skipping PDF/A file if its availability is set to private
     if ( substr($dsId,-5) != "PDF-A" ) { return TRUE; }
     $infoAry = lib4ridora_get_embargo_info($datastream);
-    return ( /* @!empty($infoAry['availability']) && */ !stristr($infoAry['availability'],"privat") );
+    return ( @!empty($infoAry['availability']) && !stristr($infoAry['availability'],"privat") );
   }
   return FALSE;
 }
