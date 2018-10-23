@@ -211,7 +211,7 @@ function lib4ridora_retrieve_filtered_pdfs(AbstractObject $object) {
 					foreach( $dsPdfAry as $pIdx => $pAry ) {			// $pIdx may be 'PDF3' or 'PDF2_PDF-A', etc., $pAry may be array( 'doc_ver' => "Erratum", 'avail' => "intranet" )
 						if ( gettype($pAry) == "array" && substr(strtolower($pAry['doc_ver']),0,strlen($wanted)) == $wanted ) {
 							$rankAry[$pIdx] = $pIdx;
-							break;
+					//		break;		// better do not, there may be more than one PDF all with the same document version.
 						}
 					}
 				}
@@ -220,10 +220,7 @@ function lib4ridora_retrieve_filtered_pdfs(AbstractObject $object) {
 				}
 				if ( sizeof($dses) == sizeof($rankAry) ) {	// for safety
 					$dsesAry = array();
-					foreach( $rankAry as $pIdx ) {
-						if ( substr($pIdx,-5) == "PDF-A" && stristr($dsPdfAry[$pIdx]['avail'],"privat") ) { continue; /* skipping PDF/A files as long as they are set to private */ }
-						$dsesAry[$pIdx] = $dses[$pIdx];
-					}
+					foreach( $rankAry as $pIdx ) { $dsesAry[$pIdx] = $dses[$pIdx]; }
 					return $dsesAry;
 				}
 			}

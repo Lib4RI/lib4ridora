@@ -312,7 +312,7 @@ function lib4ridora_islandora_datastream_access($op, AbstractDatastream $datastr
  */
 function lib4ridora_check_ip($ip_address = NULL) {
   if ( @isset($_GET['far-away']) ) {
-  	return FALSE;		// consider the intranet IP as failed, as a test/employee option to see how it looks like beyond intranet.
+  	return FALSE;		// consider the intranet IP check as failed, as an (test) option for employees and associated workers to see how it looks like beyond the intranet.
   }
   if (!$ip_address) {
     $ip_address = ip_address();
@@ -1516,7 +1516,7 @@ function lib4ridora_ir_citationCModel_islandora_object_ingested($object) {
  * Implements hook_islandora_datastream_modified().
  */
 function lib4ridora_islandora_datastream_modified($object, $datastream) {
-  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf') {
+  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf' && !substr(strval($datastream->id),-5) != "PDF-A" /* skipping PDF/A files at Lib4RI */ ) {
     module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
     module_load_include('inc', 'lib4ridora', 'includes/full_text');
     if (!isset($object['RELS-INT'])) {
@@ -1532,7 +1532,7 @@ function lib4ridora_islandora_datastream_modified($object, $datastream) {
  * Implements hook_islandora_datastream_ingested().
  */
 function lib4ridora_islandora_datastream_ingested($object, $datastream) {
-  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf') {
+  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf' && !substr(strval($datastream->id),-5) != "PDF-A" /* skipping PDF/A files at Lib4RI */ ) {
     module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
     module_load_include('inc', 'lib4ridora', 'includes/full_text');
     if (!isset($object['RELS-INT'])) {

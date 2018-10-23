@@ -44,8 +44,18 @@ function lib4ridora_multi_embargo_get_object($form_state) {
  *   the "lib4ridora_extra_pdf_datastream_prefix" Drupal variable; otherwise,
  *   FALSE.
  */
-function lib4ridora_multi_embargo_pdf_filter(AbstractDatastream $datastream) {
+function lib4ridora_multi_embargo_pdf_filter_all(AbstractDatastream $datastream) {		// original function, with '_all' attached onto its name.
   return $datastream->id == 'PDF' || strpos($datastream->id, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0;
+}
+function lib4ridora_multi_embargo_pdf_filter(AbstractDatastream $datastream) {	// modified version of the original function, now also excluding DS ending on 'PDF-A'. Mime-type check still skipped.
+  $dsId = strval( $datastream->id );
+  if ( $dsId == 'PDF' || strpos($dsId, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 ) {
+    // skipping PDF/A file if its availability is set to private
+    if ( substr($dsId,-5) != "PDF-A" ) { return TRUE; }
+    $infoAry = lib4ridora_get_embargo_info($datastream);
+    return ( /* @!empty($infoAry['availability']) && */ !stristr($infoAry['availability'],"privat") );
+  }
+  return FALSE;
 }
 
 /**
