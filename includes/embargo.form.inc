@@ -44,14 +44,23 @@ function lib4ridora_multi_embargo_get_object($form_state) {
  *   the "lib4ridora_extra_pdf_datastream_prefix" Drupal variable; otherwise,
  *   FALSE.
  */
-function lib4ridora_multi_embargo_pdf_filter_all(AbstractDatastream $datastream) {		// original function, with '_all' attached onto its name.
+function lib4ridora_multi_embargo_pdf_filter_soft(AbstractDatastream $datastream) {		// original function, with '_all' attached onto its name.
   return $datastream->id == 'PDF' || strpos($datastream->id, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0;
 }
+
 function lib4ridora_multi_embargo_pdf_filter(AbstractDatastream $datastream) {	// modified version of the original function, now also excluding DS ending on 'PDF-A'. Mime-type check still skipped.
   $dsId = strval( $datastream->id );
   if ( $dsId == 'PDF' || strpos($dsId, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 ) {
-    // skipping PDF/A file if its availability is set to private
+    return ( substr($dsId,-5) != "PDF-A" );
+  }
+  return FALSE;
+}
+
+function lib4ridora_multi_embargo_pdf_filter_hard(AbstractDatastream $datastream) {	// modified version of the original function, now also excluding DS ending on 'PDF-A'. Mime-type check still skipped.
+  $dsId = strval( $datastream->id );
+  if ( $dsId == 'PDF' || strpos($dsId, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 ) {
     if ( substr($dsId,-5) != "PDF-A" ) { return TRUE; }
+    // skipping PDF/A file if its availability is set to private
     $infoAry = lib4ridora_get_embargo_info($datastream);
     return ( @!empty($infoAry['availability']) && !stristr($infoAry['availability'],"privat") );
   }
@@ -93,7 +102,7 @@ function lib4ridora_multi_embargo_edit_form($form, &$form_state) {
   );
   $object = lib4ridora_multi_embargo_get_object($form_state);
   $datastreams = iterator_to_array($object);
-  $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter');
+  $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter_soft');
   lib4ridora_append_document_information($pdf_datastreams, $form);
   lib4ridora_append_romeo_information($form, $form_state);
   $form['actions'] = array(
@@ -649,8 +658,8 @@ function lib4ridora_update_datastream_relationships(AbstractDatastream $datastre
   }
   $filtered = array_intersect_key($values, lib4ridora_multi_pdf_defaults_properties());
   if (isset($filtered['embargo_date']) && $filtered['availability'] == 'date') {
-    $value = gmdate('Y-m-d\TH:i:s\Z', gmmktime(0, 0, 0, $filtered['embargo_date']['month'], $filtered['embargo_date']['day'], $filtered['embargo_date']['year']));
-    lib4ridora_set_relationships($datastream->relationships, LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('embargo_date'), $value, RELS_TYPE_DATETIME);
+    $date_value = gmdate('Y-m-d\TH:i:s\Z', gmmktime(0, 0, 0, $filtered['embargo_date']['month'], $filtered['embargo_date']['day'], $filtered['embargo_date']['year']));
+    lib4ridora_set_relationships($datastream->relationships, LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('embargo_date'), $date_value, RELS_TYPE_DATETIME);
   }
   else {
     $datastream->relationships->remove(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('embargo_date'));
