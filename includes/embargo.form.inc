@@ -225,7 +225,7 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
   if ($primary_file != 'PDF') {
     $datastreams = iterator_to_array($object);
     $pid = $object->id;
-    $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter');
+    $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter_soft');
     // Ask will about INT-374 in the AM.
     foreach ($pdf_datastreams as $dsid => $ds) {
       $content_uri = drupal_tempnam('temporary://', 'lib4ripdf');
