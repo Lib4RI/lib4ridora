@@ -9,7 +9,7 @@
  */
 function lib4ridora_admin(array $form, array &$form_state) {
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-  $textfield_size = 72;		// Default 60, but sometimes too short even for some Solr field names.
+  $textfield_size = 90;		// Default 60, but sometimes too short even for some text field values.
 
   $lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options( TRUE /* true to get the PDF link order as required for Lib4RI */ );
   $lib4ridora_multi_pdf_options_availability = $lib4ridora_multi_pdf_options['availability'];
