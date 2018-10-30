@@ -50,13 +50,6 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	    '#size' => 128,
 	  );
   }
-  $form['lib4ridora_author_solr_field'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Author PID Solr Field'),
-    '#default_value' => variable_get('lib4ridora_author_solr_field', 'mods_name_personal_nameIdentifier_authorId_ms'),
-    '#required' => TRUE,
-    '#size' => $textfield_size,
-  );
   $form['lib4ridora_author_fullname_solr_field'] = array(
     '#type' => 'textfield',
     '#title' => t('Author Full Name Solr Field'),
@@ -64,6 +57,21 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#default_value' => variable_get('lib4ridora_author_fullname_solr_field', 'MADS_fullname_ms'),
     '#required' => TRUE,
     '#size' => $textfield_size,
+  );
+  $form['lib4ridora_author_solr_field'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Author PID Solr Field'),
+    '#default_value' => variable_get('lib4ridora_author_solr_field', 'mods_name_personal_nameIdentifier_authorId_ms'),
+    '#required' => TRUE,
+    '#size' => $textfield_size,
+  );
+  $form['lib4ridora_mods_query_author_id'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Author MODS xpath query'),
+      '#description' => t(''),
+      '#default_value' => variable_get('lib4ridora_mods_query_author_id', 'mods:nameIdentifier[@type="authorId"]'),
+      '#required' => TRUE,
+      '#size' => $textfield_size,
   );
   $form['lib4ridora_issn_solr_field'] = array(
     '#type' => 'textfield',
@@ -211,13 +219,5 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	    '#size' => ( ( @isset($_GET['all']) || @isset($_GET['prepo']) ) ? 128 : $textfield_size ),
 	  );
   }
-  $form['lib4ridora_mods_query_author_id'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Author MODS xpath query'),
-      '#description' => t(''),
-      '#default_value' => variable_get('lib4ridora_mods_query_author_id', 'mods:nameIdentifier[@type="authorId"]'),
-      '#required' => TRUE,
-      '#size' => $textfield_size,
-  );
   return system_settings_form($form);
 }
