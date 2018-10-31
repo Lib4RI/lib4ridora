@@ -50,10 +50,10 @@ function template_preprocess_lib4ridora_pdf_link(&$variables) {
     else {
       // If user is logged in show the internal 'yellow' lock, otherwise use the
       // standard grey color.
-      $variables['span_classes_array'][] = user_is_logged_in() ? 'fa fa-lock yellow' : $variables['span_classes_array'][] = 'fa fa-lock';
+      $variables['span_classes_array'][] = user_is_logged_in() ? 'fa fa-lock yellow' : 'fa fa-lock';
     }
   }
-  elseif (user_is_logged_in() && $access != 'private') {
+  elseif (user_is_logged_in() && $access == 'intranet') {
     $variables['span_classes_array'][] = 'fa fa-lock yellow';
   }
   else {
@@ -66,7 +66,6 @@ function template_preprocess_lib4ridora_pdf_link(&$variables) {
  */
 function template_process_lib4ridora_pdf_link(&$variables) {
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-
   $values = $variables['pdf_link'];
   if ($variables['statement']) {
     $availability = $values['availability'];
