@@ -15,7 +15,8 @@ This module requires the following modules/libraries:
 
 ## Installation
 
-Install as usual, see [this](https://drupal.org/documentation/install/modules-themes/modules-7) for further information.
+Install as usual, see [this](https://drupal.org/documentation/install/modules-themes/modules-7) for further information.<br>
+There is also a Lib4RI specific [mini-HowTo for Github](https://github.com/Lib4RI/dora_github-mini-howto) related interactions.
 
 ## Usage
 

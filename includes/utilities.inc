@@ -145,6 +145,40 @@ function lib4ridora_get_factor_with_fallback(AbstractObject $object, $issued_yea
   return array($factor, $factor_year);
 }
 
+
+/*
+ * Function to return an array where the keys are the names of the PDF datastreams, and each key will carry an array with document-version and availability as defined in RELS-INT
+ *
+ */
+function lib4ridora_get_embargo_data( $relsIntCode, $dsPdfAry ) {		// $dsPdfAry may be: array( 'PDF2', 'PDF', 'PDF_PDF-A', 'PDF2_PDF-A' )
+
+	// very important: the array we are going to return must have as many key as there were items inside the input array!
+	$dataAry = array_flip($dsPdfAry);
+
+	// DOM/XML tweak (to help with minus signs and colons):
+	$repList = array( "rdf_" => "rdf:", "dora_lib4ri" => "dora:lib4ri", "_multi_embargo_" => "-multi-embargo-" );
+	foreach( $repList as $new => $orig ) { $relsIntCode = str_replace($orig,$new,$relsIntCode); }
+
+	$xmlObj = new SimpleXMLElement($relsIntCode);
+	
+	// now going through RELS-INT looking for information about the PDF datastreams:
+	foreach($xmlObj->rdf_Description as $dIdx => $dElem ) {
+		if ( $dsLink = @strval( $dElem->attributes()->rdf_about ) ) {		// someting like info:fedora/eawag:156/PDF"
+			$dsPos = empty($pid) ? (strrpos($dsLink,"/")+1) : (stripos($dsLink,$pid)+strlen($pid)+1);
+			$dsId = substr($dsLink,$dsPos);
+			foreach( $dsPdfAry as $dsPdfIdx => $dsPdfName ) {		// $dsName may be e.g. 'PDF2' or 'PDF_PDF-A'
+				if ( $dsPdfName == $dsId ) {
+					// remind, a replacement happened above, so do not use 'lib4ridora-multi-embargo-document_version' or 'lib4ridora-multi-embargo-availability' here!
+					$dataAry[$dsPdfName] = array( 'doc_ver' => strval($dElem->islandora_lib4ridora_multi_embargo_document_version), 'avail' => strval($dElem->islandora_lib4ridora_multi_embargo_availability) );
+					unset($dsPdfAry[$dsPdfIdx]);
+					break;
+				}
+			}
+		}
+	}
+	return $dataAry;		// array( 'PDF' => array( 'doc_ver' => "Published", 'avail' => "intranet"), 'PDF2' => array...
+}
+
 /**
  * Retrieve PDFs.
  *
@@ -153,11 +187,46 @@ function lib4ridora_get_factor_with_fallback(AbstractObject $object, $issued_yea
  *
  * @return array
  *   The listing of the PDFs on the object.
+ *
+ * Note: this function SHOULD BE also effective for 'Recent Additions' via lib4ridora-citation-solr-results.tpl.php / template_preprocess_lib4ridora_citation_solr_results() / template_preprocess_lib4ridora_pdf_materials(&$variables)
  */
 function lib4ridora_retrieve_filtered_pdfs(AbstractObject $object) {
-  module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+  module_load_include('inc', 'lib4ridora', 'includes/embargo.form');			// providing lib4ridora_multi_pdf_get_options()
   $dses = iterator_to_array($object);
-  $dses = array_filter($dses, 'lib4ridora_multi_embargo_pdf_filter');
+  $dses = array_filter($dses, 'lib4ridora_multi_embargo_pdf_filter');		// function lib4ridora_multi_embargo_pdf_filter() in embargo.form.inc, just looking for DS beginning the 'PDF'
+
+	// 2018-Oct-17: get the desired order for PDFs (corresponding to possible 'document versions' in RELS-INT), see also Redmine-Issue #79.
+	$lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options( TRUE /* true to get the PDF link order as required for Lib4RI */ );
+	$default_list = implode( ", ", array_map( function($ver) { return strtok(ltrim($ver),' '); }, $lib4ridora_multi_pdf_options['document_version'] ) );
+	$orderAry = explode(",", variable_get('lib4ridora_multi_pdf_link_order', /* 'Published, Accepted, Supplemental, Erratum, Unspecified' */ $default_list ) );
+
+	if ( !empty( trim( implode("",$orderAry) ) ) && @isset($object['RELS-INT']) ) {		// safety check
+		$relsIntCode = $object['RELS-INT']->content;
+		if ( !empty($relsIntCode) ) {
+			$dsPdfAry = lib4ridora_get_embargo_data( $relsIntCode, array_keys($dses) );	// array_keys() for array( 0 => 'PDF', 1 => "PDF_PDF-A", 2 => "PDF...
+			if ( sizeof($dses) == sizeof($dsPdfAry) ) {		// for safety
+				$rankAry = array();	// for all index of PDFs that have a version label that is inside our order list
+				while( sizeof($orderAry) ) {
+					$wanted = trim( strtolower( array_shift($orderAry) ) );
+					foreach( $dsPdfAry as $pIdx => $pAry ) {			// $pIdx may be 'PDF3' or 'PDF2_PDF-A', etc., $pAry may be array( 'doc_ver' => "Erratum", 'avail' => "intranet" )
+						if ( gettype($pAry) == "array" && substr(strtolower($pAry['doc_ver']),0,strlen($wanted)) == $wanted ) {
+							$rankAry[$pIdx] = $pIdx;
+					//		break;		// better do not, there may be more than one PDF all with the same document version.
+						}
+					}
+				}
+				foreach( $dsPdfAry as $pIdx => $pAry ) {		// add PDFs possibly missed because they matched no item in the order list
+					if ( @!isset($rankAry[$pIdx]) ) { $rankAry[$pIdx] = $pIdx; }
+				}
+				if ( sizeof($dses) == sizeof($rankAry) ) {	// for safety
+					$dsesAry = array();
+					foreach( $rankAry as $pIdx ) { $dsesAry[$pIdx] = $dses[$pIdx]; }
+					return $dsesAry;
+				}
+			}
+		}
+	}
+
   ksort($dses);
   return $dses;
 }
@@ -189,7 +258,7 @@ function lib4ridora_get_author_info(AbstractObject $object) {
     $info = array(
       'author' => array(
         'name' => $xpath->evaluate('normalize-space(concat(mods:namePart[@type="family"], ", ", mods:namePart[@type="given"]))', $person),
-        'id' => $xpath->evaluate('string(mods:nameIdentifier[@type="authorId"]/text())', $person),
+        'id' => $xpath->evaluate('string('.variable_get('lib4ridora_mods_query_author_id', 'mods:nameIdentifier[@type="authorId"]').'/text())', $person),
       ),
       'org' => array(
         'name' => $xpath->evaluate('normalize-space(mods:affiliation)', $person),
