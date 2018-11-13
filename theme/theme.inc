@@ -48,12 +48,12 @@ function template_preprocess_lib4ridora_pdf_link(&$variables) {
       $variables['span_classes_array'][] = 'fa fa-unlock-alt';
     }
     else {
-      // If user is logged in show the internal 'yellow' lock, otherwise use the
-      // standard grey color.
-      $variables['span_classes_array'][] = user_is_logged_in() ? 'fa fa-lock yellow' : 'fa fa-lock';
+      // If IP is internal show the 'yellow' lock, otherwise use the standard
+      // grey color.
+      $variables['span_classes_array'][] = lib4ridora_check_ip() ? 'fa fa-lock yellow' : 'fa fa-lock';
     }
   }
-  elseif (user_is_logged_in() && $access == 'intranet') {
+  elseif (lib4ridora_check_ip() && $access == 'intranet') {
     $variables['span_classes_array'][] = 'fa fa-lock yellow';
   }
   else {
