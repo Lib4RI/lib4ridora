@@ -46,6 +46,47 @@ The `lib4ridora_mods_pseudo_field` pseudo-field has been introduced to produce m
 
 The ability to associate Solr metadata configurations according to the MODS genre on `ir:citationCModel` objects has been facilitated via the menu path at `admin/islandora/solution_pack_config/lib4ridora/solr_metadata`.
 
+### Escaped HTML and plain-text in XML from `text_format` elements
+
+In order to facilitate the inclusion of markup in records, parallel to
+plain-text variants based on values provided from `text_format` elements, two
+element process functions have been implemented:
+
+* `_lib4ridora_target_text_format_to_fully_escaped`
+* `_lib4ridora_target_text_format_to_plain_text`
+
+When specified on an element (either programmatically, or in the XML Form
+Builder in the "More Advanced Controls" -> "Process" section on a given
+element), these elements will look for a
+`#user_data['lib4ridora_target_text_format']` value ("More Advanced Controls"
+-> "User Data", with the key `lib4ridora_target_text_format`) containing a JSON
+list of offsets within the form, indicating the location of a `text_format`
+element. We allow for the magic value `..` to be used at the beginning of such
+a set of offset, to permit targeting `text_format` elements in a relative
+fashion... only of particular import for recurring elements in
+`tabs`/`tabpanel` (or `fieldpanel`/`fieldpane`) implementations.
+
+Elements with these process functions _must_ occur later in document order than
+the elements they target; otherwise, they will not be able to lookup the target
+values in order to build their own.
+
+The expected patterns of use have been implemented in
+[an example form](xml/text_format_example.xml) (`lib4ridora example text_format
+form`). Effectively, this boils down to:
+* the `text_format` element targets the XML element made to contain the escaped
+  HTML in its  `read` XPath, to show the content when editing (or creating
+  using template XML).
+* a `hidden` element made to contain the plain-text via the
+  `_lib4ridora_target_text_format_to_plain_text` function, with `create`,
+  `read` and `update` XPaths (and `delete`, if relevant; no `read`), with
+  `#user_data['lib4ridora_target_text_format']` specified to point at the above
+  `text_format` element.
+* a `hidden` element made to contain the escaped HTML via the
+  `_lib4ridora_target_text_format_to_plain_text` function, with `create`,
+  `read` and `update` XPaths (and `delete`, if relevant), with
+  `#user_data['lib4ridora_target_text_format']` specified to point at the above
+  `text_format` element.
+
 ## Maintainers/Sponsors
 
 Current maintainers:
