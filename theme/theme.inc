@@ -32,15 +32,29 @@ function template_process_lib4ridora_pdf_materials(&$variables) {
  * Implements hook_preprocess_lib4ridora_pdf_link().
  */
 function template_preprocess_lib4ridora_pdf_link(&$variables) {
-  $ds = $variables['datastream'];
-  $values = lib4ridora_get_embargo_info($ds);
+  $values = lib4ridora_get_embargo_info($variables['datastream']);
+  $access = $values['availability'];
+
   $variables['pdf_link'] = $values;
-  $access = islandora_datastream_access(ISLANDORA_VIEW_OBJECTS, $variables['datastream']);
-  $variables['availability_classes'] = array(
-    'availability-text',
-  );
-  if ($access) {
+  $variables['availability_classes'] = array('availability-text');
+
+  if ($access == 'public') {
     $variables['span_classes_array'][] = 'fa fa-unlock-alt';
+  }
+  elseif ($access == 'date') {
+    $embargo = gmmktime(0, 0, 0, $values['embargo_date']['month'], $values['embargo_date']['day'], $values['embargo_date']['year']);
+
+    if (REQUEST_TIME > $embargo) {
+      $variables['span_classes_array'][] = 'fa fa-unlock-alt';
+    }
+    else {
+      // If IP is internal show the 'yellow' lock, otherwise use the standard
+      // grey color.
+      $variables['span_classes_array'][] = lib4ridora_check_ip() ? 'fa fa-lock yellow' : 'fa fa-lock';
+    }
+  }
+  elseif (lib4ridora_check_ip() && $access == 'intranet') {
+    $variables['span_classes_array'][] = 'fa fa-lock yellow';
   }
   else {
     $variables['span_classes_array'][] = 'fa fa-lock';
