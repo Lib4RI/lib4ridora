@@ -29,10 +29,12 @@ function lib4ridora_upload_form($form, &$form_state) {
     $files = array_merge($files, lib4ridora_get_uploaded_files(array('wrapper', 'upload'), $form_state));
   }
 
-  $button = end($form_state['clicked_button']['#parents']);
-  if ($button == 'remove') {
-    $selected = array_filter($form_state['values']['wrapper']['table_wrapper']['files']);
-    $files = array_values(array_diff_key($files, $selected));
+  if (isset($form_state['clicked_button']['#parents'])){
+      $button = end($form_state['clicked_button']['#parents']);
+      if ($button == 'remove') {
+        $selected = array_filter($form_state['values']['wrapper']['table_wrapper']['files']);
+        $files = array_values(array_diff_key($files, $selected));
+      }
   }
   $current_step = islandora_ingest_form_get_step($form_state);
   if (($current_step == 'lib4ridora_multi_pdf_upload' && $form_state['values']['next'] == t('Ingest') && !empty($files)) ||

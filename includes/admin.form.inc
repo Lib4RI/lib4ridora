@@ -9,11 +9,12 @@
  */
 function lib4ridora_admin(array $form, array &$form_state) {
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-  $lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options();
+  $textfield_size = 90;		// Default 60, but sometimes too short even for some text field values.
+
+  $lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options( TRUE /* true to get the PDF link order as required for Lib4RI */ );
   $lib4ridora_multi_pdf_options_availability = $lib4ridora_multi_pdf_options['availability'];
   $lib4ridora_multi_pdf_options_availability_exclude = array('date' => $lib4ridora_multi_pdf_options_availability['date']);
   $lib4ridora_multi_pdf_options_availability_effective = array_diff_key($lib4ridora_multi_pdf_options_availability, $lib4ridora_multi_pdf_options_availability_exclude);
-  $textfield_size = 72;		// Default 60, but sometimes too short even for some Solr field names.
   $form['lib4ridora_multi_pdf_defaults_property_availability'] = array(
     '#type' => 'select',
     '#title' => t('Default PDF availability at ingest'),
@@ -23,6 +24,14 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#multiple' => FALSE,
     '#required' => TRUE,
   );
+  $form['lib4ridora_multi_pdf_link_order'] = array(	/* according to http://lib-dora-dev1.emp-eaw.ch:3000/issues/79 : Updated, Published, Accepted, Supplemental, Erratum, Unspecified */
+    '#type' => 'textfield',
+    '#title' => t('Link order of PDF versions'),
+    '#default_value' => variable_get('lib4ridora_multi_pdf_link_order', implode( ", ", array_map( function($ver) { return strtok(ltrim($ver),' '); }, $lib4ridora_multi_pdf_options['document_version'] ) ) ),
+    '#description' => t("Comma separated list of PDF versions to define the order when displayed (case-insensitive, leading part is sufficient):<br>- " . implode( "<br>- ", $lib4ridora_multi_pdf_options['document_version'] ) . "<br>The 'Updated Version' has been removed to match the belongs of Lib4RI." ),
+    '#required' => FALSE,
+    '#size' => $textfield_size,
+  );
   $form['lib4ridora_restricted_datastreams'] = array(
     '#type' => 'textfield',
     '#title' => t('Restricted DSIDs'),
@@ -31,7 +40,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => FALSE,
     '#size' => $textfield_size,
   );
-  if ( @isset($_GET['all']) || @isset($_GET['intranet']) ) {		// Added by Frank. IP assignments configurable now, see lib4ridora.module, function lib4ridora_check_ip(), ...but no idea who originally assigned this IP ranges.
+  if ( @isset($_GET['all']) || @isset($_GET['ip']) ) {		// IP assignments for intranet, see lib4ridora.module, function lib4ridora_check_ip(). The origin is unknown, up-to-dateness not checked.
 	  $form['lib4ridora_ip_range_list'] = array(
 	    '#type' => 'textfield',
 	    '#title' => t('Intranet IP restriction'),
@@ -41,13 +50,6 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	    '#size' => 128,
 	  );
   }
-  $form['lib4ridora_author_solr_field'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Author PID Solr Field'),
-    '#default_value' => variable_get('lib4ridora_author_solr_field', 'mods_name_personal_nameIdentifier_authorId_ms'),
-    '#required' => TRUE,
-    '#size' => $textfield_size,
-  );
   $form['lib4ridora_author_fullname_solr_field'] = array(
     '#type' => 'textfield',
     '#title' => t('Author Full Name Solr Field'),
@@ -55,6 +57,21 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#default_value' => variable_get('lib4ridora_author_fullname_solr_field', 'MADS_fullname_ms'),
     '#required' => TRUE,
     '#size' => $textfield_size,
+  );
+  $form['lib4ridora_author_solr_field'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Author PID Solr Field'),
+    '#default_value' => variable_get('lib4ridora_author_solr_field', 'mods_name_personal_nameIdentifier_authorId_ms'),
+    '#required' => TRUE,
+    '#size' => $textfield_size,
+  );
+  $form['lib4ridora_mods_query_author_id'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Author MODS xpath query'),
+      '#description' => t(''),
+      '#default_value' => variable_get('lib4ridora_mods_query_author_id', 'mods:nameIdentifier[@type="authorId"]'),
+      '#required' => TRUE,
+      '#size' => $textfield_size,
   );
   $form['lib4ridora_issn_solr_field'] = array(
     '#type' => 'textfield',
@@ -102,7 +119,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => TRUE,
     '#size' => $textfield_size,
   );
-  if ( @isset($_GET['all']) || @isset($_GET['impact']) ) {		// Added by Frank. Even if we skip this configuration, the variable defaults will do what we need - until we reconfigure it.
+  if ( @isset($_GET['all']) || @isset($_GET['impact']) ) {			// Even if we skip this configuration, the variable defaults will do what we need - until reconfiguring it here.
 	  $form['lib4ridora_pseudo_solr_field_factor_failed'] = array(
 	    '#type' => 'textfield',
 	    '#title' => t('Journal Impact Factor failure term for export'),
@@ -152,6 +169,14 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => TRUE,
     '#size' => $textfield_size,
   );
+  $form['lib4ri_affiliation_author1_form_export_placeholder'] = array(		/*  for affiliation of the first author, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/14 */
+    '#type' => 'textfield',
+    '#title' => t("First Author's Affiliation Pseudo-Solr Field"),
+    '#description' => t("Placeholder where to put first author's affiliation in CSV/Ecxel exports. To be added as 'display field' at: /admin/islandora/search/islandora_solr/settings"),
+    '#default_value' => variable_get('lib4ri_affiliation_author1_form_export_placeholder','mods_name_personal_author_affiliation_1_placeholder_lib4ri'),
+    '#required' => FALSE,
+    '#size' => ( ( @isset($_GET['all']) || @isset($_GET['aa1']) ) ? 128 : $textfield_size ),
+  );
   $form['lib4ridora_solr_field_peer_review'] = array(
     '#type' => 'textfield',
     '#title' => t('Peer Review Solr Field'),
@@ -184,7 +209,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => TRUE,
     '#size' => $textfield_size,
   );
-  if ( @isset($_GET['all']) || @isset($_GET['prepo']) ) {		// Added by Frank. prepo ~= label prepositions
+  if ( @isset($_GET['all']) || @isset($_GET['prepo']) ) {			// 'prepo' ~= label prepositions, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/57
 	  $form['lib4ridora_solr_field_org_terms_1on1'] = array(
 	    '#type' => 'textfield',
 	    '#title' => t('Organizational unit name parts untouched'),
