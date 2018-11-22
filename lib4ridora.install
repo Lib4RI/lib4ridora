@@ -46,7 +46,7 @@ function lib4ridora_uninstall() {
     'lib4ridora_islandora_solr_metadata_mappings',
     'lib4ridora_citation_subtype_semantics',
     'lib4ridora_extra_pdf_datastream_prefix',
-    'lib4ridora_uploadable_extensions',
+    'lib4ridora_extra_pdfa_datastream_suffix',
     'lib4ridora_ip_range_list',
     'lib4ridora_pseudo_solr_field_factor_failed',
     'lib4ridora_pseudo_solr_field_factor_none_yet',

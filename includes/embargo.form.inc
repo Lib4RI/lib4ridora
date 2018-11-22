@@ -45,13 +45,14 @@ function lib4ridora_multi_embargo_get_object($form_state) {
  *   FALSE.
  */
 function lib4ridora_multi_embargo_pdf_filter_soft(AbstractDatastream $datastream) {		// original function, with '_all' attached onto its name.
-  return $datastream->id == 'PDF' || strpos($datastream->id, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0;
+  return ( $datastream->id == 'PDF' || strpos($datastream->id, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 );
 }
 
 function lib4ridora_multi_embargo_pdf_filter(AbstractDatastream $datastream) {	// modified version of the original function, now also excluding DS ending on 'PDF-A'. Mime-type check still skipped.
   $dsId = strval( $datastream->id );
   if ( $dsId == 'PDF' || strpos($dsId, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 ) {
-    return ( substr($dsId,-5) != "PDF-A" );
+    $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
+    return ( substr($dsId,0-strlen($pdfa_suffix)) != $pdfa_suffix );
   }
   return FALSE;
 }
@@ -59,7 +60,8 @@ function lib4ridora_multi_embargo_pdf_filter(AbstractDatastream $datastream) {	/
 function lib4ridora_multi_embargo_pdf_filter_hard(AbstractDatastream $datastream) {	// modified version of the original function, now also excluding DS ending on 'PDF-A'. Mime-type check still skipped.
   $dsId = strval( $datastream->id );
   if ( $dsId == 'PDF' || strpos($dsId, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 ) {
-    if ( substr($dsId,-5) != "PDF-A" ) { return TRUE; }
+    $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
+    if ( substr($dsId,0-strlen($pdfa_suffix)) != $pdfa_suffix ) { return TRUE; }
     // skipping PDF/A file if its availability is set to private
     $infoAry = lib4ridora_get_embargo_info($datastream);
     return ( @!empty($infoAry['availability']) && strtolower($infoAry['availability']) != strtolower(variable_get('lib4ri_pdfa_availability','private')) );
@@ -68,12 +70,23 @@ function lib4ridora_multi_embargo_pdf_filter_hard(AbstractDatastream $datastream
 }
 
 /*
+ * function to define what term is inserted into the DS label to mark a PDF/A datastream.
+ * Set up as own function so other modules easily can refer on this quite special/proprietary function.
+ */
+function lib4ridora_get_pdfa_label_insert() {
+  $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
+  return strtr(trim(strtr($pdfa_suffix,"/:>?<\\_*\".","      \r\n\n\t"))," \r\n\t","-_'.");
+}
+
+/*
  * function to define the label of the PDF/A datastreams
+ * Note: if we are going to download this file/ds, then this label will become the filename!
  */
 function lib4ridora_get_pdfa_label( $parent_filename, $parent_dsid = '', $is_final = TRUE ) {
   if ( $is_final ) {
     $pos = strrpos($parent_filename,".");
-      return ( substr($parent_filename,0,$pos+1) . "PDF-A" . substr($parent_filename,$pos) );
+    $label_insert = lib4ridora_get_pdfa_label_insert();
+    return ( substr($parent_filename,0,$pos) . ( empty($label_insert) ? '' : '.' ) . $pdfa_insert . substr($parent_filename,$pos) );
   }
   return ( "PDF/A of " . ( $parent_dsid != '' ? $parent_dsid." " : "" ) . "'" . $parent_filename . "'" );
 }
@@ -113,7 +126,7 @@ function lib4ridora_multi_embargo_edit_form($form, &$form_state) {
   );
   $object = lib4ridora_multi_embargo_get_object($form_state);
   $datastreams = iterator_to_array($object);
-  $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter');
+  $pdf_datastreams = array_filter( $datastreams, ( @isset($_GET['all']) ? 'lib4ridora_multi_embargo_pdf_filter_soft' : 'lib4ridora_multi_embargo_pdf_filter' ) );
   lib4ridora_append_document_information($pdf_datastreams, $form);
   lib4ridora_append_romeo_information($form, $form_state);
   $form['actions'] = array(
@@ -179,12 +192,13 @@ function lib4ridora_multi_embargo_form_submit(&$form, &$form_state) {
   }
 
 	$pdf_nr_suffix = 2;
+	$pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
 	foreach ($form_state['values']['files'] as $filename => $values) {
-		if ( substr($filename,-5) == "PDF-A" ) {
+		if ( substr($filename,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
 			continue;
 		}
 		// Construct the datastreams.
-		$dsid_new = "PDF";		// = variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF');
+		$dsid_new = variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF');
 		if ( $filename != $primary_file ) {
 			$dsid_new = format_string('@prefix@index', array(
 				'@prefix' => variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF'),
@@ -192,9 +206,9 @@ function lib4ridora_multi_embargo_form_submit(&$form, &$form_state) {
 			));
 			$pdf_nr_suffix++;
 		}
-		$dsid_pdfa = $filename . "_" . "PDF-A";		// old/current name of PDF/A darastream
+		$dsid_pdfa = $filename . $pdfa_suffix;		// old/current name of PDF/A darastream
 		if ( @isset($mapped_files[$dsid_pdfa]) ) {
-			$dsid_new_pdfa = $dsid_new . "_" . "PDF-A";		// new datastream name
+			$dsid_new_pdfa = $dsid_new . $pdfa_suffix;		// new datastream name
 			$datastream = $object->constructDatastream($dsid_new_pdfa, 'M');
 			$datastream->mimetype = $mapped_files[$dsid_pdfa]->filemime;
 			$datastream->label = lib4ridora_get_pdfa_label( $mapped_files[$filename]->filename, $dsid_new );		// by default $mapped_files[$filename]->filename is the original PDF filename
@@ -223,7 +237,7 @@ function lib4ridora_multi_embargo_form_submit(&$form, &$form_state) {
 function lib4ridora_multi_embargo_form_undo_submit(&$form, &$form_state) {
   $object = lib4ridora_multi_embargo_get_object($form_state);
   $datastreams = iterator_to_array($object);
-  $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter');
+  $pdf_datastreams = array_filter( $datastreams, ( @isset($_GET['all']) ? 'lib4ridora_multi_embargo_pdf_filter_soft' : 'lib4ridora_multi_embargo_pdf_filter' ) );
   foreach ($pdf_datastreams as $dsid => $ds) {
     foreach (lib4ridora_multi_pdf_defaults_properties() as $pred => $default) {
       $ds->relationships->remove(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate($pred));
@@ -249,8 +263,9 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 		// just update the RELS-INT, and copy over the document version to the PDF/A
 		foreach ($form_state['values']['files'] as $dsid => $values) {
 			lib4ridora_update_datastream_relationships($object[$dsid], $values);
-			if ( substr($dsid,-5) == "PDF-A" ) { continue; }
-			$dsid_pdfa = $dsid . "_" . "PDF-A";
+			$pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
+			if ( substr($dsid,0-strlen($pdfa_suffix)) == $pdfa_suffix ) { continue; }
+			$dsid_pdfa = $dsid . $pdfa_suffix;
 			if ( @isset($object[$dsid_pdfa]) ) {
 				$values_pdfa = $values; 	// $values is an array with the following indices: document_version | availability | embargo_date | use_permission
 				if ( $avail_custom = variable_get('lib4ri_pdfa_availability','private') ) {
@@ -265,7 +280,7 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 	$mapped_files = array();
 	$datastreams = iterator_to_array($object);
 	$pid = $object->id;
-	$pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter');
+	$pdf_datastreams = array_filter( $datastreams, ( @isset($_GET['all']) ? 'lib4ridora_multi_embargo_pdf_filter_soft' : 'lib4ridora_multi_embargo_pdf_filter' ) );
 
 	foreach ($pdf_datastreams as $dsid => $ds) {
 		$content_uri = drupal_tempnam('temporary://', 'lib4ripdf');
@@ -296,11 +311,12 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 	}
 
 	$pdf_nr_suffix = 2;
+	$pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
 	foreach ($form_state['values']['files'] as $filename => $values) {		// $filename is the DS Id
-		if ( substr($filename,-5) == "PDF-A" ) {
+		if ( substr($filename,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
 			continue;
 		}
-		$dsid_new = "PDF";		// = variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF');
+		$dsid_new = variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF');
 		if ( $filename != $primary_file ) {
 			$dsid_new = format_string('@prefix@index', array(
 				'@prefix' => variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF'),
@@ -309,9 +325,9 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 			$pdf_nr_suffix++;
 		}
 		// Construct the datastreams.
-		$dsid_pdfa = $filename . "_" . "PDF-A";		// old/current name of PDF/A darastream
+		$dsid_pdfa = $filename . $pdfa_suffix;		// old/current name of PDF/A darastream
 		if ( @isset($mapped_files[$dsid_pdfa]) ) {
-			$dsid_new_pdfa = $dsid_new . "_" . "PDF-A";		// new datastream name
+			$dsid_new_pdfa = $dsid_new . $pdfa_suffix;		// new datastream name
 			$datastream = $non_cached_object->constructDatastream($dsid_new_pdfa, 'M');
 			$datastream->mimetype = $mapped_files[$dsid_pdfa]['mime'];
 			$datastream->label = lib4ridora_get_pdfa_label( $mapped_files[$filename]['label'], $dsid_new );		// by default $mapped_files[$filename]['label'] is the original PDF filename
@@ -334,16 +350,33 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 	}
 }
 
-
 /**
  * Set a relationship.
+ * Add a relationship such that it is the only relationship with the given predicate for the given subject.
  *
- * Add a relationship such that it is the only relationship with the given
- * predicate for the given subject.
+ * Revised Nov-2018: Only set the new value if it not exisits or if it is not equal - this should reduce the amount of RELS-INT datastream notably,
+ * or at least - if we press update properties on the 'PDF Management' tab without any changes - now this will not produce additional/redundant RELS-INT versions.
+ * See also Redmine issue #80: http://lib-dora-dev1.emp-eaw.ch:3000/issues/80
  */
-function lib4ridora_set_relationships(FedoraRelationships $rels, $pred_uri, $pred, $object, $object_type = RELS_TYPE_URI) {
-  $rels->remove($pred_uri, $pred);
-  $rels->add($pred_uri, $pred, $object, $object_type);
+function lib4ridora_set_relationships(FedoraRelationships $rels, $pred_uri, $pred, $object_value, $object_type = RELS_TYPE_URI) {
+
+	$predAry = $rels->get( $pred_uri, $pred, NULL, TRUE );
+	$num_found = sizeof($predAry);
+	if ( $num_found > 1 ) {
+		// sanity tuning, only allow one - this case basically matches the original function.
+		$rels->remove($pred_uri, $pred);
+		$rels->add($pred_uri, $pred, $object_value, $object_type);
+		return;
+	}
+	// without sanity tuning (or then disabled) let's always take the last one (if a ds should have more than one entry for e.g. 'document_version'):
+	// note: as tested the format of embargo_date for $value_found is e.g. '2019-04-28T00:00:00Z', and $object_value has the same format (luckily).
+	$value_found = @$predAry[($num_found-1)]['object']['value'];
+	if ( $num_found < 1 || $object_value != $value_found ) {
+		if ( $num_found > 0 ) {
+			$rels->remove($pred_uri, $pred);
+		}
+		$rels->add($pred_uri, $pred, $object_value, $object_type);
+	}
 }
 
 /**
@@ -686,6 +719,26 @@ function lib4ridora_get_primary_file_for_datastream_info($info) {
 }
 
 /**
+ * Compose the string how the embargo date is saved in the RELS-INT of Lib4RI.
+ * Outsourced from lib4ridora_update_datastream_relationships() so other modules easier can access this special/ustomized string format.
+ *
+ * @param array $date_array
+ *   An associative array containing keys 'year', 'month' and 'day'.
+ *
+ * @return string
+ *   Date string (as used in RELS-INT datastream).
+ */
+function lib4ridora_get_embargo_date_string( $date_array, $treat_empty_array = FALSE ) {
+	if ( gettype($date_array) == "string" ) {
+		return $date_array;	// already a string!(?)
+	}
+	if ( !$treat_empty_array && !sizeof($date_array) ) {
+		return "";		// $date_array may be empty e.g. right after ingesting without an embargo date (then the formating below would return '1999-11-30T00:00:00Z').
+	}
+	return gmdate('Y-m-d\TH:i:s\Z', gmmktime(0, 0, 0, @$date_array['month'], @$date_array['day'], @$date_array['year']));
+}
+
+/**
  * Updates datastream relationships.
  *
  * @param AbstractDatastream $datastream
@@ -703,21 +756,26 @@ function lib4ridora_update_datastream_relationships(AbstractDatastream $datastre
     $non_cached_object = islandora_object_load($pid);
     $datastream = $non_cached_object[$dsid];
   }
+
   $filtered = array_intersect_key($values, lib4ridora_multi_pdf_defaults_properties());
+  $pred_full = lib4ridora_multi_embargo_build_predicate('embargo_date');
   if (isset($filtered['embargo_date']) && $filtered['availability'] == 'date') {
-    $date_value = gmdate('Y-m-d\TH:i:s\Z', gmmktime(0, 0, 0, $filtered['embargo_date']['month'], $filtered['embargo_date']['day'], $filtered['embargo_date']['year']));
-    lib4ridora_set_relationships($datastream->relationships, LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('embargo_date'), $date_value, RELS_TYPE_DATETIME);
+    $date_value = lib4ridora_get_embargo_date_string( $filtered['embargo_date'] );
+    lib4ridora_set_relationships($datastream->relationships, LIB4RIDORA_RELS_URI, $pred_full, $date_value, RELS_TYPE_DATETIME);
   }
-  else {
-    $datastream->relationships->remove(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('embargo_date'));
+  elseif ( $datastream->relationships->get(LIB4RIDORA_RELS_URI, $pred_full) !== NULL ) {
+    $datastream->relationships->remove(LIB4RIDORA_RELS_URI, $pred_full);
   }
+
   unset($filtered['embargo_date']);
   foreach ($filtered as $pred => $value) {
+    $pred_full = lib4ridora_multi_embargo_build_predicate($pred);
     if (!empty($value)) {
-      lib4ridora_set_relationships($datastream->relationships, LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate($pred), $value, RELS_TYPE_PLAIN_LITERAL);
+     lib4ridora_set_relationships($datastream->relationships, LIB4RIDORA_RELS_URI, $pred_full, $value, RELS_TYPE_PLAIN_LITERAL);
     }
-    else {
-      $datastream->relationships->remove(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate($pred));
+    elseif ( $datastream->relationships->get(LIB4RIDORA_RELS_URI,$pred_full) !== NULL ) {
+      $datastream->relationships->remove(LIB4RIDORA_RELS_URI,$pred_full);
     }
   }
 }
+
