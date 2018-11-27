@@ -162,11 +162,14 @@ function lib4ridora_multi_embargo_edit_form($form, &$form_state) {
  *   - document_version
  *   - use_permission
  */
-function lib4ridora_get_embargo_info(AbstractDatastream $datastream) {
+function lib4ridora_get_embargo_info(AbstractDatastream $datastream, $keep_defaults = TRUE ) {
   // Add in defaults.
   $to_return = lib4ridora_multi_pdf_defaults_properties();
 
   foreach ($to_return as $pred => $default) {
+    if ( !$keep_defaults ) {
+    	$to_return[$pred] = NULL;
+    }
     $value = $datastream->relationships->get(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate($pred));
     // Should be at most one value... Just get it.
     $value = reset($value);
@@ -179,7 +182,7 @@ function lib4ridora_get_embargo_info(AbstractDatastream $datastream) {
         )));
       }
       else {
-        $to_return[$pred] = $value['object']['value'];
+        $to_return[$pred] = $value['object']['value'];				// 'object' + 'value' are some predefined 'sub-keys' of RELS-INT
       }
     }
   }
@@ -194,6 +197,7 @@ function lib4ridora_multi_embargo_form_submit(&$form, &$form_state) {
 
 	$step_storage = islandora_ingest_form_get_step_storage($form_state, 'lib4ridora_multi_pdf_upload');
 	$object = lib4ridora_multi_embargo_get_object($form_state);
+	$pid = $object->id;
 	$primary_file = lib4ridora_get_primary_file_for_datastream($form_state);
 	$file_info = $step_storage['files'];
 	// The files are keyed in the values by uuid for fieldset uniqueness for
@@ -202,9 +206,9 @@ function lib4ridora_multi_embargo_form_submit(&$form, &$form_state) {
 	foreach ($file_info as $file) {
 		$mapped_files[$file->uuid] = $file;
 	}
-
 	$pdf_nr_suffix = 2;
 	$pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
+    $object->relationships->autoCommit = FALSE;		// part 1/2, will need commitRelationships() !
 	foreach ($form_state['values']['files'] as $filename => $values) {
 		if ( substr($filename,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
 			continue;
@@ -221,7 +225,7 @@ function lib4ridora_multi_embargo_form_submit(&$form, &$form_state) {
 		$dsid_pdfa = $filename . $pdfa_suffix;		// old/current name of PDF/A darastream
 		if ( @isset($mapped_files[$dsid_pdfa]) ) {
 			$dsid_new_pdfa = $dsid_new . $pdfa_suffix;		// new datastream name
-			$datastream = $object->constructDatastream($dsid_new_pdfa, 'M');
+			$datastream = /* ( @isset($mapped_files[$dsid_new_pdfa]) ) ? $mapped_files[$dsid_new_pdfa] : */ $object->constructDatastream($dsid_new_pdfa, 'M');
 			$datastream->mimetype = $mapped_files[$dsid_pdfa]->filemime;
 			$datastream->label = lib4ridora_get_pdfa_label( $mapped_files[$filename]->filename, $dsid_new );		// by default $mapped_files[$filename]->filename is the original PDF filename
 			$datastream->setContentFromFile($mapped_files[$dsid_pdfa]->uri, FALSE);
@@ -239,6 +243,7 @@ function lib4ridora_multi_embargo_form_submit(&$form, &$form_state) {
 		$object->ingestDatastream($datastream);
 		lib4ridora_update_datastream_relationships($object[$dsid_new], $values);
 	}
+    $object->relationships->commitRelationships();		// part 2/2
 }
 
 /**
@@ -259,6 +264,28 @@ function lib4ridora_multi_embargo_form_undo_submit(&$form, &$form_state) {
 }
 
 /**
+ * function to instantly set open access or restricted
+ *
+function lib4ridora_handle_open_access( $pid, $chk ) {
+    module_load_include('inc', 'lib4ridora', 'includes/full_text');
+	$tuque = islandora_get_tuque_connection();
+	$tuque->cache->delete($pid);
+	$obj = islandora_object_load($pid);
+	lib4ridora_update_full_text( $obj, TRUE );
+}
+ */
+
+/**
+ * function to compose a warning if the set embargo date in the past.
+ */
+function lib4ridora_get_note_embargo_date_passed( $embargo_date_unix, $ds_label ) {
+	$msg_new = "<font color='red'>WARNING</font>: ";
+	$msg_new .= "The current <b>embargo date</b> (currently '" . gmdate("Y-m-d", $embargo_date_unix ) . "') for '<b>" . $ds_label . "</b>' should be in the future!<br>";
+	$msg_new .= "Please recheck it or set the availability to 'public', otherwise this PDF will be available for everybody soon after midnight! <br>\n";
+	return $msg_new;
+}
+
+/**
  * Submit handler for the edit multi-PDF form.
  *
  * @param array $form
@@ -266,34 +293,62 @@ function lib4ridora_multi_embargo_form_undo_submit(&$form, &$form_state) {
  * @param array $form_state
  *   An array containing the Drupal form state.
  */
-
 function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 
+	date_default_timezone_set('GMT');
 	$object = lib4ridora_multi_embargo_get_object($form_state);
+	$pid = $object->id;
 	$primary_file = lib4ridora_get_primary_file_for_datastream($form_state);
 	$pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
+	$error_msg_ary = array();
 
 	if ( $primary_file == 'PDF' ) {
 		// just update the RELS-INT, and copy over the document version to its PDF/A
+	    $object->relationships->autoCommit = FALSE;		// part 1/2, will need commitRelationships() !
 		foreach ($form_state['values']['files'] as $dsid => $values) {
 			lib4ridora_update_datastream_relationships($object[$dsid], $values);
 			if ( substr($dsid,0-strlen($pdfa_suffix)) != $pdfa_suffix ) {
+				// Error message for embargo date in the past:
+				if ( $values['availability'] == "date" ) {
+					if ( $embargo_date_string = lib4ridora_get_embargo_date_string($values['embargo_date']) ) {
+						$embargo_date_unix = strtotime($embargo_date_string);		// working but unpretty, to be tuned
+						if ( $embargo_date_unix < time() ) { $error_msg .= lib4ridora_get_note_embargo_date_passed( $embargo_date_unix, $object[$dsid]->label ); }
+					}
+				}
 				$dsid_pdfa = $dsid . $pdfa_suffix;
 				if ( @isset($object[$dsid_pdfa]) ) {
 					$values_pdfa = $values; 	// $values is an array with the following indices: document_version | availability | embargo_date | use_permission
+					// Set Lib4RI's default availability for PDF/A:
 					if ( $avail_custom = variable_get('lib4ri_pdfa_availability','private') ) {
 						if ( strlen($avail_custom) > 1 ) { $values_pdfa['availability'] = $avail_custom; }
+					}
+					// If somebody removed the embargo date manually (when edited in PDF Management) then remove it from RELS-INT too:
+					if ( $values['availability'] != "date" || empty(lib4ridora_get_embargo_date_string($values['embargo_date'])) ) {
+						$pred_full = lib4ridora_multi_embargo_build_predicate('embargo_date');
+					//	$valueAry = $object[$dsid_pdfa]->relationships->get(LIB4RIDORA_RELS_URI,$pred_full);		// note: here it can be $valueAry[0]['object']['value']
+					// TAKE CARE, here the structure can be $valueAry[#]['object']['value'] or just $valueAry['object']['value'] !
+						$infoAry = lib4ridora_get_embargo_info($object[$dsid_pdfa],FALSE);
+						if ( !empty(lib4ridora_get_embargo_date_string($infoAry['embargo_date'])) ) {
+							$object[$dsid_pdfa]->relationships->remove(LIB4RIDORA_RELS_URI,$pred_full);
+						}
+						if ( @isset($values_pdfa['embargo_date']) ) { unset($values_pdfa['embargo_date']); }
 					}
 					lib4ridora_update_datastream_relationships($object[$dsid_pdfa], $values_pdfa);
 				}
 			}
 		}
-		return;
+	    $object->relationships->commitRelationships();		// part 2/2
+
+		// If all datastreams keep their names/IDs, then islandora_derivative_logging() won't produce an update massage (about now/other derivatives), let's create an own one:
+		if ( $error_msg != "" ) { drupal_set_message( trim($error_msg), 'warning' ); }
+		else { drupal_set_message(t('Derivatives successfully <a href="./datastream/RELS-INT/version/0/view">updated</a>.'), 'status'); }
+
+ 		return;
 	}
 
+	$non_cached_object = $object;		// aux, will be replaced.
 	$mapped_files = array();
 	$datastreams = iterator_to_array($object);
-	$pid = $object->id;
 
 	$pdf_datastreams = array_filter( $datastreams, 'lib4ridora_multi_embargo_pdf_filter_soft' );		// soft! - do the following PDF and PDF/A as well!
 	foreach ($pdf_datastreams as $dsid => $ds) {
@@ -324,6 +379,7 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 		}
 	}
 
+    $non_cached_object->relationships->autoCommit = FALSE;		// part 1/2, will need commitRelationships() !
 	$pdf_nr_suffix = 2;
 	foreach ($form_state['values']['files'] as $filename => $values) {		// $filename is the DS Id
 		if ( substr($filename,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
@@ -337,6 +393,13 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 			));
 			$pdf_nr_suffix++;
 		}
+		// Error message for embargo date in the past:
+		if ( $values['availability'] == "date" ) {
+			if ( $embargo_date_string = lib4ridora_get_embargo_date_string($values['embargo_date']) ) {
+				$embargo_date_unix = strtotime($embargo_date_string);		// working but unpretty, to be tuned
+				if ( $embargo_date_unix < time() ) { $error_msg .= lib4ridora_get_note_embargo_date_passed( $embargo_date_unix, $non_cached_object[$filename]->label ); }
+			}
+		}
 		// Construct the datastreams.
 		$dsid_pdfa = $filename . $pdfa_suffix;		// old/current name of PDF/A darastream
 		if ( @isset($mapped_files[$dsid_pdfa]) ) {
@@ -347,9 +410,22 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 			$datastream->setContentFromFile($mapped_files[$dsid_pdfa]['content'], FALSE);
 			$non_cached_object->ingestDatastream($datastream);
 			file_unmanaged_delete($mapped_files[$dsid_pdfa]['content']);
+
 			$values_pdfa = $values; 	// $values is an array with the following indices: document_version | availability | embargo_date | use_permission
+			// Set Lib4RI's default availability for PDF/A:
 			if ( $avail_custom = variable_get('lib4ri_pdfa_availability','private') ) {
 				if ( strlen($avail_custom) > 1 ) { $values_pdfa['availability'] = $avail_custom; }
+			}
+			// If somebody removed the embargo date manually (when edited in PDF Management) then remove it from its PDF/A in RELS-INT too:
+			if ( $values['availability'] != "date" || empty(lib4ridora_get_embargo_date_string($values['embargo_date'])) ) {
+				$pred_full = lib4ridora_multi_embargo_build_predicate('embargo_date');
+			//	$valueAry = $non_cached_object[$dsid_new_pdfa]->relationships->get(LIB4RIDORA_RELS_URI,$pred_full);		// note: here it can be $valueAry[0]['object']['value']
+			// TAKE CARE, here the structure can be $valueAry[#]['object']['value'] or just $valueAry['object']['value'] !
+				$infoAry = lib4ridora_get_embargo_info($non_cached_object[$dsid_new_pdfa],FALSE);
+				if ( !empty(lib4ridora_get_embargo_date_string($infoAry['embargo_date'])) ) {
+					$non_cached_object[$dsid_new_pdfa]->relationships->remove(LIB4RIDORA_RELS_URI,$pred_full);
+				}
+				if ( @isset($values_pdfa['embargo_date']) ) { unset($values_pdfa['embargo_date']); }
 			}
 			lib4ridora_update_datastream_relationships($non_cached_object[$dsid_new_pdfa], $values_pdfa);
 		}
@@ -361,6 +437,11 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 		file_unmanaged_delete($mapped_files[$filename]['content']);
 		lib4ridora_update_datastream_relationships($non_cached_object[$dsid_new], $values);
 	}
+    $non_cached_object->relationships->commitRelationships();		// part 2/2
+
+	// If all datastreams keep their names/IDs, then islandora_derivative_logging() won't produce an update massage (about now/other derivatives), let's create an own one:
+	if ( $error_msg != "" ) { drupal_set_message( trim($error_msg), 'warning' ); }
+	else { drupal_set_message(t('Derivatives successfully <a href="./datastream/RELS-INT/version/0/view">updated</a>.'), 'status'); }
 }
 
 /**
@@ -492,11 +573,12 @@ function lib4ridora_append_document_information($files, &$form ) {
   $type_file = reset($files);
   $edit = ( $type_file instanceof IslandoraFedoraDatastream );
   $options = lib4ridora_multi_pdf_get_options();
-  $auto_pdfa = variable_get('lib4ri_pdfa_auto_managed',TRUE);
+  $skip_pdfa = ( variable_get('lib4ri_pdfa_auto_managed',TRUE) && ( !$edit || @!isset($_GET['all']) ) );
   $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
   foreach ($files as $file) {
     $uuid = $edit ? $file->id : $file->uuid;
-    if ( $auto_pdfa && substr($uuid,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
+    // check if we need to skip PDF/A:
+    if ( $skip_pdfa && substr($uuid,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
       continue;
     }
     $defaults = $edit ? lib4ridora_get_embargo_info($file) : lib4ridora_multi_pdf_defaults_properties();
@@ -547,7 +629,7 @@ function lib4ridora_append_document_information($files, &$form ) {
     // Tricky situation if the original PDF has an embargo date (and so the PDF/A will get it too), however
     // we have decided that the PDF/A shell get the availablility 'private' to be hidden from public access.
     // For the time being let's leave a hint about this issue (if the user wants to treat PDF/As here).
-    if ( $edit && !$auto_pdfa && substr($uuid,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
+    if ( !$skip_pdfa && substr($uuid,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
       if ( empty(lib4ridora_get_embargo_date_string($defaults['embargo_date'])) ) {
         $form['files'][$uuid]['embargo_date']['#title'] .= " (so far unassigned, hence can be ignored)";
       } else {
@@ -783,20 +865,16 @@ function lib4ridora_update_datastream_relationships(AbstractDatastream $datastre
     $datastream = $non_cached_object[$dsid];
   }
 
+  $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
   $filtered = array_intersect_key($values, lib4ridora_multi_pdf_defaults_properties());
-  $pred_full = lib4ridora_multi_embargo_build_predicate('embargo_date');
-  if (isset($filtered['embargo_date']) && $filtered['availability'] == 'date') {
-    $date_value = lib4ridora_get_embargo_date_string( $filtered['embargo_date'] );
-    lib4ridora_set_relationships($datastream->relationships, LIB4RIDORA_RELS_URI, $pred_full, $date_value, RELS_TYPE_DATETIME);
-  }
-  elseif ( $datastream->relationships->get(LIB4RIDORA_RELS_URI, $pred_full) !== NULL ) {
-    $datastream->relationships->remove(LIB4RIDORA_RELS_URI, $pred_full);
-  }
-
-  unset($filtered['embargo_date']);
   foreach ($filtered as $pred => $value) {
     $pred_full = lib4ridora_multi_embargo_build_predicate($pred);
-    if (!empty($value)) {
+    if ( $pred == 'embargo_date' && ( $filtered['availability'] == 'date' || 
+    ( substr($datastream->id,0-strlen($pdfa_suffix)) == $pdfa_suffix && strtolower($filtered['availability']) == strtolower(variable_get('lib4ri_pdfa_availability','private')) ) ) ) {
+      $date_value = lib4ridora_get_embargo_date_string($value);
+      lib4ridora_set_relationships($datastream->relationships, LIB4RIDORA_RELS_URI, $pred_full, $date_value, RELS_TYPE_DATETIME);
+    }
+    else if ( $pred != 'embargo_date' && !empty($value)) {
      lib4ridora_set_relationships($datastream->relationships, LIB4RIDORA_RELS_URI, $pred_full, $value, RELS_TYPE_PLAIN_LITERAL);
     }
     elseif ( $datastream->relationships->get(LIB4RIDORA_RELS_URI,$pred_full) !== NULL ) {
