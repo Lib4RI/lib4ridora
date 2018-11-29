@@ -606,7 +606,7 @@ function lib4ridora_form_islandora_ingest_form_alter(&$form, &$form_state) {
     module_load_include('inc', 'lib4ridora', 'includes/citation.subtypes');
     $citation_map = lib4ridora_get_citation_mapping_info();
     $publication_type_name = $citation_map[$lib4ridora_association_step_storage['ingest_selector']]['name'];
-    if (in_array($publication_type_name, $form['publication_type']['#options'])){
+    if ( @in_array($publication_type_name, $form['publication_type']['#options'] )){	// index '#options' may not exist sometimes! And since it's an array, it also could be empty!(?)
       $form['publication_type']['#default_value'] = $publication_type_name;
       $form['publication_type']['#disabled'] = TRUE;
     }

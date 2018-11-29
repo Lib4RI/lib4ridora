@@ -69,7 +69,28 @@ function lib4ridora_multi_embargo_pdf_filter_hard(AbstractDatastream $datastream
   return FALSE;
 }
 
-/*
+/**
+ * function to sort the PDF datastreams in order to get/keep PDF and its PDF/A together
+ */
+function lib4ridora_ds_pdf_sort( $pdf_datastreams, $try_dsid = TRUE ) {
+  $pdf_sorted = array();
+  foreach ($pdf_datastreams as $pdf_dsid => $pdf_datastream ) {
+  	$dsid_tmp = ( !$try_dsid || @empty($pdf_datastream->id) ) ? strval($pdf_dsid) : strval($pdf_datastream->id);
+	if ( strlen($dsid_tmp) < 3 || substr($dsid_tmp,3,1) == "_" ) {
+	  $dsid_tmp = ( str_pad(substr($dsid_tmp,0,3),4,"!") . substr($dsid_tmp,3) );		// just to get e.g. 'PDF_PDF-A' above 'PDF2'.
+	}
+	$pdf_sorted[$dsid_tmp] = array( $pdf_dsid, $pdf_datastream );
+  }
+  ksort($pdf_sorted);
+  unset($pdf_datastreams);
+  $pdf_datastreams = array();
+  foreach ($pdf_sorted as $pdf_ds_ary ) {
+	$pdf_datastreams[$pdf_ds_ary[0]] = $pdf_ds_ary[1];
+  }
+  return $pdf_datastreams;
+}
+
+/**
  * function to define what term is inserted into the DS label to mark a PDF/A datastream (by default just 'PDF-A).
  * Set up as own function so other modules could easily refer on this quite special/proprietary function.
  */
@@ -78,7 +99,7 @@ function lib4ridora_get_pdfa_label_insert() {
   return strtr(trim(strtr($pdfa_suffix,"/:>?<\\_*\".","      \r\n\n\t"))," \r\n\t","-_'.");
 }
 
-/*
+/**
  * function to define the label of the PDF/A datastreams
  * Note: if we are going to download this file/ds, then this label will become the filename,
  * that's also why $label_pdf_orig is usually a filename (or a term we can use as a filename).
@@ -575,7 +596,10 @@ function lib4ridora_append_document_information($files, &$form ) {
   $options = lib4ridora_multi_pdf_get_options();
   $skip_pdfa = ( variable_get('lib4ri_pdfa_auto_managed',TRUE) && ( !$edit || @!isset($_GET['all']) ) );
   $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
-  foreach ($files as $file) {
+  if ( sizeof($files) > 1 ) {
+	$files = lib4ridora_ds_pdf_sort( $files );
+  }
+  foreach ($files as $fIdx => $file) {
     $uuid = $edit ? $file->id : $file->uuid;
     // check if we need to skip PDF/A:
     if ( $skip_pdfa && substr($uuid,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
@@ -586,7 +610,7 @@ function lib4ridora_append_document_information($files, &$form ) {
     $form['files'][$uuid] = array(
       '#type' => 'fieldset',
       '#title' => t('@filename', array(
-        '@filename' => $filename,
+        '@filename' => ( ( $fIdx == '' ) ? $filename : "{$fIdx} : {$filename}" ),
       )),
       'document_version' => array(
         '#type' => 'select',

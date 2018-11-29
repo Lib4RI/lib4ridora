@@ -31,6 +31,9 @@ function lib4ridora_list_pdfs(AbstractObject $object) {
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
   $datastreams = iterator_to_array($object);
   $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter_soft');
+  if ( sizeof($pdf_datastreams) > 1 ) {
+	$pdf_datastreams = lib4ridora_ds_pdf_sort( $pdf_datastreams );
+  }
   $options = lib4ridora_multi_pdf_get_options();
   $get_option = function ($name, $info, $default = NULL) use ($options) {
     return isset($options[$name][$info[$name]]) ?
