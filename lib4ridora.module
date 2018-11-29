@@ -156,6 +156,9 @@ function lib4ridora_islandora_xml_form_builder_forms() {
     LIB4RIDORA_CITATION_FORM => array(
       'form_file' => "$module_path/xml/citation_mods_form.xml",
     ),
+    'lib4ridora example text_format form' => array(
+      'form_file' => "$module_path/xml/text_format_example.xml",
+    ),
   );
 
   module_load_include('inc', 'lib4ridora', 'includes/citation.subtypes');
@@ -1793,4 +1796,43 @@ function lib4ridora_authority_hidden_validate($element, &$form_state, $form) {
       }
     }
   }
+}
+
+/**
+ * Element process callback; fetch target markup.
+ *
+ * @see _lib4ridora_target_text_format_fetch_markup()
+ * @see _lib4ridora_target_text_format_fetch_element()
+ */
+function _lib4ridora_target_text_format_to_fully_escaped($element, &$form_state, $form) {
+  form_load_include($form_state, 'inc', 'lib4ridora', 'includes/text_format');
+  $value = check_plain(
+    _lib4ridora_target_text_format_fetch_markup($element, $form_state, $form)
+  );
+
+  $element['#value'] = $value;
+  if (!empty($form_state['values'])) {
+    drupal_array_set_nested_value($form_state['values'], $element['#parents'], $value);
+  }
+  return $element;
+}
+
+/**
+ * Element process callback; fetch target as plain-text.
+ *
+ * @see _lib4ridora_target_text_format_fetch_markup()
+ * @see _lib4ridora_target_text_format_fetch_element()
+ */
+function _lib4ridora_target_text_format_to_plain_text($element, &$form_state, $form) {
+  form_load_include($form_state, 'inc', 'lib4ridora', 'includes/text_format');
+  $value = strip_tags(
+    _lib4ridora_target_text_format_fetch_markup($element, $form_state, $form)
+  );
+
+  $element['#value'] = $value;
+  if (!empty($form_state['values'])) {
+    drupal_array_set_nested_value($form_state['values'], $element['#parents'], $value);
+  }
+
+  return $element;
 }
