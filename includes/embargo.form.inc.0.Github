@@ -64,7 +64,7 @@ function lib4ridora_multi_embargo_pdf_filter_hard(AbstractDatastream $datastream
     if ( substr($dsId,0-strlen($pdfa_suffix)) != $pdfa_suffix ) { return TRUE; }
     // skipping PDF/A file if its availability is set to private
     $infoAry = lib4ridora_get_embargo_info($datastream);
-    return ( @!empty($infoAry['availability']) && strtolower($infoAry['availability']) != 'private' );		// 'private' must be hard-coded here, as in lib4ridora_islandora_datastream_access()
+    return ( @!empty($infoAry['availability']) && strtolower($infoAry['availability']) != strtolower(variable_get('lib4ri_pdfa_availability','private')) );
   }
   return FALSE;
 }
@@ -252,7 +252,7 @@ function lib4ridora_multi_embargo_form_submit(&$form, &$form_state) {
 			$datastream->setContentFromFile($mapped_files[$dsid_pdfa]->uri, FALSE);
 			$object->ingestDatastream($datastream);
 			$values_pdfa = $values; 	// $values is an array with the following indices: document_version | availability | embargo_date | use_permission
-			if ( $avail_custom = lib4ridora_pdfa_availability_default(FALSE) ) {
+			if ( $avail_custom = variable_get('lib4ri_pdfa_availability','private') ) {
 				if ( strlen($avail_custom) > 1 ) { $values_pdfa['availability'] = $avail_custom; }
 			}
 			lib4ridora_update_datastream_relationships($object[$dsid_new_pdfa], $values_pdfa);
@@ -340,7 +340,7 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 				if ( @isset($object[$dsid_pdfa]) ) {
 					$values_pdfa = $values; 	// $values is an array with the following indices: document_version | availability | embargo_date | use_permission
 					// Set Lib4RI's default availability for PDF/A:
-					if ( $avail_custom = lib4ridora_pdfa_availability_default(FALSE) ) {
+					if ( $avail_custom = variable_get('lib4ri_pdfa_availability','private') ) {
 						if ( strlen($avail_custom) > 1 ) { $values_pdfa['availability'] = $avail_custom; }
 					}
 					// If somebody removed the embargo date manually (when edited in PDF Management) then remove it from RELS-INT too:
@@ -434,7 +434,7 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 
 			$values_pdfa = $values; 	// $values is an array with the following indices: document_version | availability | embargo_date | use_permission
 			// Set Lib4RI's default availability for PDF/A:
-			if ( $avail_custom = lib4ridora_pdfa_availability_default(FALSE) ) {
+			if ( $avail_custom = variable_get('lib4ri_pdfa_availability','private') ) {
 				if ( strlen($avail_custom) > 1 ) { $values_pdfa['availability'] = $avail_custom; }
 			}
 			// If somebody removed the embargo date manually (when edited in PDF Management) then remove it from its PDF/A in RELS-INT too:
@@ -508,17 +508,6 @@ function lib4ridora_multi_embargo_build_predicate($base) {
 }
 
 /**
- * Helper function, to return the default PDF/A availability (as string).
- */
-function lib4ridora_pdfa_availability_default( $help_with_pdf_default = TRUE ) {
-  $availability = variable_get('lib4ri_pdfa_availability','private');		// caution. as currently implemented we better should consider 1 single character as empty too.
-  if ( $help_with_pdf_default && strlen($availability) < 2 ) {
-    $availability = variable_get('lib4ridora_multi_pdf_defaults_property_availability', 'intranet');
-  }
-  return trim(strtolower($availability));
-}
-
-/**
  * Helper function, to enumerate the defaults.
  *
  * @return array
@@ -532,7 +521,7 @@ function lib4ridora_multi_pdf_defaults_properties() {
     'day' => $date['mday'],
   );
   return array(
-    'availability' => strtolower(variable_get('lib4ridora_multi_pdf_defaults_property_availability', 'intranet')),
+    'availability' => variable_get('lib4ridora_multi_pdf_defaults_property_availability', 'intranet'),
     'embargo_date' => $embargo_date,
     'document_version' => 'published version',
     'use_permission' => NULL,
@@ -621,7 +610,7 @@ function lib4ridora_append_document_information($files, &$form ) {
     $form['files'][$uuid] = array(
       '#type' => 'fieldset',
       '#title' => t('@filename', array(
-        '@filename' => ( ( $fIdx == '' || $fIdx == $filename ) ? $filename : "{$fIdx} : {$filename}" ),
+        '@filename' => ( ( $fIdx == '' ) ? $filename : "{$fIdx} : {$filename}" ),
       )),
       'document_version' => array(
         '#type' => 'select',
@@ -905,7 +894,7 @@ function lib4ridora_update_datastream_relationships(AbstractDatastream $datastre
   foreach ($filtered as $pred => $value) {
     $pred_full = lib4ridora_multi_embargo_build_predicate($pred);
     if ( $pred == 'embargo_date' && ( $filtered['availability'] == 'date' || 
-    ( substr($datastream->id,0-strlen($pdfa_suffix)) == $pdfa_suffix && strtolower($filtered['availability']) == lib4ridora_pdfa_availability_default() ) ) ) {
+    ( substr($datastream->id,0-strlen($pdfa_suffix)) == $pdfa_suffix && strtolower($filtered['availability']) == strtolower(variable_get('lib4ri_pdfa_availability','private')) ) ) ) {
       $date_value = lib4ridora_get_embargo_date_string($value);
       lib4ridora_set_relationships($datastream->relationships, LIB4RIDORA_RELS_URI, $pred_full, $date_value, RELS_TYPE_DATETIME);
     }
