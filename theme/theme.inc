@@ -99,9 +99,12 @@ function template_process_lib4ridora_pdf_link(&$variables) {
   }
   $human_readable = lib4ridora_multi_pdf_get_options();
   $human_version = $human_readable['document_version'];
+  $alias = "Lib4RI-" . strtr($variables['datastream']->parent->id,":","-") . ".";
+  $alias .= ( strchr("/pdf/jpeg/png/gif/mp4/zip/",strchr($variables['datastream']->mimeType,"/")) ? $variables['datastream']->label : $variables['datastream']->id );
+  $alias = preg_replace('/[?*<\\/>:]+/', '-', strtr($alias,'"',"'") );
   $variables['title_link'] = array(
     'title' => $human_version[$values['document_version']],
-    'url' => url("islandora/object/{$variables['datastream']->parent->id}/datastream/{$variables['datastream']->id}/view"),
+    'url' => url("islandora/object/{$variables['datastream']->parent->id}/datastream/{$variables['datastream']->id}/{$alias}"),
   );
 }
 
