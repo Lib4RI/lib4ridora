@@ -137,6 +137,14 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	    '#size' => 128,
 	  );
   }
+  $form['lib4ri_citation_export_form_placeholder'] = array(		/*  for citations in Excel/CSV exports */
+    '#type' => 'textfield',
+    '#title' => t("Citation Pseudo-Solr Field"),
+    '#description' => t("Placeholder where to put citations into CSV/Ecxel exports. To be added as 'display field' at: /admin/islandora/search/islandora_solr/settings"),
+    '#default_value' => variable_get('lib4ri_citation_export_form_placeholder','mods_citation_export_placeholder_lib4ri'),
+    '#required' => FALSE,
+    '#size' => ( ( @isset($_GET['all']) || @isset($_GET['cit']) ) ? 128 : $textfield_size ),
+  );
   $form['lib4ridora_solr_field_publication_year'] = array(
     '#type' => 'textfield',
     '#title' => t('Publication Year Solr Field'),
@@ -172,8 +180,8 @@ function lib4ridora_admin(array $form, array &$form_state) {
   $form['lib4ri_affiliation_author1_form_export_placeholder'] = array(		/*  for affiliation of the first author, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/14 */
     '#type' => 'textfield',
     '#title' => t("First Author's Affiliation Pseudo-Solr Field"),
-    '#description' => t("Placeholder where to put first author's affiliation in CSV/Ecxel exports. To be added as 'display field' at: /admin/islandora/search/islandora_solr/settings"),
-    '#default_value' => variable_get('lib4ri_affiliation_author1_form_export_placeholder','mods_name_personal_author_affiliation_1_placeholder_lib4ri'),
+    '#description' => t("Placeholder where to put first author's affiliation into CSV/Ecxel exports. To be added as 'display field' at: /admin/islandora/search/islandora_solr/settings"),
+    '#default_value' => variable_get('lib4ri_affiliation_author1_form_export_placeholder','mods_personal_affiliation_author1_placeholder_lib4ri'),
     '#required' => FALSE,
     '#size' => ( ( @isset($_GET['all']) || @isset($_GET['aa1']) ) ? 128 : $textfield_size ),
   );
