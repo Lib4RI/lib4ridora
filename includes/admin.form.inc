@@ -9,7 +9,7 @@
  */
 function lib4ridora_admin(array $form, array &$form_state) {
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-  $textfield_size = 90;		// Default 60, but sometimes too short even for some text field values.
+  $textfield_size = 96;		// Default 60, but sometimes too short even for some text field values.
 
   $lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options( TRUE /* true to get the PDF link order as required for Lib4RI */ );
   $lib4ridora_multi_pdf_options_availability = $lib4ridora_multi_pdf_options['availability'];
@@ -180,7 +180,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
   $form['lib4ri_affiliation_author1_form_export_placeholder'] = array(		/*  for affiliation of the first author, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/14 */
     '#type' => 'textfield',
     '#title' => t("First Author's Affiliation Pseudo-Solr Field"),
-    '#description' => t("Placeholder where to put first author's affiliation into CSV/Ecxel exports. To be added as 'display field' at: /admin/islandora/search/islandora_solr/settings"),
+    '#description' => t("Placeholder where to put first author's affiliation into CSV/Ecxel exports. To be added as 'display field' at: /admin/islandora/search/islandora_solr/settings <br>Instead of one value only, this field here can also have two values (comma-separated) to put author name and author's unit into two columns."),
     '#default_value' => variable_get('lib4ri_affiliation_author1_form_export_placeholder','mods_personal_affiliation_author1_placeholder_lib4ri'),
     '#required' => FALSE,
     '#size' => ( ( @isset($_GET['all']) || @isset($_GET['aa1']) ) ? 128 : $textfield_size ),
