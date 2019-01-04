@@ -93,16 +93,20 @@ function lib4ridora_download_name_pdf($pid,$fileExt,$docVer,$dsId) {
 
 		if ( $query = $xpath->query('//mods:mods/mods:titleInfo/mods:title') ) {
 			$title = strip_tags( $query->item(0)->nodeValue );
-			$title = trim( strtok( strip_tags( $query->item(0)->nodeValue ) . ":" , ":" ) );	// hard-coded: only until the next semi-colon
-			$title = str_replace("\n","; ",strtr($title,"<>\\/:\*\|\?\n\r","{}__-'_~  "));
+			$title = trim( strtok( strip_tags( $query->item(0)->nodeValue ) . ":" , ":" ) );		// hard-coded: only until the next semi-colon
+			$title = trim( str_replace("\n","; ",strtr($title,"<>\\/:\*\|\?\t\r","{}_--',~  ")) );
 		}
+
 		$titAry = explode(" ",$title);
 		if ( sizeof($titAry) > ( $titLimit - min($titCustom,0) + 1 ) ) {		// if any customization allowed then +1 for 1 word 'hard-coded' tolerance
 			$title = implode(" ",array_slice($titAry,0,$titLimit)) . ( ( $titCustom < 1 ) ? "" : "..." );		// hard-coded '...' to indicate that we cut the title.
 		}
 
 		if ( $query = $xpath->query('//mods:mods/mods:originInfo/mods:dateIssued') ) {
-			$year = strtr( $query->item(0)->nodeValue, ":", "-" );
+			if ( $year = $query->item(0)->nodeValue ) {
+				date_default_timezone_set('CET');
+				$year = date("Y",strtotime($year));			// would also work if ussued before year 1970
+			}
 		}
 
 		// In case there are multiple DS with identical 'document version' (assuming this is won't happen for published or accepted versions)
@@ -118,7 +122,7 @@ function lib4ridora_download_name_pdf($pid,$fileExt,$docVer,$dsId) {
 		if ( !stristr($docVer,"published") && !stristr($docVer,"accepted") ) {			// assuming there will be only one accepted/published version...
 			$idNum = intval( preg_replace('/[a-z_\-\/A-Z]/', '', $dsId ) );
 		}
-		$version = $docVer . ( ($idNum < 0 ) ? "" : " ".chr($idNum+64) );	// hard-coded: plus alterning letter for 'name safety'
+		$version = $docVer . ( ($idNum < 1 ) ? "" : " ".chr($idNum+64) );	// hard-coded: plus alterning letter for 'name safety'
 		if ( $titCustom >= 0 ) { $version = "(" . $version . ")"; }			// hard-coded: document version inside brackets if customization allowed
 
 		// replace space character if requested by the 2nd config parameter:

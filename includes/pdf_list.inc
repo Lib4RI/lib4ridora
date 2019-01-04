@@ -72,7 +72,7 @@ function lib4ridora_list_pdfs(AbstractObject $object) {
     $info = lib4ridora_get_embargo_info($pdf_datastream);
 
     $row = array(
-      l($pdf_datastream->id, "islandora/object/{$object->id}/datastream/{$pdf_datastream->id}/view"),
+      l($pdf_datastream->id, "islandora/object/{$object->id}/datastream/{$pdf_datastream->id}/{$pdf_datastream->label}"),
       $pdf_datastream->label,
       $get_availability_option($info),
       $get_option('document_version', $info),
