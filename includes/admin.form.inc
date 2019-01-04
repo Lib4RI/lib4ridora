@@ -28,16 +28,16 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#type' => 'textfield',
     '#title' => t('Link order of PDF versions'),
     '#default_value' => variable_get('lib4ridora_multi_pdf_link_order', implode( ", ", array_map( function($ver) { return strtok(ltrim($ver),' '); }, $lib4ridora_multi_pdf_options['document_version'] ) ) ),
-    '#description' => t("Comma separated list of PDF versions to define the order when displayed (case-insensitive, leading part is sufficient):<br>- " . implode( "<br>- ", $lib4ridora_multi_pdf_options['document_version'] ) . "<br>The 'Updated Version' has been removed to match the belongs of Lib4RI." ),
+    '#description' => t("Comma-separated list of PDF versions to define the order when displayed (case-insensitive, leading part is sufficient):<br>- " . implode( "<br>- ", $lib4ridora_multi_pdf_options['document_version'] ) . "<br>The 'Updated Version' has been removed to match the belongs of Lib4RI." ),
     '#required' => FALSE,
     '#size' => $textfield_size,
   );
   if ( @isset($_GET['all']) || @isset($_GET['dl']) ) {			// related to Redmine issue #67 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/67
 	  $form['lib4ridora_download_name_tuning'] = array(
 		'#type' => 'textfield',
-		'#title' => t('Separator for PDF download name'),
+		'#title' => t('Option list for PDF download name'),
 		'#default_value' => variable_get('lib4ridora_download_name_tuning','+3,_'),
-		'#description' => t("Comma-separated list: [1] how many words of the title to use ('+' for dots), [2] optional string to separate the filename parts, [3] optional space replacement. Quotes are OK for easier space/comma/empty-string handling."),
+		'#description' => t("Comma-separated list: [1] how many words of the title to use ('+' for cropping dots), [2] optional string to separate the filename parts, [3] optional space replacement. Quotes are OK for easier space/comma/empty-string handling."),
 		'#required' => FALSE,
 	    '#size' => 128,
 	  );
@@ -46,7 +46,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#type' => 'textfield',
     '#title' => t('Restricted DSIDs'),
     '#default_value' => variable_get('lib4ridora_restricted_datastreams', 'RELS-INT,RELS-EXT,POLICY'),
-    '#description' => t("Comma separated list of datastream-IDs that should not be viewable for anonymous users. Default is: \"RELS-INT,RELS-EXT,POLICY\"."),
+    '#description' => t("Comma-separated list of datastream-IDs that should not be viewable for anonymous users. Default is: \"RELS-INT,RELS-EXT,POLICY\"."),
     '#required' => FALSE,
     '#size' => $textfield_size,
   );
