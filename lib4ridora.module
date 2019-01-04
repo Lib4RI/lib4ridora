@@ -749,7 +749,7 @@ function lib4ridora_ir_citationcmodel_islandora_solr_object_result_alter(&$resul
     return;
   }
   
-  $term_failed_ary = explode( ",", variable_get('lib4ridora_pseudo_solr_field_factor_failed', '') );		// empty default by intention (and not N/A)
+  $term_failed_ary = str_getcsv( variable_get('lib4ridora_pseudo_solr_field_factor_failed', '') );		// empty default by intention (and not N/A)
   $term_failed_factor = trim( $term_failed_ary[0] );
   $term_failed_year = ( @!isset($term_failed_ary[1]) ) ? $term_failed_factor : trim( $term_failed_ary[1] );
 

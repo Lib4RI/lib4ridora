@@ -51,6 +51,7 @@ function lib4ridora_uninstall() {
     'lib4ridora_pseudo_solr_field_factor_failed',
     'lib4ridora_pseudo_solr_field_factor_none_yet',
     'lib4ridora_solr_field_org_terms_1on1',
+    'lib4ridora_download_name_tuning',
   );
   array_walk($variables, 'variable_del');
 }

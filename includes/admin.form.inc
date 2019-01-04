@@ -32,6 +32,16 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => FALSE,
     '#size' => $textfield_size,
   );
+  if ( @isset($_GET['all']) || @isset($_GET['dl']) ) {			// related to Redmine issue #67 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/67
+	  $form['lib4ridora_download_name_tuning'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Separator for PDF download name'),
+		'#default_value' => variable_get('lib4ridora_download_name_tuning','+3,_'),
+		'#description' => t("Comma-separated list: [1] how many words of the title to use ('+' for dots), [2] optional string to separate the filename parts, [3] optional space replacement. Quotes are OK for easier space/comma/empty-string handling."),
+		'#required' => FALSE,
+	    '#size' => 128,
+	  );
+  }
   $form['lib4ridora_restricted_datastreams'] = array(
     '#type' => 'textfield',
     '#title' => t('Restricted DSIDs'),
@@ -123,7 +133,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	  $form['lib4ridora_pseudo_solr_field_factor_failed'] = array(
 	    '#type' => 'textfield',
 	    '#title' => t('Journal Impact Factor failure term for export'),
-	    '#description' => t('Terms in CSV export if Journal Impact Factor evaluation failed (originally \'N/A\'). May be comma-separated to have different terms for factor and year field.'),
+	    '#description' => t('Terms in CSV export if Journal Impact Factor evaluation failed (originally \'N/A\'). May be comma-separated to have different terms for factor and year field (quotes are allowed).'),
 	    '#default_value' => variable_get('lib4ridora_pseudo_solr_field_factor_failed', ''),
 	    '#required' => FALSE,
 	    '#size' => 128,

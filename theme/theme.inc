@@ -61,6 +61,80 @@ function template_preprocess_lib4ridora_pdf_link(&$variables) {
   }
 }
 
+/*
+ * Implements function to proprietarily compose the download name of the link PDF file.
+ * Related to Redmine issue #67 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/67
+ *
+ * There will be a 'hidden' configuration available at/with: admin/islandora/solution_pack_config/lib4ridora?dl
+ */
+function lib4ridora_download_name_pdf($pid,$fileExt,$docVer,$dsId) {
+	$title = "Lib4RI-" . strtr($pid,":","-");		// aux
+	if( ( $object = islandora_object_load($pid) ) && @isset($object['MODS']) ) {
+	    $mods = $object['MODS']->content;
+		$dom = new DOMDocument();
+		$dom->loadXML($mods);
+		$xpath = new DOMXPath($dom);
+		$xpath->registerNamespace('mods', 'http://www.loc.gov/mods/v3');
+
+		$confAry = str_getcsv( variable_get('lib4ridora_download_name_tuning','+3,_') );
+		$sep = ( preg_match('/[<>\\/:\*\|\?]+/',$confAry[1]) ? "_" : $confAry[1] );		// it can be a space too, so do not trim!
+		$name = "";
+		$year = "";
+		$version = "";
+		$titLimit = max( abs(intval($confAry[0])), 1 );				// use abs(), since if negative may become a meaning here
+		$titCustom = 0;
+		if ( intval($confAry[0]) < 0 ) { $titCustom = -1; }
+		elseif ( substr(ltrim($confAry[0]),0,1) == "+" ) { $titCustom = 1; }			// to enable custum tunings for the naming.
+
+		if ( $query = $xpath->query('//mods:mods/mods:name[@type="personal"]/mods:namePart[@type="family"]') ) {
+			$name = strip_tags( $query->item(0)->nodeValue );
+			$name = trim( strip_tags( $query->item(0)->nodeValue ) );
+		}
+
+		if ( $query = $xpath->query('//mods:mods/mods:titleInfo/mods:title') ) {
+			$title = strip_tags( $query->item(0)->nodeValue );
+			$title = trim( strtok( strip_tags( $query->item(0)->nodeValue ) . ":" , ":" ) );	// hard-coded: only until the next semi-colon
+			$title = str_replace("\n","; ",strtr($title,"<>\\/:\*\|\?\n\r","{}__-'_~  "));
+		}
+		$titAry = explode(" ",$title);
+		if ( sizeof($titAry) > ( $titLimit - min($titCustom,0) + 1 ) ) {		// if any customization allowed then +1 for 1 word 'hard-coded' tolerance
+			$title = implode(" ",array_slice($titAry,0,$titLimit)) . ( ( $titCustom < 1 ) ? "" : "..." );		// hard-coded '...' to indicate that we cut the title.
+		}
+
+		if ( $query = $xpath->query('//mods:mods/mods:originInfo/mods:dateIssued') ) {
+			$year = strtr( $query->item(0)->nodeValue, ":", "-" );
+		}
+
+		// In case there are multiple DS with identical 'document version' (assuming this is won't happen for published or accepted versions)
+		// then let's add a specific number or letter to keep the download names different.
+		/* However here a snippet when we need to examine RELS-INT for a more precise itendifying number/letter:
+		    $dom->loadXml( $object['RELS-INT']->content );
+		    $xpath = new DOMXPath($dom);
+			$xpath->registerNamespace('rdf', "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+			$xpath->registerNamespace('islandora', "http://islandora.ca/ontology/relsint#");
+			$query = $xpath->query('/rdf:RDF/rdf:Description/@rdf:about');
+		*/
+		$idNum = -1;
+		if ( !stristr($docVer,"published") && !stristr($docVer,"accepted") ) {			// assuming there will be only one accepted/published version...
+			$idNum = intval( preg_replace('/[a-z_\-\/A-Z]/', '', $dsId ) );
+		}
+		$version = $docVer . ( ($idNum < 0 ) ? "" : " ".chr($idNum+64) );	// hard-coded: plus alterning letter for 'name safety'
+		if ( $titCustom >= 0 ) { $version = "(" . $version . ")"; }			// hard-coded: document version inside brackets if customization allowed
+
+		// replace space character if requested by the 2nd config parameter:
+		$title = $name . $sep . ( empty($year) ? "" : $year.$sep ) . $title . $sep . $version;
+		if ( @isset($confAry[2]) ) {
+			if ( empty($confAry[2]) ) {			// may happen if whithing quotes
+				$title = str_replace( " ", "", ucwords($title,"[{(_.,;!')}] \t\r\n\f\v") );
+			}
+			elseif ( @!empty(trim($confAry[2])) && !preg_match('/[<>\\/:\*\|\?]+/',trim($confAry[2])) ) {		// here safer if we trim, since it's not a space
+				$title = str_replace( " ", trim($confAry[2]), $title );
+			}
+		}
+	}
+	return( $title . "." . ( empty($fileExt) ? "pdf" : $fileExt ) );		// = actually the new DL name now.
+}
+
 /**
  * Implements hook_process_lib4ridora_pdf_link().
  */
@@ -99,12 +173,22 @@ function template_process_lib4ridora_pdf_link(&$variables) {
   }
   $human_readable = lib4ridora_multi_pdf_get_options();
   $human_version = $human_readable['document_version'];
-  $alias = "Lib4RI-" . strtr($variables['datastream']->parent->id,":","-") . ".";
-  $alias .= ( strchr("/pdf/jpeg/png/gif/mp4/zip/",strchr($variables['datastream']->mimeType,"/")) ? $variables['datastream']->label : $variables['datastream']->id );
-  $alias = preg_replace('/[?*<\\/>:]+/', '-', strtr($alias,'"',"'") );
+  
+  // PDF downloand: let's assign a download name for the PDF that is as meaningful as possible.
+  // Refers to Redmine issue #67 http://lib-dora-dev1.emp-eaw.ch:3000/issues/67
+  $pid = $variables['datastream']->parent->id;
+  if ( $ext = @trim(strchr($variables['datastream']->mimeType,"/"),"/") ) {
+    $ext = strtolower($ext);
+  } elseif ( $ext = @trim(strchr(substr($variables['datastream']->label,-5),"."),".") ) {
+    $ext = strtolower($ext);		// assumed the last 5 signs/letters of the DS label are carrying an extension (for PDFs this is currently the case).
+  } else {
+    $ext = strtolower($variables['datastream']->id );		// aux, to be tuned by MIME type detection of DS
+  }
+  $dl_name = lib4ridora_download_name_pdf( $pid, $ext, $values['document_version'], $variables['datastream']->id );
+  $dl_name = preg_replace('/[?*<\\/>:]+/', '-', strtr($dl_name,'"',"'") );		// rather for safety
   $variables['title_link'] = array(
     'title' => $human_version[$values['document_version']],
-    'url' => url("islandora/object/{$variables['datastream']->parent->id}/datastream/{$variables['datastream']->id}/{$alias}"),
+    'url' => url("islandora/object/{$variables['datastream']->parent->id}/datastream/{$variables['datastream']->id}/{$dl_name}"),
   );
 }
 
