@@ -110,18 +110,21 @@ function lib4ridora_download_name_pdf($pid,$fileExt,$docVer,$dsId) {
 
 		// In case there are multiple DS with identical 'document version' (assuming this is won't happen for published or accepted versions)
 		// then let's add a specific number or letter to keep the download names different.
-		/* However here a snippet when we need to examine RELS-INT for a more precise itendifying number/letter:
+		$version = $docVer;
+		/* However here a snippet when we need to examine RELS-INT for a more precise itendifying number/letter, unsure however what happends if datastream ID would change.
 		    $dom->loadXml( $object['RELS-INT']->content );
 		    $xpath = new DOMXPath($dom);
 			$xpath->registerNamespace('rdf', "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
 			$xpath->registerNamespace('islandora', "http://islandora.ca/ontology/relsint#");
 			$query = $xpath->query('/rdf:RDF/rdf:Description/@rdf:about');
 		*/
-		$idNum = -1;
 		if ( !stristr($docVer,"published") && !stristr($docVer,"accepted") ) {			// assuming there will be only one accepted/published version...
-			$idNum = intval( preg_replace('/[a-z_\-\/A-Z]/', '', $dsId ) );
+			// note: for Lib4ri publications the $object[$dsId]->checksum is not assigned ('none' will be returned). So let's compose an own one:
+			$dsSize = $object[$dsId]->size;		// assuming it's at least 5kb (5120 bytes)
+			$dsPart = $dsLen >> 7;		// take/check 1/128 form the beginning and from the end (so ~64x less content)
+			$hash = dechex( crc32( substr($object[$dsId]->content,0,2560+$dsPart) ."||". substr($object[$dsId]->content,(0-2560-$dsPart)) ."||". strval($dsSize) ) );
+			$version .= " " . $hash;		// after a space, since there may be spaces too inside the doc.ver. term.
 		}
-		$version = $docVer . ( ($idNum < 1 ) ? "" : " ".chr($idNum+64) );	// hard-coded: plus alterning letter for 'name safety'
 		if ( $titCustom >= 0 ) { $version = "(" . $version . ")"; }			// hard-coded: document version inside brackets if customization allowed
 
 		// replace space character if requested by the 2nd config parameter:
