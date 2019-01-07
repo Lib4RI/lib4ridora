@@ -120,9 +120,7 @@ function lib4ridora_download_name_pdf($pid,$fileExt,$docVer,$dsId) {
 		*/
 		if ( !stristr($docVer,"published") && !stristr($docVer,"accepted") ) {			// assuming there will be only one accepted/published version...
 			// note: for Lib4ri publications the $object[$dsId]->checksum is not assigned ('none' will be returned). So let's compose an own one:
-			$dsSize = $object[$dsId]->size;		// assuming it's at least 5kb (5120 bytes)
-			$dsPart = $dsLen >> 7;		// take/check 1/128 form the beginning and from the end (so ~64x less content)
-			$hash = dechex( crc32( substr($object[$dsId]->content,0,2560+$dsPart) ."||". substr($object[$dsId]->content,(0-2560-$dsPart)) ."||". strval($dsSize) ) );
+			$hash = dechex( crc32( strval( $object[$dsId]->label ) ) );
 			$version .= " " . $hash;		// after a space, since there may be spaces too inside the doc.ver. term.
 		}
 		if ( $titCustom >= 0 ) { $version = "(" . $version . ")"; }			// hard-coded: document version inside brackets if customization allowed
