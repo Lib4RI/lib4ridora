@@ -104,8 +104,7 @@ function lib4ridora_download_name_pdf($pid,$fileExt,$docVer,$dsId) {
 
 		if ( $query = $xpath->query('//mods:mods/mods:originInfo/mods:dateIssued') ) {
 			if ( $year = $query->item(0)->nodeValue ) {
-				date_default_timezone_set('CET');
-				$year = date("Y",strtotime($year));			// would also work if ussued before year 1970
+				$year = strtok($year."-","-");				// let's keep it simple, it's usually just a (year) number, rarely something like 2015-12-23
 			}
 		}
 
