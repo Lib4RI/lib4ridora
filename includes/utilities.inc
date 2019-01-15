@@ -108,6 +108,7 @@ function lib4ridora_get_factor_with_fallback(AbstractObject $object, $issued_yea
   foreach ($issued_years as $year) {
     // They wish to fallback to trying to use values from a preceding year.
     $issued_years_with_fallbacks[] = $year - 1;
+    $issued_years_with_fallbacks[] = $year - 2;		// ...and the year before, accordin to Lib4RI Jour Fix from 2019-Jan-15 about Redmine Issue #48 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/48
   }
   $issued_years_with_fallbacks = array_unique($issued_years_with_fallbacks, SORT_NUMERIC);
 
@@ -120,8 +121,6 @@ function lib4ridora_get_factor_with_fallback(AbstractObject $object, $issued_yea
       break;
     }
   }
-
-//  return $factor !== FALSE ? array($factor, $factor_year) : FALSE;
 
   if ( $factor === FALSE ) {
     	return FALSE;
