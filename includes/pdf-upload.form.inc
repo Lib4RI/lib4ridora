@@ -67,6 +67,8 @@ function lib4ridora_single_pdf_upload_form($form, &$form_state, AbstractObject $
   $form['add'] = array(
     '#type' => 'submit',
     '#value' => t('Add PDF'),
+    '#prefix' => '<br>',
+    '#suffix' => '<br><br><br>',
   );
 
   return $form;
@@ -125,7 +127,7 @@ function lib4ridora_single_pdf_upload_form_submit(&$form, &$form_state) {
       drupal_unlink($temp_file);
       $object->ingestDatastream($new_old);
       lib4ridora_update_datastream_relationships($new_old, $info['PDF']);
-      $to_purge = array('PDF', 'TN', 'PREVIEW', 'FULL_TEXT');
+      $to_purge = array('PDF', 'TN', 'PREVIEW', 'FULL_TEXT', 'PDF'.variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A') );
       array_map(array($object, 'purgeDatastream'), $to_purge);
     }
 
