@@ -104,11 +104,11 @@ function lib4ridora_get_pdfa_label_insert() {
  * Note: if we are going to download this file/ds, then this label will become the filename,
  * that's also why $label_pdf_orig is usually a filename (or a term we can use as a filename).
  */
-function lib4ridora_get_pdfa_label( $label_pdf_orig, $parent_dsid = '', $term_new = 'NEW', $is_final = TRUE ) {
+function lib4ridora_get_pdfa_label( $label_pdf_orig, $parent_dsid = '', $term_new = 'PDF-A', $is_final = TRUE ) {
 	if ( !$is_final ) {
 		return ( "PDF/A of " . ( $parent_dsid != '' ? $parent_dsid." " : "" ) . "'" . $label_pdf_orig . "'" );
 	}
-	$label_insert = ( strtolower(substr($label_pdf_orig,-4)) != ".pdf" ) ? $term_new : lib4ridora_get_pdfa_label_insert();
+	$label_insert = ( empty($term_new) || strtolower(substr($label_pdf_orig,-4)) == ".pdf" ) ? lib4ridora_get_pdfa_label_insert() : $term_new;
 	$nameAry = explode(".",$label_pdf_orig);
 	if ( sizeof($nameAry) > 1 ) {
 		$ext = array_pop($nameAry);
@@ -122,7 +122,6 @@ function lib4ridora_get_pdfa_label( $label_pdf_orig, $parent_dsid = '', $term_ne
 	}
 	return $label_insert;		// aux.
 }
-
 
 /**
  * Form building function; build multi-PDF embargo form.
@@ -229,7 +228,6 @@ function lib4ridora_multi_embargo_form_submit(&$form, &$form_state) {
 	}
 	$pdf_nr_suffix = 2;
 	$pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
-    $object->relationships->autoCommit = FALSE;		// part 1/2, will need commitRelationships() !
 	foreach ($form_state['values']['files'] as $filename => $values) {
 		if ( substr($filename,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
 			continue;
@@ -264,7 +262,6 @@ function lib4ridora_multi_embargo_form_submit(&$form, &$form_state) {
 		$object->ingestDatastream($datastream);
 		lib4ridora_update_datastream_relationships($object[$dsid_new], $values);
 	}
-    $object->relationships->commitRelationships();		// part 2/2
 }
 
 /**
@@ -325,7 +322,8 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 
 	if ( $primary_file == 'PDF' ) {
 		// just update the RELS-INT, and copy over the document version to its PDF/A
-	    $object->relationships->autoCommit = FALSE;		// part 1/2, will need commitRelationships() !
+	//	$object->relationships->autoCommit = FALSE;		// part 1/2, will need commitRelationships()
+	//	REVISED + disabled again. The following code may cause DS manipulations caught by hooks/functions that possibly want to rewrite/update RELS-INT/RELS-EXT too.
 		foreach ($form_state['values']['files'] as $dsid => $values) {
 			lib4ridora_update_datastream_relationships($object[$dsid], $values);
 			if ( substr($dsid,0-strlen($pdfa_suffix)) != $pdfa_suffix ) {
@@ -358,7 +356,7 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 				}
 			}
 		}
-	    $object->relationships->commitRelationships();		// part 2/2
+	//	$object->relationships->commitRelationships();		// part 2/2
 
 		// If all datastreams keep their names/IDs, then islandora_derivative_logging() won't produce an update massage (about now/other derivatives), let's create an own one:
 		if ( $error_msg != "" ) { drupal_set_message( trim($error_msg), 'warning' ); }
@@ -400,7 +398,6 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 		}
 	}
 
-    $non_cached_object->relationships->autoCommit = FALSE;		// part 1/2, will need commitRelationships() !
 	$pdf_nr_suffix = 2;
 	foreach ($form_state['values']['files'] as $filename => $values) {		// $filename is the DS Id
 		if ( substr($filename,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
@@ -458,7 +455,6 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 		file_unmanaged_delete($mapped_files[$filename]['content']);
 		lib4ridora_update_datastream_relationships($non_cached_object[$dsid_new], $values);
 	}
-    $non_cached_object->relationships->commitRelationships();		// part 2/2
 
 	// If all datastreams keep their names/IDs, then islandora_derivative_logging() won't produce an update massage (about now/other derivatives), let's create an own one:
 	if ( $error_msg != "" ) { drupal_set_message( trim($error_msg), 'warning' ); }

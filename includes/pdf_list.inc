@@ -70,10 +70,14 @@ function lib4ridora_list_pdfs(AbstractObject $object) {
     }
 
     $info = lib4ridora_get_embargo_info($pdf_datastream);
-
+    $pid = $object->id;
+	$dsId = $pdf_datastream->id;
+    $dsLabel = $pdf_datastream->label;
+  	// if the DS label is no filename, then let's compose an auxiliary one:
+  	$pdfName =  ( strtolower(substr($dsLabel,-4)) == '.pdf' ) ? $dsLabel : ( strtr($pid,":","-") . ".{$dsId}.pdf" );
     $row = array(
-      l($pdf_datastream->id, "islandora/object/{$object->id}/datastream/{$pdf_datastream->id}/{$pdf_datastream->label}"),
-      $pdf_datastream->label,
+      l($dsId, "islandora/object/{$pid}/datastream/{$dsId}/{$pdfName}"),
+      $dsLabel,
       $get_availability_option($info),
       $get_option('document_version', $info),
       $get_option('use_permission', $info),
