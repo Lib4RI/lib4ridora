@@ -1167,25 +1167,33 @@ function lib4ridora_islandora_personCModel_islandora_view_object_alter(AbstractO
 }
 
 // work-around to revert HTML encoding in page title (for the time being), in context with Redmine Issue #189: http://lib-dora-dev1.emp-eaw.ch:3000/issues/189
-function lib4ridora_page_title_tagless($title, $pass_through = FALSE ) {
+function lib4ridora_page_title_tagless($title, $extra_safe = FALSE ) {
+	$changed = FALSE;
+	if ( $extra_safe ) {		// as long as we got the title with drupal_get_title() we don't need this.
+		$titleAux = str_ireplace("<","&lt;",str_ireplace(">","&gt;",$title));	// for safety when passed through, we only want to revert the tags in the list
+		if ( $title != $titleAux ) { $changed = TRUE; $title = $titleAux; }
+	}
+	$titleAux = str_ireplace("&amp;lt;","&lt;",str_ireplace("&amp;gt;","&gt;",$title));
+	if ( $title != $titleAux ) { $changed = TRUE; $title = $titleAux; }
+
 	$tagAry = array('i','em','b','strong','sup','sub','u','small');		// widely copied from here: https://www.dora.lib4ri.ch/psi/admin/config/content/formats/filtered_html
-	if ( $pass_through ) {
-		$title = str_replace("<","&lt;",str_replace(">","&gt;",$title));	// for safety when passed through, we only want to revert the tags in the list
-	}
-	$title = str_replace("&amp;lt;","&lt;",str_replace("&amp;gt;","&gt;",$title));
 	foreach( $tagAry as $tag ) {
-		$title = str_replace("&lt;{$tag}&gt;","<{$tag}>",str_replace("&lt;/{$tag}&gt;","</{$tag}>",$title));
+		$titleAux = str_ireplace("&lt;{$tag}&gt;","<{$tag}>",str_ireplace("&lt;/{$tag}&gt;","</{$tag}>",$title));
+		if ( $title != $titleAux ) { $changed = TRUE; $title = $titleAux; }
 	}
-	return $title;
+	return( $changed ? $title : FALSE );
 }
 function lib4ridora_form_alter(&$form, $form_state, $form_id) {
 	// dpm($form_id);
-	if ( user_is_logged_in() && in_array($form_id,array("lib4ridora_citation_select_mods_edit_form","islandora_ip_embargo_object_embargo_form","lib4ridora_multi_embargo_edit_form")) ) {
-		drupal_set_title( lib4ridora_page_title_tagless( drupal_get_title() ) );
+	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) && user_is_logged_in() && 
+		in_array($form_id,array("lib4ridora_citation_select_mods_edit_form","islandora_ip_embargo_object_embargo_form","lib4ridora_multi_embargo_edit_form")) ) {
+		if ( $title = lib4ridora_page_title_tagless( drupal_get_title() ) ) { drupal_set_title( $title, PASS_THROUGH ); }
 	}
 }
 function lib4ridora_form_islandora_scholar_citation_select_form_alter(&$form, &$form_state) {
-	drupal_set_title( lib4ridora_page_title_tagless( drupal_get_title() ) );
+	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) ) {
+		if ( $title = lib4ridora_page_title_tagless( drupal_get_title() ) ) { drupal_set_title( $title, PASS_THROUGH ); }
+	}
 }
 
 /**
@@ -1200,23 +1208,30 @@ function lib4ridora_page_alter(&$page) {
 	$url = strtok(strtok($_SERVER['REQUEST_URI']."?","?")."#","#");
 
 	// work-around (for the time being), in context with Redmine Issue #189: http://lib-dora-dev1.emp-eaw.ch:3000/issues/189
-	if ( substr($url,-7) == "/manage" || substr(dirname($url),-7) == "/manage" ) {
-		drupal_set_title( lib4ridora_page_title_tagless( drupal_get_title(), TRUE ), PASS_THROUGH );
-		if ( substr($url,-19) == "/manage/datastreams" ) {		// special case, since the title exists also as page content
-			if ( $html = @$page['content']['system_main']['Default Edit output']['#markup'] );
-			// we are looking for something: like <table class="manage-datastreams"><caption>80km h&lt;sup&gt;-1&lt;/sup&gt; for less ozone - psi:30501</caption><thread><tr>...
-			$htmlAry = explode("caption>",$html,3);
-			if ( @!empty($htmlAry[2]) ) {
-				$htmlAry[1] = lib4ridora_page_title_tagless( substr($htmlAry[1],0,-2) ) . "</";
-				$page['content']['system_main']['Default Edit output']['#markup'] = implode("caption>",$htmlAry);
+	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) ) {
+		if ( substr($url,-7) == "/manage" || substr(dirname($url),-7) == "/manage" ) {
+			if ( $title = lib4ridora_page_title_tagless( drupal_get_title() ) ) { drupal_set_title( $title, PASS_THROUGH ); }
+			// special case, since the title exists also as page content on top of the datastreams table:
+			if ( substr($url,-19) == "/manage/datastreams" ) {
+				if ( $html = @$page['content']['system_main']['Default Edit output']['#markup'] ) {
+					// we are looking for something: like <table class="manage-datastreams"><caption>80km h&lt;sup&gt;-1&lt;/sup&gt; for less ozone - psi:30501</caption><thread><tr>...
+					$htmlAry = explode("caption>",$html,3);
+					if ( @!empty($htmlAry[2]) ) {
+						if ( $label = lib4ridora_page_title_tagless( substr($htmlAry[1],0,-2) ) ) {
+							$htmlAry[1] = $label . "</";
+							$page['content']['system_main']['Default Edit output']['#markup'] = implode("caption>",$htmlAry);
+						}
+					}
+				}
 			}
 		}
-	}
-	elseif ( substr($url,-20) == "/lib4ridora_pdf_list" || substr($url,-24) == "/islandora_scholar_romeo" ) {
-		drupal_set_title( lib4ridora_page_title_tagless( drupal_get_title() ) );
+		elseif ( substr($url,-20) == "/lib4ridora_pdf_list" || substr($url,-24) == "/islandora_scholar_romeo" ) {
+			if ( $title = lib4ridora_page_title_tagless( drupal_get_title() ) ) { drupal_set_title( $title, PASS_THROUGH ); }
+		}
+		return;
 	}
 
-	elseif ( substr($url,-16) == "/RELS-INT/delete" ) {		// safety tuning
+	if ( substr($url,-16) == "/RELS-INT/delete" ) {		// safety tuning
 		// dpm(var_dump($page['content']['system_main']));
 		if ( $content = @$page['content']['system_main']['derivative_info']['#markup'] ) {
 			$page['content']['system_main']['derivative_info']['#markup'] = str_replace( ", RELS-EXT", " &plus; <font color='#e70707'><b>RELS-EXT</b> &nbsp; &nbsp; &nbsp; (warning: also the <a href='../../manage/datastreams'>RELS-EXT datastream</a> will be deleted, causing future editing problems)</font>", $content );
