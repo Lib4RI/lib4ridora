@@ -1203,32 +1203,22 @@ function lib4ridora_form_islandora_scholar_citation_select_form_alter(&$form, &$
  *	Example/test: https://www.dora-dev.lib4ri.ch/eawag/islandora/object/eawag%3A9334/manage/datastreams
  */ 
 function lib4ridora_page_alter(&$page) {
-	if ( !user_is_logged_in() ) { return; }
 
 	$url = strtok(strtok($_SERVER['REQUEST_URI']."?","?")."#","#");
 
-	// work-around (for the time being), in context with Redmine Issue #189: http://lib-dora-dev1.emp-eaw.ch:3000/issues/189
+	/* ( strchr("/".strtok(substr($url,1)."/","/"),"/eawag/empa/psi/wsl/") || strchr($url,"/islandora/object/") || strchr($url,"/islandora/search/") ) */
 	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) ) {
-		if ( substr($url,-7) == "/manage" || substr(dirname($url),-7) == "/manage" ) {
-			if ( $title = lib4ridora_page_title_tagless( drupal_get_title() ) ) { drupal_set_title( $title, PASS_THROUGH ); }
-			// special case, since the title exists also as page content on top of the datastreams table:
-			if ( substr($url,-19) == "/manage/datastreams" ) {
-				if ( $html = @$page['content']['system_main']['Default Edit output']['#markup'] ) {
-					// we are looking for something: like <table class="manage-datastreams"><caption>80km h&lt;sup&gt;-1&lt;/sup&gt; for less ozone - psi:30501</caption><thread><tr>...
-					$htmlAry = explode("caption>",$html,3);
-					if ( @!empty($htmlAry[2]) ) {
-						if ( $label = lib4ridora_page_title_tagless( substr($htmlAry[1],0,-2) ) ) {
-							$htmlAry[1] = $label . "</";
-							$page['content']['system_main']['Default Edit output']['#markup'] = implode("caption>",$htmlAry);
-						}
-					}
-				}
-			}
-		}
-		elseif ( substr($url,-20) == "/lib4ridora_pdf_list" || substr($url,-24) == "/islandora_scholar_romeo" ) {
-			if ( $title = lib4ridora_page_title_tagless( drupal_get_title() ) ) { drupal_set_title( $title, PASS_THROUGH ); }
-		}
-		return;
+		// work-around (for the time being), in context with Redmine Issue #189: http://lib-dora-dev1.emp-eaw.ch:3000/issues/189
+		$jsCode = 'jQuery(document).ready(function() { ';
+		$jsCode .= 'if ( ( elem = document.getElementById("page-title") ) && elem != "undefined" ) { document.getElementById("page-title").innerHTML = elem.innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } ';
+		$jsCode .= 'if ( ary = document.getElementsByTagName("caption") ) { for(i=0;i<ary.length;i++) { document.getElementsByTagName("caption")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+		$jsCode .= 'if ( ary = document.getElementsByClassName("page-title") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("page-title")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+		$jsCode .= 'if ( ary = document.getElementsByClassName("messages__item") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("messages__item")[i].innerHTML = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
+		$jsCode .= 'if ( ary = document.getElementsByClassName("placeholder") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("placeholder")[i].innerHTML = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+		$jsCode .= 'if ( ary = document.getElementsByClassName("csl-entry") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("csl-entry")[i].innerHTML = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
+		$jsCode .= 'if ( ( elem = document.getElementById("edit-object-label") ) && elem != "undefined" ) { document.getElementById("edit-object-label").value = elem.value.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } ';
+		$jsCode .= ' });';
+		drupal_add_js($jsCode,'inline');
 	}
 
 	if ( substr($url,-16) == "/RELS-INT/delete" ) {		// safety tuning
@@ -1894,3 +1884,59 @@ function _lib4ridora_target_text_format_to_plain_text($element, &$form_state, $f
 
   return $element;
 }
+
+/**
+ * Implements hook_solr_query_alter
+ *
+ * Used here to expand the search request on another Solr field when a specific Solr field is given.
+ */
+function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
+
+	if ( !strchr($_SERVER['HTTP_HOST'],"localhost") ) {
+		$webSite = strtok(substr($_SERVER['REQUEST_URI']."/",1),"/");
+		if ( strchr("eawag|empa|wsl",$webSite) ) { return; }
+	}
+
+	$batch = batch_get();		// right now this is not intended for/when exporting results.
+	if ( !empty($batch) ) { return; }
+
+	$query = $islandora_solr_query->solrQuery;
+
+	if ( !strchr(rawurldecode($query),":") ) {
+		// This seems ti be a simple search!(?)
+		// Our custom author list is an additional element inside the MODS, and the entire MODS content is available via catch_all_MODS_mt.
+		// So as long as the simple search will use catch_all_MODS_mt (...well, we better should ensure this) there is nothing to do here.
+		return;
+	}
+
+	$fieldSearch = trim( strtr( variable_get('lib4ridora_solr_search_extension','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'), "&", "+" ) );
+	if ( substr($fieldSearch,0,1) == "#" || !strchr($fieldSearch,"+") ) { return; }
+
+	$queryNew = $query;
+
+	$fieldData = explode( ",", strtr( $fieldSearch, "/;", "|," ) );
+	foreach( $fieldData as $fieldSearch ) {
+		$fieldExtraAry = explode("|",substr(strchr($fieldSearch,"+"),1));
+		foreach( $fieldExtraAry as $fieldExtra ) {
+			$fieldExtra = trim($fieldExtra);
+			if ( strchr($queryNew,$fieldExtra) ) {
+				// So far: consider this additional/alternate Solr field as appropriately treated, and go on. To be tuned.
+				continue;
+			}
+			$fieldUsedAry = explode("|",strtok($fieldSearch."+","+"));
+			foreach( $fieldUsedAry as $fieldUsed ) {
+				$fieldUsed = trim($fieldUsed);
+				if ( $value = strchr($queryNew,$fieldUsed) ) { 		// adv. search!? Usually a syntax with brackets is used, but also quotes are imaginable.
+					$value = substr($value,strlen($fieldUsed));
+					$value = ltrim( rawurldecode($value), "(=):\" \t\n\r\0\x0B" );
+					$value = strtr($value," )\"","|||");		// uncertain how it is delmited
+					$value = rtrim(substr($value,0,strpos($value,"|")));
+					$queryNew = str_replace( $fieldUsed, "{$fieldExtra}:({$value}) OR  {$fieldUsed}", $queryNew );
+				}
+			}
+		}
+	}
+
+	if ( $queryNew != $query ) { $islandora_solr_query->solrQuery = $queryNew; }
+}
+

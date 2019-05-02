@@ -9,7 +9,7 @@
  */
 function lib4ridora_admin(array $form, array &$form_state) {
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-  $textfield_size = 96;		// Default 60, but sometimes too short even for some text field values.
+  $textfield_size = 120;		// Default 60, but sometimes too short even for some text field values.
 
   $lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options( TRUE /* true to get the PDF link order as required for Lib4RI */ );
   $lib4ridora_multi_pdf_options_availability = $lib4ridora_multi_pdf_options['availability'];
@@ -227,6 +227,16 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => TRUE,
     '#size' => $textfield_size,
   );
+  if ( @isset($_GET['all']) || @isset($_GET['solr-ext']) ) {			// related to Redmine issue #250 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/250
+	  $form['lib4ridora_solr_search_extension'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Solr Search Field Extension'),
+		'#default_value' => variable_get('lib4ridora_solr_search_extension','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'),
+		'#description' => t("Accepts a special list, example: 'field1|field2 + fieldA' means that the search in 'field1' or in 'field2' both will be expanded by searching in 'fieldA' too."),
+		'#required' => FALSE,
+	    '#size' => 128,
+	  );
+  }
   if ( @isset($_GET['all']) || @isset($_GET['prepo']) ) {			// 'prepo' ~= label prepositions, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/57
 	  $form['lib4ridora_solr_field_org_terms_1on1'] = array(
 	    '#type' => 'textfield',
