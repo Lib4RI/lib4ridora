@@ -1082,6 +1082,14 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
     );
     $authors = citeproc_bibliography_from_mods($style, $object['MODS']->content);
     $csled_authors = array_map("trim", explode(',', strip_tags($authors)));
+    // added as work-around for/against publications with more than 1000 authors:
+    $tagAuthorList = trim( variable_get('lib4ridora_author_list_original', 'originalAuthorList') );		// may exist (only) in MODS
+    $reqEtAl = FALSE;		// in context with $tagAuthorList
+    if ( strlen($tagAuthorList) > 1 && ( $posA = strpos($mods_content,"<{$tagAuthorList}>") ) ) {
+      if ( $posZ = strpos($mods_content,"</{$tagAuthorList}>",$posA) ) {
+        if ( !empty( trim(strip_tags(substr($mods_content,$posA,$posZ-$posA))) /* check if originalAuthorList is empty */ ) ) { $reqEtAl = TRUE; }
+      }
+    }
     if (isset($author_json['author'])) {
       $authors = $author_json['author'];
       $author_list = array();
@@ -1113,16 +1121,24 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
         $last_author = array_pop($author_list);
         if (count($author_list)) {
           $authors_string = implode(', ', $author_list);
-          $authors_string .= " & {$last_author}";
-        }
-        else {
-          $authors_string = "$last_author";
+          $authors_string .= ( $reqEtAl ? ", {$last_author}, et al." : " &amp; {$last_author}" );
+        } else {
+          $authors_string = ( $reqEtAl ? "{$last_author}, et al." : $last_author );
         }
         $rendered['citation.tab']['authors'] = array(
           '#type' => 'item',
           '#markup' => $authors_string,
           '#weight' => -10,
         );
+      }
+    }
+    // added as work-around for/against publications with more than 1000 authors:
+    if ( $reqEtAl && strlen($tagAuthorList) > 1 ) {
+      $metaData = $rendered['citation.tab']['metadata']['#markup'];
+      if ( $posA = strpos($metaData,"Author(s)") ) {			// weak approach... - to be tuned
+        if ( $posZ = strpos($metaData,"</dd>",$posA) ) {
+          $rendered['citation.tab']['metadata']['#markup'] = substr($metaData,0,$posZ) . "<p>et al.</p>" . substr($metaData,$posZ);
+        }
       }
     }
 
