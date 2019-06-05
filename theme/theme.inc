@@ -68,7 +68,7 @@ function template_preprocess_lib4ridora_pdf_link(&$variables) {
  * There will be a 'hidden' configuration available at/with: admin/islandora/solution_pack_config/lib4ridora?dl
  */
 function lib4ridora_download_name_pdf($pid,$fileExt,$docVer,$dsId) {
-	$title = "Lib4RI-" . strtr($pid,":","-");		// aux
+	$title = "Lib4RI-" . strtr(rawurldecode($pid),":","-");		// aux
 	if( ( $object = islandora_object_load($pid) ) && @isset($object['MODS']) ) {
 	    $mods = $object['MODS']->content;
 		$dom = new DOMDocument();
@@ -87,13 +87,11 @@ function lib4ridora_download_name_pdf($pid,$fileExt,$docVer,$dsId) {
 		elseif ( substr(ltrim($confAry[0]),0,1) == "+" ) { $titCustom = 1; }			// to enable custum tunings for the naming.
 
 		if ( $query = $xpath->query('//mods:mods/mods:name[@type="personal"]/mods:namePart[@type="family"]') ) {
-			$name = strip_tags( $query->item(0)->nodeValue );
-			$name = trim( strip_tags( $query->item(0)->nodeValue ) );
+			$name = trim( strip_tags(html_entity_decode( $query->item(0)->nodeValue )) );
 		}
 
 		if ( $query = $xpath->query('//mods:mods/mods:titleInfo/mods:title') ) {
-			$title = strip_tags( $query->item(0)->nodeValue );
-			$title = trim( strtok( strip_tags( $query->item(0)->nodeValue ) . ":" , ":" ) );		// hard-coded: only until the next semi-colon
+			$title = trim( strtok( strip_tags(html_entity_decode( $query->item(0)->nodeValue )).":", ":" ) );		// hard-coded: only until the next semi-colon
 			$title = trim( str_replace("\n","; ",strtr($title,"<>\\/:\*\|\?\t\r","{}_--',~  ")) );
 		}
 
@@ -103,8 +101,9 @@ function lib4ridora_download_name_pdf($pid,$fileExt,$docVer,$dsId) {
 		}
 
 		if ( $query = $xpath->query('//mods:mods/mods:originInfo/mods:dateIssued') ) {
-			if ( $year = $query->item(0)->nodeValue ) {
-				$year = strtok($year."-","-");				// let's keep it simple, it's usually just a (year) number, rarely something like 2015-12-23
+			if ( $year = $query->item(0)->nodeValue ) {				// let's keep it simple, it's usually just a (year) number, rarely something like 2015-12-23
+				$year = ltrim( strip_tags(html_entity_decode($year)), "/-: \t\n\r\0\x0B" );
+				$year = rtrim( strtok(strtr($year,"/:","--")."-","-") );
 			}
 		}
 
