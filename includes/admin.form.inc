@@ -228,24 +228,40 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#size' => $textfield_size,
   );
   if ( @isset($_GET['all']) || @isset($_GET['solr-ext']) ) {			// related to Redmine issue #250 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/250
-	  $form['lib4ridora_solr_search_extension'] = array(
-		'#type' => 'textfield',
-		'#title' => t('Solr Search Field Extension'),
-		'#default_value' => variable_get('lib4ridora_solr_search_extension','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'),
-		'#description' => t("Accepts a special list, example: 'field1|field2 + fieldA' means that the search in 'field1' or in 'field2' both will be expanded by searching in 'fieldA' too."),
-		'#required' => FALSE,
-	    '#size' => 128,
-	  );
+    $form['lib4ridora_solr_search_extension'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Solr Search Field Extension'),
+    '#default_value' => variable_get('lib4ridora_solr_search_extension','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'),
+    '#description' => t("Accepts a special list, example: 'field1|field2 + fieldA' means that the search in 'field1' or in 'field2' both will be expanded by searching in 'fieldA' too."),
+    '#required' => FALSE,
+      '#size' => 128,
+    );
   }
   if ( @isset($_GET['all']) || @isset($_GET['prepo']) ) {			// 'prepo' ~= label prepositions, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/57
-	  $form['lib4ridora_solr_field_org_terms_1on1'] = array(
-	    '#type' => 'textfield',
-	    '#title' => t('Organizational unit name parts untouched'),
-	    '#description' => t('A comma seperated list of name parts where the first letter shall not be upper-cased (affects ingest form and adv. search).'),
-	    '#default_value' => variable_get('lib4ridora_solr_field_org_terms_1on1', 'or, and, for, of, in, at'),
-	    '#required' => FALSE,
-	    '#size' => ( ( @isset($_GET['all']) || @isset($_GET['prepo']) ) ? 128 : $textfield_size ),
-	  );
+    $form['lib4ridora_solr_field_org_terms_1on1'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Organizational unit name parts untouched'),
+      '#description' => t('A comma seperated list of name parts where the first letter shall not be upper-cased (affects ingest form and adv. search).'),
+      '#default_value' => variable_get('lib4ridora_solr_field_org_terms_1on1', 'or, and, for, of, in, at'),
+      '#required' => FALSE,
+      '#size' => ( ( @isset($_GET['all']) || @isset($_GET['prepo']) ) ? 128 : $textfield_size ),
+    );
   }
+  // related to Redmine issue #189 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/189 (about HTML tags in page title)
+  $form['lib4ridora_page_title_tag_fix'] = array(
+    '#type' => 'checkbox',
+    '#title' => t("Enable HTML tag tuning in web pages?"),
+    '#description' => t("Activate work-around to decode accidentially encoded HTML tags (related to HTML-editing of publications)."),
+    '#default_value' => variable_get('lib4ridora_page_title_tag_fix', TRUE),
+    '#required' => FALSE,
+    '#prefix' => "<a name='html'><!-- to jump here --></a><span style='font-size:10pt; position:relative; top:4px'><b>Layout</b>",
+    '#suffix' => "</span><br>",
+  );
+  $form['lib4ridora_config_dummy_line'] = array(
+    '#type' => 'radios',
+    '#title' => t(''),
+    '#options' => array(),
+    '#required' => FALSE,
+  );
   return system_settings_form($form);
 }

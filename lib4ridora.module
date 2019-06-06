@@ -1226,6 +1226,7 @@ function lib4ridora_page_alter(&$page) {
 	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) ) {
 		// work-around (for the time being), in context with Redmine Issue #189: http://lib-dora-dev1.emp-eaw.ch:3000/issues/189
 		$jsCode = 'jQuery(document).ready(function() { ';
+		$jsCode .= 'document.title = document.title.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<").replace( /<\/?[^>]+(>|$)/g, ""); ';
 		$jsCode .= 'if ( ( elem = document.getElementById("page-title") ) && elem != "undefined" ) { document.getElementById("page-title").innerHTML = elem.innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } ';
 		$jsCode .= 'if ( ary = document.getElementsByTagName("caption") ) { for(i=0;i<ary.length;i++) { document.getElementsByTagName("caption")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
 		$jsCode .= 'if ( ary = document.getElementsByClassName("page-title") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("page-title")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
@@ -1233,6 +1234,7 @@ function lib4ridora_page_alter(&$page) {
 		$jsCode .= 'if ( ary = document.getElementsByClassName("placeholder") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("placeholder")[i].innerHTML = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
 		$jsCode .= 'if ( ary = document.getElementsByClassName("csl-entry") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("csl-entry")[i].innerHTML = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
 		$jsCode .= 'if ( ( elem = document.getElementById("edit-object-label") ) && elem != "undefined" ) { document.getElementById("edit-object-label").value = elem.value.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } ';
+		$jsCode .= 'if ( ( bttn = document.getElementById("edit-delete") ) && bttn != "undefined" ) { ary = bttn.value.split("\'",3); dt = document.title.substring(0,(document.title+" |").indexOf(" |")).trim(); ary[1] = ( dt.length > 32 ? dt.substring(0,30)+"..." : dt ); document.getElementById("edit-delete").value = ary.join("\'"); } ';
 		$jsCode .= ' });';
 		drupal_add_js($jsCode,'inline');
 	}
