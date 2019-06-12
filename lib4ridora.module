@@ -1185,11 +1185,16 @@ function lib4ridora_islandora_personCModel_islandora_view_object_alter(AbstractO
 // work-around to revert HTML encoding in page title (for the time being), in context with Redmine Issue #189: http://lib-dora-dev1.emp-eaw.ch:3000/issues/189
 function lib4ridora_page_title_tagless($title, $extra_safe = FALSE ) {
 	$changed = FALSE;
+	$titleAux = $title;
 	if ( $extra_safe ) {		// as long as we got the title with drupal_get_title() we don't need this.
-		$titleAux = str_ireplace("<","&lt;",str_ireplace(">","&gt;",$title));	// for safety when passed through, we only want to revert the tags in the list
+		// for safety when 'passed through', we only want to revert the tags in the list
+		while( stristr($titleAux,"<") ) { $titleAux = str_ireplace("<","&lt;",$titleAux); }
+		while( stristr($titleAux,">") ) { $titleAux = str_ireplace(">","&gt;",$titleAux); }
 		if ( $title != $titleAux ) { $changed = TRUE; $title = $titleAux; }
 	}
-	$titleAux = str_ireplace("&amp;lt;","&lt;",str_ireplace("&amp;gt;","&gt;",$title));
+	while( stristr($titleAux,"&amp;amp;") ) { $titleAux = str_ireplace("&amp;amp;","&amp;",$titleAux); }
+	while( stristr($titleAux,"&amp;lt;") ) { $titleAux = str_ireplace("&amp;lt;","&lt;",$titleAux); }
+	while( stristr($titleAux,"&amp;gt;") ) { $titleAux = str_ireplace("&amp;gt;","&gt;",$titleAux); }
 	if ( $title != $titleAux ) { $changed = TRUE; $title = $titleAux; }
 
 	$tagAry = array('i','em','b','strong','sup','sub','u','small');		// widely copied from here: https://www.dora.lib4ri.ch/psi/admin/config/content/formats/filtered_html
@@ -1201,9 +1206,24 @@ function lib4ridora_page_title_tagless($title, $extra_safe = FALSE ) {
 }
 function lib4ridora_form_alter(&$form, $form_state, $form_id) {
 	// dpm($form_id);
-	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) && user_is_logged_in() && 
-		in_array($form_id,array("lib4ridora_citation_select_mods_edit_form","islandora_ip_embargo_object_embargo_form","lib4ridora_multi_embargo_edit_form")) ) {
-		if ( $title = lib4ridora_page_title_tagless( drupal_get_title() ) ) { drupal_set_title( $title, PASS_THROUGH ); }
+	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) && user_is_logged_in() ) { 
+		if ( in_array($form_id,array("islandora_object_properties_form","islandora_object_properties_form_delete")) ) {
+			// related to HTML-editor issues: Changing the value of this submit button by jQuery/JavaScript may be tricky,
+			// as tested it works smoother when changing it already as form element:
+			if ( strchr($form['delete']['#value'],"&") || strchr($form['delete']['#value'],"<") ) {		// the value may actually have truncated HTML tags!
+				// since this label the be used on the button directly, we cannnot allow HTML tags here.
+				$label = trim( strip_tags( html_entity_decode( lib4ridora_page_title_tagless( drupal_get_title() ) ) ) );
+				while( strchr($label,"  ") ) { $label = str_replace("  "," ",$label); }
+
+				$valAry = explode("'",str_replace("&#039;","'",str_replace("\'","[aPo)",$form['delete']['#value'])));
+				$valAry[1] = ( strlen($label) > 25 ) ? rtrim(substr($label,0,22))."..." : $label;
+
+				$form['delete']['#value'] = str_replace("[aPo)","\'",implode("'",$valAry));
+			}
+		}
+		elseif ( in_array($form_id,array("lib4ridora_citation_select_mods_edit_form","islandora_ip_embargo_object_embargo_form","lib4ridora_multi_embargo_edit_form")) ) {
+			if ( $title = lib4ridora_page_title_tagless( drupal_get_title() ) ) { drupal_set_title( $title, PASS_THROUGH ); }
+		}
 	}
 }
 function lib4ridora_form_islandora_scholar_citation_select_form_alter(&$form, &$form_state) {
@@ -1229,12 +1249,15 @@ function lib4ridora_page_alter(&$page) {
 		$jsCode .= 'document.title = document.title.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<").replace( /<\/?[^>]+(>|$)/g, ""); ';
 		$jsCode .= 'if ( ( elem = document.getElementById("page-title") ) && elem != "undefined" ) { document.getElementById("page-title").innerHTML = elem.innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } ';
 		$jsCode .= 'if ( ary = document.getElementsByTagName("caption") ) { for(i=0;i<ary.length;i++) { document.getElementsByTagName("caption")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
-		$jsCode .= 'if ( ary = document.getElementsByClassName("page-title") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("page-title")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
-		$jsCode .= 'if ( ary = document.getElementsByClassName("messages__item") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("messages__item")[i].innerHTML = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
-		$jsCode .= 'if ( ary = document.getElementsByClassName("placeholder") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("placeholder")[i].innerHTML = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
-		$jsCode .= 'if ( ary = document.getElementsByClassName("csl-entry") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("csl-entry")[i].innerHTML = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
+		$jsCode .= 'if ( ary = document.getElementsByClassName("page-title") )               { for(i=0;i<ary.length;i++) { document.getElementsByClassName("page-title")[i].innerHTML               = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+		$jsCode .= 'if ( ary = document.getElementsByClassName("islandora-object-caption") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("islandora-object-caption")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+		$jsCode .= 'if ( ary = document.getElementsByClassName("messages__item") )           { for(i=0;i<ary.length;i++) { document.getElementsByClassName("messages__item")[i].innerHTML           = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
+		$jsCode .= 'if ( ary = document.getElementsByClassName("placeholder") )              { for(i=0;i<ary.length;i++) { document.getElementsByClassName("placeholder")[i].innerHTML              = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+		$jsCode .= 'if ( ary = document.getElementsByClassName("csl-entry") )                { for(i=0;i<ary.length;i++) { document.getElementsByClassName("csl-entry")[i].innerHTML                = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
 		$jsCode .= 'if ( ( elem = document.getElementById("edit-object-label") ) && elem != "undefined" ) { document.getElementById("edit-object-label").value = elem.value.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } ';
-		$jsCode .= 'if ( ( bttn = document.getElementById("edit-delete") ) && bttn != "undefined" ) { ary = bttn.value.split("\'",3); dt = document.title.substring(0,(document.title+" |").indexOf(" |")).trim(); ary[1] = ( dt.length > 32 ? dt.substring(0,30)+"..." : dt ); document.getElementById("edit-delete").value = ary.join("\'"); } ';
+	//	$jsCode .= 'if ( ( bttn = document.getElementById("edit-delete") ) && bttn != "undefined" ) { ary = bttn.value.split("\'",3); dt = document.title.substring(0,(document.title+" |").indexOf(" |")).trim(); ary[1] = ( dt.length > 32 ? dt.substring(0,30)+"..." : dt ); document.getElementById("edit-delete").value = ary.join("\'"); } ';
+	// Can be handled as form element, morever changing the value of the submit button may end up in a broken redirection to the 'confirm deletion' page,
+	// Note too that we (always?) can find the single-quote as &#039; within the form value... - however check out now the hook lib4ridora_form_alter()
 		$jsCode .= ' });';
 		drupal_add_js($jsCode,'inline');
 	}
