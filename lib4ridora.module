@@ -1097,6 +1097,10 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
       foreach ($authors as $key => &$author) {
         $family = (isset($author['family']) ? $author['family'] : "");
         $given = (isset($author['given']) ? $author['given'] : "");
+		if ( empty($family) && empty($given) ) {
+          $commaoffset -=1;
+		  continue;
+		}
         $commacnt = substr_count($family, ',') + substr_count($given, ','); // commas in family and given names
         $entity = $xpath->evaluate('string(//mods:name[@type="personal"][php:functionString("tolowernotrailingdot", mods:namePart[@type="family"]) = "' . tolowernotrailingdot($family) . '" and php:functionString("tolowernotrailingdot", mods:namePart[@type="given"]) = "' . tolowernotrailingdot($given) . '"]/'.variable_get('lib4ridora_mods_query_author_id', 'mods:nameIdentifier[@type="authorId"]').')');
         // Grab from our parsed CSL style string; account for possible commas in name fields
