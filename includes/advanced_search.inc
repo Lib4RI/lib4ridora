@@ -339,7 +339,7 @@ function lib4ridora_construct_full_text_filter(&$form_state) {
     $filters[] = $availability_field . " : " . $no_full_text;
   }
 
-  if ($form_state['values']['full_text']['under embargo']) {		// Our adv.search table shows 3 items per row, so 'Under Embargo' will be right below 'Open Access'
+  if ($form_state['values']['full_text']['under embargo']) {
     $filters[] = $availability_field . " : " . $under_embargo;
   }
 

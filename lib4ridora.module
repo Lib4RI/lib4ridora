@@ -1350,9 +1350,9 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#type' => 'checkboxes',
     '#options' => array(
       'open access' => t('Open Access'),
-      'under embargo' => t('Under Embargo'),
       'restricted' => t('Restricted'),
       'no full text' => t('No Full Text'),
+      'under embargo' => t('Under Embargo'),
     ),
     '#title' => t('Full Text'),
     // XXX: Wrapping element desired to counteract core CSS at this level, and
