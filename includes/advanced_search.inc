@@ -323,6 +323,7 @@ function lib4ridora_construct_full_text_filter(&$form_state) {
   $open = islandora_solr_lesser_escape('Open Access');
   $restricted = islandora_solr_lesser_escape('Restricted');
   $no_full_text = islandora_solr_lesser_escape('No Full Text');
+  $under_embargo = islandora_solr_lesser_escape('Under Embargo');
 
   $filters = array();
 
@@ -336,6 +337,10 @@ function lib4ridora_construct_full_text_filter(&$form_state) {
 
   if ($form_state['values']['full_text']['no full text']) {
     $filters[] = $availability_field . " : " . $no_full_text;
+  }
+
+  if ($form_state['values']['full_text']['under embargo']) {		// Our adv.search table shows 3 items per row, so 'Under Embargo' will be right below 'Open Access'
+    $filters[] = $availability_field . " : " . $under_embargo;
   }
 
   return lib4ridora_construct_filter_string_from_array($filters);

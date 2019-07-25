@@ -16,6 +16,7 @@ const LIB4RIDORA_FULL_TEXT_RELATIONSHIP = 'fullText';
 function lib4ridora_update_full_text(AbstractObject $object) {
   module_load_include('inc', 'lib4ridora', 'includes/utilities');
   $is_open_access = FALSE;
+  $is_under_embargo = FALSE;
   $accepted_or_published = FALSE;
   $pdf_datastreams = lib4ridora_retrieve_filtered_pdfs($object);
   $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
@@ -25,11 +26,10 @@ function lib4ridora_update_full_text(AbstractObject $object) {
     if ( $info['availability'] == "private" && substr(strval($datastream->id),0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
       continue;
     }
-    if (in_array($info['document_version'], array(
-      'accepted version',
-      'published version',
-    ))) {
-    	$accepted_or_published = true;
+    $is_ds_acc_or_pub = FALSE;		// only considering this datastream
+    if ( in_array($info['document_version'],array('accepted version','accepted version')) ) {
+        $is_ds_acc_or_pub = TRUE;
+    	$accepted_or_published = TRUE;
     	if ( $info['availability'] == "public" ) {
           $is_open_access = TRUE;
         }
@@ -38,8 +38,10 @@ function lib4ridora_update_full_text(AbstractObject $object) {
       $embargo_date = $datastream->relationships->get(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('embargo_date'));
       $embargo_date = reset($embargo_date);
       // Check if embargo date has passed.
-      if (REQUEST_TIME > strtotime($embargo_date['object']['value'])) {
+      if (REQUEST_TIME >= strtotime($embargo_date['object']['value'])) {
         $is_open_access = TRUE;
+      } elseif ( $is_ds_acc_or_pub ) {
+        $is_under_embargo = TRUE;
       }
     }
   }
@@ -48,6 +50,9 @@ function lib4ridora_update_full_text(AbstractObject $object) {
   }
   elseif ($is_open_access) {
     $relationship_value = 'Open Access';
+  }
+  elseif ($is_under_embargo) {
+    $relationship_value = 'Under Embargo';
   }
   else {
     $relationship_value = 'Restricted';

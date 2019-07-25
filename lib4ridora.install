@@ -55,6 +55,7 @@ function lib4ridora_uninstall() {
 	'lib4ridora_page_title_tag_fix',
 	'lib4ridora_solr_search_extension',
 	'lib4ridora_author_list_original',
+	'lib4ridora_amount_recent_additions',
 	'lib4ridora_config_dummy_line',
   );
   array_walk($variables, 'variable_del');

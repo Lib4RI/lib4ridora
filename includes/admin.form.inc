@@ -32,6 +32,16 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => FALSE,
     '#size' => $textfield_size,
   );
+  if ( @isset($_GET['all']) || @isset($_GET['add']) ) {
+	  $form['lib4ridora_amount_recent_additions'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Amount of Recent Additions'),
+		'#default_value' => min( max( variable_get('lib4ridora_amount_recent_additions', 15), 2 ), 100 ),
+		'#description' => t("Number to define how many of the recently added publications will be listed when you click on the 'Browse' link."),
+		'#required' => FALSE,
+	    '#size' => 128,
+	  );
+  }
   if ( @isset($_GET['all']) || @isset($_GET['dl']) ) {			// related to Redmine issue #67 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/67
 	  $form['lib4ridora_download_name_tuning'] = array(
 		'#type' => 'textfield',

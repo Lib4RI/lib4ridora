@@ -524,7 +524,7 @@ function lib4ridora_multi_pdf_defaults_properties() {
   $date = getdate();
   $embargo_date = array(
     'year' => $date['year'],
-    'month' => $date['month'],
+    'month' => $date['mon'],
     'day' => $date['mday'],
   );
   return array(
@@ -609,10 +609,10 @@ function lib4ridora_append_document_information($files, &$form ) {
   foreach ($files as $fIdx => $file) {
     $uuid = $edit ? $file->id : $file->uuid;
     // check if we need to skip PDF/A:
-    if ( $skip_pdfa && substr($uuid,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
-      continue;
-    }
-    $defaults = $edit ? lib4ridora_get_embargo_info($file) : lib4ridora_multi_pdf_defaults_properties();
+	$is_pdfa = ( substr($uuid,0-strlen($pdfa_suffix)) == $pdfa_suffix );
+    if ( $is_pdfa && $skip_pdfa ) { continue; }
+ 
+    $defaults = $edit ? lib4ridora_get_embargo_info($file,(!$is_pdfa)) : lib4ridora_multi_pdf_defaults_properties();
     $filename = $edit ? $file->label : $file->filename;
     $form['files'][$uuid] = array(
       '#type' => 'fieldset',

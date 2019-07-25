@@ -35,6 +35,30 @@ function drush_lib4ridora_lift_embargoes() {
   // We don't limited this to a date range, as the default behaviour
   // is to set the object's full text to 'Open Access', if any single PDF has an
   // expired embargo.
+  // Force the cron to run as user 1 so we don't get locked out of objects.
+  $user = user_load(1);
+  $repository = islandora_get_tuque_connection($user);
+
+  $query = <<<EOT
+PREFIX lib4ridora-rels-ext: <$rels_ext_namespace>
+PREFIX lib4ridora-rels-int: <$rels_int_namespace>
+SELECT ?object WHERE {
+  ?object <fedora-model:state> <fedora-model:Active> ;
+          <lib4ridora-rels-ext:fullText> "Under Embargo" ;
+          <fedora-view:disseminates> ?ds .
+  ?ds <fedora-view:mimeType> "application/pdf" ;
+      <lib4ridora-rels-int:lib4ridora-multi-embargo-embargo_date> ?date .
+  FILTER(?date <= '$now'^^xsd:dateTime)
+}
+EOT;
+  $results = $repository->repository->ri->sparqlQuery($query);
+  foreach ($results as $result) {		// new, for/with 'Under Embargo'
+    $object = islandora_object_load($result['object']['value']);
+    if ($object) {
+      lib4ridora_update_full_text($object);
+    }
+  }
+
   $query = <<<EOT
 PREFIX lib4ridora-rels-ext: <$rels_ext_namespace>
 PREFIX lib4ridora-rels-int: <$rels_int_namespace>
@@ -44,14 +68,11 @@ SELECT ?object WHERE {
           <fedora-view:disseminates> ?ds .
   ?ds <fedora-view:mimeType> "application/pdf" ;
       <lib4ridora-rels-int:lib4ridora-multi-embargo-embargo_date> ?date .
-  FILTER(?date < '$now'^^xsd:dateTime)
+  FILTER(?date <= '$now'^^xsd:dateTime)
 }
 EOT;
-  // Force the cron to run as user 1 so we don't get locked out of objects.
-  $user = user_load(1);
-  $repository = islandora_get_tuque_connection($user);
   $results = $repository->repository->ri->sparqlQuery($query);
-  foreach ($results as $result) {
+  foreach ($results as $result) {		// old (before August 2019), quite obsolete!?
     $object = islandora_object_load($result['object']['value']);
     if ($object) {
       lib4ridora_update_full_text($object);
