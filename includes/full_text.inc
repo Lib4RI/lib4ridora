@@ -19,20 +19,22 @@ function lib4ridora_update_full_text(AbstractObject $object) {
   $is_under_embargo = FALSE;
   $accepted_or_published = FALSE;
   $pdf_datastreams = lib4ridora_retrieve_filtered_pdfs($object);
+  $pdf_ds_count = 0;		// amount of PDFs really examined here.
   $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
   foreach ($pdf_datastreams as $datastream) {
     $info = lib4ridora_get_embargo_info($datastream);
-    // skip evaluating PDF/A files at Lib4RI if they are 'private' (default)
+    // skip evaluating PDF/A files at Lib4RI if they are 'private' (default/convention):
     if ( $info['availability'] == "private" && substr(strval($datastream->id),0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
       continue;
     }
+    $pdf_ds_count += 1;
     $is_ds_acc_or_pub = FALSE;		// only considering this datastream
-    if ( in_array($info['document_version'],array('accepted version','accepted version')) ) {
-        $is_ds_acc_or_pub = TRUE;
-    	$accepted_or_published = TRUE;
-    	if ( $info['availability'] == "public" ) {
-          $is_open_access = TRUE;
-        }
+    if ( in_array($info['document_version'],array('published version','accepted version')) ) {
+      $is_ds_acc_or_pub = TRUE;
+      $accepted_or_published = TRUE;
+      if ( $info['availability'] == "public" ) {
+        $is_open_access = TRUE;
+      }
     }
     if ($info['availability'] == 'date') {
       $embargo_date = $datastream->relationships->get(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('embargo_date'));
@@ -45,7 +47,7 @@ function lib4ridora_update_full_text(AbstractObject $object) {
       }
     }
   }
-  if (!$pdf_datastreams || !$accepted_or_published) {
+  if ( empty($pdf_ds_count) || !$accepted_or_published) {
     $relationship_value = 'No Full Text';
   }
   elseif ($is_open_access) {
