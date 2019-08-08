@@ -157,14 +157,14 @@ function template_process_lib4ridora_pdf_link(&$variables) {
           $availability_text = t('Intranet Only until tomorrow');
         } else { // Embargo still active. Need to get a human readable month.
           $date = new DateTime();
-          $availability_text = t('Intranet Only until @day @month @year', array(
+          $availability_text = t('Intranet Only until @day&nbsp;@month&nbsp;@year', array(
             '@day' => $values['embargo_date']['day'],
             '@month' => date_format($date->createFromFormat('!m', $values['embargo_date']['month']), 'F'),
             '@year' => $values['embargo_date']['year'],
           ));
         }
-      } elseif ( REQUEST_TIME < ( 60 * 60 * 15 - ( pow(strpos($_SERVER['HTTP_HOST'],"prod"),0) * 9 ) + $embargo ) ) { // RELS-EXT just changed, or overdue. For Prod server 6h only.
-        $availability_text = t('Embargo just expiring');
+      } elseif ( REQUEST_TIME < ( 60 * 60 * 12 - ( pow(strpos($_SERVER['HTTP_HOST'],"prod"),0) * 6 ) + $embargo ) ) { // RELS-EXT just changed, or overdue. For Prod server 6h only.
+        $availability_text = t('Open Access now');
       } else { 	// Embargo period is over:
         $availability_text = t('Open Access');
       }
