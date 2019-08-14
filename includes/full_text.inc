@@ -16,7 +16,7 @@ const LIB4RIDORA_FULL_TEXT_RELATIONSHIP = 'fullText';
 function lib4ridora_update_full_text(AbstractObject $object) {
   module_load_include('inc', 'lib4ridora', 'includes/utilities');
   $is_open_access = FALSE;
-  $is_under_embargo = FALSE;
+  $is_embargo_restricted = FALSE;
   $accepted_or_published = FALSE;
   $pdf_datastreams = lib4ridora_retrieve_filtered_pdfs($object);
   $pdf_ds_count = 0;		// amount of PDFs really examined here.
@@ -43,7 +43,7 @@ function lib4ridora_update_full_text(AbstractObject $object) {
       if (REQUEST_TIME >= strtotime($embargo_date['object']['value'])) {
         $is_open_access = TRUE;
       } elseif ( $is_ds_acc_or_pub ) {
-        $is_under_embargo = TRUE;
+        $is_embargo_restricted = TRUE;
       }
     }
   }
@@ -53,8 +53,8 @@ function lib4ridora_update_full_text(AbstractObject $object) {
   elseif ($is_open_access) {
     $relationship_value = 'Open Access';
   }
-  elseif ($is_under_embargo) {
-    $relationship_value = 'Under Embargo';
+  elseif ($is_embargo_restricted) {
+    $relationship_value = variable_get('lib4ridora_term_embargo_restricted', 'Restricted (Embargo)');
   }
   else {
     $relationship_value = 'Restricted';

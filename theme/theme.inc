@@ -153,7 +153,7 @@ function template_process_lib4ridora_pdf_link(&$variables) {
       $embargo = gmmktime(0, 0, 0, $values['embargo_date']['month'], $values['embargo_date']['day'], $values['embargo_date']['year']);
       // Check if embargo date has passed.
       if ( REQUEST_TIME < $embargo ) {
-        if ( ( 60 * 60 * 18 + REQUEST_TIME ) >= $embargo ) {		// expiring within the next 18h
+        if ( ( 3600 * 18 + REQUEST_TIME ) >= $embargo ) {		// expiring within the next 18h
           $availability_text = t('Intranet Only until tomorrow');
         } else { // Embargo still active. Need to get a human readable month.
           $date = new DateTime();
@@ -163,7 +163,7 @@ function template_process_lib4ridora_pdf_link(&$variables) {
             '@year' => $values['embargo_date']['year'],
           ));
         }
-      } elseif ( REQUEST_TIME < ( 60 * 60 * 12 - ( pow(strpos($_SERVER['HTTP_HOST'],"prod"),0) * 6 ) + $embargo ) ) { // RELS-EXT just changed, or overdue. For Prod server 6h only.
+      } elseif ( REQUEST_TIME < ( 3600 * 12 + $embargo ) ) { // RELS-EXT just changed (or overdue) - indicating this for 12h
         $availability_text = t('Open Access now');
       } else { 	// Embargo period is over:
         $availability_text = t('Open Access');

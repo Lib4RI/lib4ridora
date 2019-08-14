@@ -323,24 +323,24 @@ function lib4ridora_construct_full_text_filter(&$form_state) {
   $open = islandora_solr_lesser_escape('Open Access');
   $restricted = islandora_solr_lesser_escape('Restricted');
   $no_full_text = islandora_solr_lesser_escape('No Full Text');
-  $under_embargo = islandora_solr_lesser_escape('Under Embargo');
+  $embargo_restricted = islandora_solr_lesser_escape( variable_get('lib4ridora_term_embargo_restricted', 'Restricted (Embargo)') );
 
   $filters = array();
 
-  if ($form_state['values']['full_text']['open access']) {
-    $filters[] = $availability_field . " : " . $open;
-  }
-
   if ($form_state['values']['full_text']['restricted']) {
     $filters[] = $availability_field . " : " . $restricted;
+  }
+
+  if ($form_state['values']['full_text']['open access']) {
+    $filters[] = $availability_field . " : " . $open;
   }
 
   if ($form_state['values']['full_text']['no full text']) {
     $filters[] = $availability_field . " : " . $no_full_text;
   }
 
-  if ($form_state['values']['full_text']['under embargo']) {
-    $filters[] = $availability_field . " : " . $under_embargo;
+  if ($form_state['values']['full_text']['embargo-restricted']) {
+    $filters[] = $availability_field . " : " . $embargo_restricted;
   }
 
   return lib4ridora_construct_filter_string_from_array($filters);
