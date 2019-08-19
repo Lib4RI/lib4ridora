@@ -27,10 +27,11 @@ function lib4ridora_drush_command() {
 function drush_lib4ridora_lift_embargoes() {
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
   module_load_include('inc', 'lib4ridora', 'includes/full_text');
-  $time_now = gmdate("Y-m-d\TH:i:s\Z", time());
+  date_default_timezone_set('CET');			// required!
+  $now = date("Y-m-d\TH:i:s\Z", time());		// intentionally not gmdate()
   $rels_ext_namespace = LIB4RIDORA_RELS_EXT_NAMESPACE;
   $rels_int_namespace = LIB4RIDORA_RELS_URI;
-  $embagro_resticted = variable_get('lib4ridora_term_embargo_restricted', 'Restricted (Embargo)');
+  $embargo_restricted = variable_get('lib4ridora_term_embargo_restricted', 'Restricted (Embargo)');
   // Look for any embargo's which have expired, and update their RELS-EXT as
   // appropriate.
   // We don't limited this to a date range, as the default behaviour
@@ -45,11 +46,11 @@ PREFIX lib4ridora-rels-ext: <$rels_ext_namespace>
 PREFIX lib4ridora-rels-int: <$rels_int_namespace>
 SELECT ?object WHERE {
   ?object <fedora-model:state> <fedora-model:Active> ;
-          <lib4ridora-rels-ext:fullText> "$embagro_resticted" ;
+          <lib4ridora-rels-ext:fullText> "$embargo_restricted" ;
           <fedora-view:disseminates> ?ds .
   ?ds <fedora-view:mimeType> "application/pdf" ;
       <lib4ridora-rels-int:lib4ridora-multi-embargo-embargo_date> ?date .
-  FILTER(?date <= '$time_now'^^xsd:dateTime)
+  FILTER(?date <= '$now'^^xsd:dateTime)
 }
 EOT;
   $results = $repository->repository->ri->sparqlQuery($query);
@@ -69,7 +70,7 @@ SELECT ?object WHERE {
           <fedora-view:disseminates> ?ds .
   ?ds <fedora-view:mimeType> "application/pdf" ;
       <lib4ridora-rels-int:lib4ridora-multi-embargo-embargo_date> ?date .
-  FILTER(?date <= '$time_now'^^xsd:dateTime)
+  FILTER(?date <= '$now'^^xsd:dateTime)
 }
 EOT;
   $results = $repository->repository->ri->sparqlQuery($query);
