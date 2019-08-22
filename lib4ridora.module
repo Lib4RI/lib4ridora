@@ -366,14 +366,56 @@ function lib4ridora_menu_alter(&$items) {
 }
 
 /**
- * Implements hook_block_view_alter() - currently not needed !(?)
- *
+ * Implements hook_preprocess_menu_link().
+ */
+function lib4ridora_preprocess_menu_link(&$vars) {
+  $element = &$vars['element'];
+  if ( $emSource = strchr($element['#href'],"?email-template.") ) {
+    $emSource = str_replace("?","/var/www/html/data/all/",$emSource);		// assigning the local path (hard-coded, could also be derivated from a clever/tweaked HTTP url...)
+    if ( $emData = @file_get_contents($emSource) ) {
+      $emExt = strrchr($emSource,".");
+      if ( strtolower($emExt) != ".html" ) {
+        foreach( array("<p>","<br>","<p/>","<br/>") as $brk ) { $emData = str_ireplace($brk,"\r\n",$emData); }
+      }
+      // get the link of the page where the user currently is:
+      $emLink = "https://www.dora" . ( strchr($_SERVER['HTTP_HOST'],"prod") ? "" : "-dev" ) . ".lib4ri.ch" . request_uri();
+      $emData = str_ireplace("Lib4RI:WebPageOrigin",$emLink,$emData);		// 'Lib4RI:WebPageOrigin' is a placeholder
+      // get the institute abbreviation:
+      $emInst = strtok(ltrim(substr(strchr($GLOBALS['base_url']."/",".ch/"),4),"/"),"/");
+      $emInst = empty($emInst) ? "Lib4RI" : ( strlen($emInst) > 3 ? ucfirst($emInst) : strtoupper($emInst) );
+      $emData = str_ireplace("Lib4RI:Eawag/Empa/PSI/WSL",$emInst,$emData);			// 'Lib4RI:Eawag/Empa/PSI/WSL' is a placeholder
+      // replace the defaults for e-mail subject+body:
+      $emSubject = "Feedback/Suggestion for " . $emInst;
+      if ( $pos = strpos($emData,"</title>") ) {
+        $emSubject = strchr(substr($emData,0,$pos),"<title");
+        $emSubject = trim(strip_tags($emSubject),":- \t\n\r\0\x0B");
+      }
+      $emBody = "Hello!\r\n";
+      if ( $pos = strpos($emData,"</body>") ) {
+        $emBody = strchr(substr($emData,0,$pos),"<body");
+        $emBody = ( strtolower($emExt) == ".html" ) ? trim($emBody) : str_ireplace("&nbsp;"," ",ltrim(strip_tags($emBody)));
+      }
+      // assigning the new e-mail/mailto link:
+      $element['#href'] = "mailto:dora@lib4ri.ch?subject=" . rawurlencode($emSubject) . "&body=" . rawurlencode($emBody);
+    }
+    else { // old link (before Aug 2019):
+      $element['#href'] = 'mailto:dora@lib4ri.ch?subject=DORA%20PROBLEM&body=PROBLEM%20REPORT%0D%0A%0D%0APAGE:%20' . urlencode($GLOBALS['base_url'].request_uri()) . '%0D%0AREFERRER:%20' . urlencode($_SERVER['HTTP_REFERER']) . '%0D%0A%0D%0ADESCRIPTION:%0D%0A%0D%0A%0D%0A';
+    }
+  }
+  if ($element['#href'] == 'http://www.lib4ri.ch/about/contact.html?pick_a_subject=submit') {
+      $element['#localized_options']['attributes']['target'][] = '_blank';
+  }
+}
+
+/**
+ * Implements hook_block_view_alter().
+ */
 function lib4ridora_block_view_alter(&$data, $block) {
   if (isset($data['content']) && is_array($data['content']) && isset($data['content']['#markup']) && (strpos($data['content']['#markup'], '<a href="http://www.lib4ri.ch">') !== false)) {
     $data['content']['#markup'] = preg_replace('/<a href="http:\/\/www.lib4ri.ch">/', '<a href="http://www.lib4ri.ch" target="_blank">', $data['content']['#markup']);
   }
 }
- */
+
 
 /**
  * Access callback, to determine whether or not to create the RoMEO tab.
@@ -1231,6 +1273,8 @@ function lib4ridora_form_islandora_scholar_citation_select_form_alter(&$form, &$
  */ 
 function lib4ridora_page_alter(&$page) {
 
+	$url = strtok(strtok($_SERVER['REQUEST_URI']."?","?")."#","#");
+
 	/* ( strchr("/".strtok(substr($url,1)."/","/"),"/eawag/empa/psi/wsl/") || strchr($url,"/islandora/object/") || strchr($url,"/islandora/search/") ) */
 	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) ) {
 		// work-around (for the time being), in context with Redmine Issue #189: http://lib-dora-dev1.emp-eaw.ch:3000/issues/189
@@ -1251,15 +1295,20 @@ function lib4ridora_page_alter(&$page) {
 		drupal_add_js($jsCode,'inline');
 	}
 
-	if ( user_is_logged_in() ) {
-		$url = strtok(strtok($_SERVER['REQUEST_URI']."?","?")."#","#");
-
- 		if ( substr($url,-16) == "/RELS-INT/delete" ) {		// safety tuning
-			// dpm(var_dump($page['content']['system_main']));
-			if ( $content = @$page['content']['system_main']['derivative_info']['#markup'] ) {
-				$page['content']['system_main']['derivative_info']['#markup'] = str_replace( ", RELS-EXT", " &plus; <font color='#e70707'><b>RELS-EXT</b> &nbsp; &nbsp; &nbsp; (warning: also the <a href='../../manage/datastreams'>RELS-EXT datastream</a> will be deleted, causing future editing problems)</font>", $content );
-				if ( $content = @$page['content']['system_main']['derivative_info']['#title'] ) {
-					$page['content']['system_main']['derivative_info']['#title'] = str_replace( "Datastream(s) to be purged", "Datastreams to be purged:", $content );
+	if ( substr($url,-16) == "/RELS-INT/delete" ) {		// safety tuning
+		// dpm(var_dump($page['content']['system_main']));
+		if ( $content = @$page['content']['system_main']['derivative_info']['#markup'] ) {
+			$page['content']['system_main']['derivative_info']['#markup'] = str_replace( ", RELS-EXT", " &plus; <font color='#e70707'><b>RELS-EXT</b> &nbsp; &nbsp; &nbsp; (warning: also the <a href='../../manage/datastreams'>RELS-EXT datastream</a> will be deleted, causing future editing problems)</font>", $content );
+			if ( $content = @$page['content']['system_main']['derivative_info']['#title'] ) {
+				$page['content']['system_main']['derivative_info']['#title'] = str_replace( "Datastream(s) to be purged", "Datastreams to be purged:", $content );
+			}
+		}
+	}
+	elseif ( strchr(substr(dirname($url)."/",-20),"/islandora/object/") && preg_match( '/^\w+:{1}\d+$/',urldecode(basename($url))) ) {
+		foreach( $page['footer']['menu_menu-footer-menu'] as $idx => $link ) {
+			if ( $title = @$page['footer']['menu_menu-footer-menu'][intval($idx)]['#title'] ) {		// = $link['#title'] failed for some reasons
+				if ( ( $pos = strpos($title,"Feedback on a Record") ) !== false ) {
+					$page['footer']['menu_menu-footer-menu'][intval($idx)]['#title'] = substr($title,0,$pos+9) . "on this" . substr($title,$pos+13);
 				}
 			}
 		}
@@ -1338,10 +1387,9 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
   $form['full_text'] = array(
     '#type' => 'checkboxes',
     '#options' => array(
-      'restricted' => t('Restricted'),
       'open access' => t('Open Access'),
+      'restricted' => t('Restricted'),
       'no full text' => t('No Full Text'),
-      'embargo-restricted' => t( variable_get('lib4ridora_term_embargo_restricted', 'Restricted (Embargo)') ),
     ),
     '#title' => t('Full Text'),
     // XXX: Wrapping element desired to counteract core CSS at this level, and
@@ -1929,16 +1977,16 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 
 	if ( !strchr($_SERVER['HTTP_HOST'],"localhost") ) {
 		$webSite = strtok(substr($_SERVER['REQUEST_URI']."/",1),"/");
-		if ( strchr("eawag|empa|wsl",$webSite) ) { return; }
+		if ( strchr(variable_get('lib4ridora_solr_search_extension_blacklist','eawag, empa, wsl'),$webSite) ) { return; }
 	}
 
 	$batch = batch_get();		// right now this is not intended for/when exporting results.
 	if ( !empty($batch) ) { return; }
 
-	$query = $islandora_solr_query->solrQuery;
+	$query = trim( $islandora_solr_query->solrQuery );		// expecting something like: lib4ri_all_authors_mt:(aaa) NOT lib4ri_all_authors_mt:(bbb)
 
-	if ( !strchr(rawurldecode($query),":") ) {
-		// This seems ti be a simple search!(?)
+	if ( !strchr($query,":") || strlen($query) < 4 ) {
+		// This seems ti be a simple search!(?) However let's exclude searches with '*:*' only.s
 		// Our custom author list is an additional element inside the MODS, and the entire MODS content is available via catch_all_MODS_mt.
 		// So as long as the simple search will use catch_all_MODS_mt (...well, we better should ensure this) there is nothing to do here.
 		return;
@@ -1947,31 +1995,36 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 	$fieldSearch = trim( strtr( variable_get('lib4ridora_solr_search_extension','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'), "&", "+" ) );
 	if ( substr($fieldSearch,0,1) == "#" || !strchr($fieldSearch,"+") ) { return; }
 
-	$queryNew = $query;
+	$queryNew = $query . " OR " ;		// aux.
+	$matchAry = array();
+	preg_match_all( "/\sNOT\s|\sAND\s|\sOR\s/", $queryNew, $matchAry, PREG_OFFSET_CAPTURE ); // looking for positions of the operators NOT, AND, OR (embraced by a space).
+	$qPartAry = array();
+	$qOffset = 0;
+	foreach( $matchAry[0] as $mAry ) {		// with $mAry[0] as search operator found, and $mAry[1] is its position in the query string
+		$qPartAry[] = array( substr($queryNew,$qOffset,$mAry[1]-$qOffset), trim($mAry[0]) );
+		$qOffset = strlen($mAry[0]) + $mAry[1];
+	}
+	$qPartAry[sizeof($qPartAry)-1][1] = "";		// to clear the aux. ' OR '
 
+	$queryNew = "";
 	$fieldData = explode( ",", strtr( $fieldSearch, "/;", "|," ) );
 	foreach( $fieldData as $fieldSearch ) {
-		$fieldExtraAry = explode("|",substr(strchr($fieldSearch,"+"),1));
-		foreach( $fieldExtraAry as $fieldExtra ) {
-			$fieldExtra = trim($fieldExtra);
-			if ( strchr($queryNew,$fieldExtra) ) {
-				// So far: consider this additional/alternate Solr field as appropriately treated, and go on. To be tuned.
-				continue;
-			}
-			$fieldUsedAry = explode("|",strtok($fieldSearch."+","+"));
-			foreach( $fieldUsedAry as $fieldUsed ) {
-				$fieldUsed = trim($fieldUsed);
-				if ( $value = strchr($queryNew,$fieldUsed) ) { 		// adv. search!? Usually a syntax with brackets is used, but also quotes are imaginable.
-					$value = substr($value,strlen($fieldUsed));
-					$value = ltrim( rawurldecode($value), "(=):\" \t\n\r\0\x0B" );
-					$value = strtr($value," )\"","|||");		// uncertain how it is delmited
-					$value = rtrim(substr($value,0,strpos($value,"|")));
-					$queryNew = str_replace( $fieldUsed, "{$fieldExtra}:({$value}) OR  {$fieldUsed}", $queryNew );
+		$fieldAry = explode("+",trim($fieldSearch),2);
+		$fieldExtra = trim($fieldAry[1]);
+		$fieldAry = explode("|",$fieldAry[0]);
+		foreach( $qPartAry as $qIdx => $qAry ) {
+			$ary = explode(":",$qAry[0],2);
+			foreach( $fieldAry as $fieldOld ) {
+				if ( trim($ary[0]) == trim($fieldOld) ) {
+					$qAry[0] = $ary[0] . ":" . $ary[1] . " OR  " . $fieldExtra . ":" . $ary[1];
+					$qOffset = -1;	// just to state we have found/expanded something.
 				}
 			}
+			$qPartAry[$qIdx] = array( $qAry[0], $qAry[1] );
 		}
+		foreach( $qPartAry as $ary ) { $queryNew .= "(" . trim($ary[0]) . ") " . trim($ary[1]) . " "; }
 	}
 
-	if ( $queryNew != $query ) { $islandora_solr_query->solrQuery = $queryNew; }
+	if ( $qOffset < 0 ) { $islandora_solr_query->solrQuery = trim($queryNew); }
 }
 
