@@ -33,20 +33,20 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#size' => $textfield_size,
   );
   if ( @isset($_GET['all']) || @isset($_GET['add']) ) {
-	  $form['lib4ridora_amount_recent_additions'] = array(
+	  $form['lib4ridora_recent_additions_amount'] = array(
 		'#type' => 'textfield',
 		'#title' => t('Amount of Recent Additions'),
-		'#default_value' => min( max( variable_get('lib4ridora_amount_recent_additions', 15), 2 ), 100 ),
+		'#default_value' => min( max( variable_get('lib4ridora_recent_additions_amount', 15), 2 ), 100 ),
 		'#description' => t("Number to define how many of the recently added publications will be listed when you click on the 'Browse' link."),
 		'#required' => FALSE,
 	    '#size' => 128,
 	  );
   }
   if ( @isset($_GET['all']) || @isset($_GET['dl']) ) {			// related to Redmine issue #67 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/67
-	  $form['lib4ridora_download_name_tuning'] = array(
+	  $form['lib4ridora_pdf_download_name_tuning'] = array(
 		'#type' => 'textfield',
 		'#title' => t('Option list for PDF download name'),
-		'#default_value' => variable_get('lib4ridora_download_name_tuning','+3,_'),
+		'#default_value' => variable_get('lib4ridora_pdf_download_name_tuning','+3,_'),
 		'#description' => t("Comma-separated list: [1] how many words of the title to use ('+' for cropping dots), [2] optional string to separate the filename parts, [3] optional space replacement. Quotes are OK for easier space/comma/empty-string handling."),
 		'#required' => FALSE,
 	    '#size' => 128,
@@ -60,16 +60,16 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => FALSE,
     '#size' => $textfield_size,
   );
-  if ( @isset($_GET['all']) || @isset($_GET['ip']) ) {		// IP assignments for intranet, see lib4ridora.module, function lib4ridora_check_ip(). The origin is unknown, up-to-dateness not checked.
-	  $form['lib4ridora_ip_range_list'] = array(
+/* if ( @isset($_GET['all']) || @isset($_GET['ip']) ) {		// IP assignments for intranet, see lib4ridora.module, function lib4ridora_check_ip(). The origin of the IPs is unknown - up-to-date!?
+	  $form['lib4ridora_intranet_ip_range_list'] = array(
 	    '#type' => 'textfield',
 	    '#title' => t('Intranet IP restriction'),
 	    '#description' => t('If the publication is available on the intranet only, user\'s IP must be in one of the specified ranges (a comma-seperated list, slash allowed on the last IP part to indicate min/max).'),
-	    '#default_value' => variable_get( 'lib4ridora_ip_range_list', "129.129.0.0/16, 152.88.0.0/16, 192.33.118.0/24, 193.134.200.0/21, 195.176.244.0/23" ),
+	    '#default_value' => variable_get( 'lib4ridora_intranet_ip_range_list', "129.129.0.0/16, 152.88.0.0/16, 192.33.118.0/24, 193.134.200.0/21, 195.176.244.0/23" ),
 	    '#required' => TRUE,
 	    '#size' => 128,
 	  );
-  }
+  } */
   $form['lib4ridora_author_fullname_solr_field'] = array(
     '#type' => 'textfield',
     '#title' => t('Author Full Name Solr Field'),
@@ -255,6 +255,16 @@ function lib4ridora_admin(array $form, array &$form_state) {
       '#default_value' => variable_get('lib4ridora_solr_field_org_terms_1on1', 'or, and, for, of, in, at'),
       '#required' => FALSE,
       '#size' => ( ( @isset($_GET['all']) || @isset($_GET['prepo']) ) ? 128 : $textfield_size ),
+    );
+  }
+  if ( @isset($_GET['all']) || @isset($_GET['css']) ) {			// 'prepo' ~= label prepositions, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/57
+    $form['lib4ridora_css_block_inert_iconless'] = array(
+      '#type' => 'textfield',
+      '#title' => t('CSS class for block text'),
+      '#description' => t('A space or comma seperated list of CSS classes to use for text labels in 1st/2nd sidebar without leading icons.'),
+      '#default_value' => variable_get('lib4ridora_css_block_inert_iconless', 'availability-text'),
+      '#required' => FALSE,
+      '#size' => ( ( @isset($_GET['all']) || @isset($_GET['css']) ) ? 128 : $textfield_size ),
     );
   }
   // related to Redmine issue #189 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/189 (about HTML tags in page title)

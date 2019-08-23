@@ -36,7 +36,7 @@ function template_preprocess_lib4ridora_pdf_link(&$variables) {
   $access = $values['availability'];
 
   $variables['pdf_link'] = $values;
-  $variables['availability_classes'] = array('availability-text');
+  $variables['availability_classes'] = str_getcsv( variable_get('lib4ridora_css_block_inert_iconless', 'availability-text') );
 
   if ($access == 'public') {
     $variables['span_classes_array'][] = 'fa fa-unlock-alt';
@@ -76,7 +76,7 @@ function lib4ridora_download_name_pdf($pid,$fileExt,$docVer,$dsId) {
 		$xpath = new DOMXPath($dom);
 		$xpath->registerNamespace('mods', 'http://www.loc.gov/mods/v3');
 
-		$confAry = str_getcsv( variable_get('lib4ridora_download_name_tuning','+3,_') );
+		$confAry = str_getcsv( variable_get('lib4ridora_pdf_download_name_tuning','+3,_') );
 		$sep = ( preg_match('/[<>\\/:\*\|\?]+/',$confAry[1]) ? "_" : $confAry[1] );		// it can be a space too, so do not trim!
 		$name = "";
 		$year = "";

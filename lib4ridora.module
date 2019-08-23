@@ -329,7 +329,7 @@ function lib4ridora_check_ip($ip_address = NULL) {
     '195.176.244.0/23',
   );
   */
-  $cidr_list = variable_get( 'lib4ridora_ip_range_list', "129.129.0.0/16, 152.88.0.0/16, 192.33.118.0/24, 193.134.200.0/21, 195.176.244.0/23" );
+  $cidr_list = variable_get( 'lib4ridora_intranet_ip_range_list', "129.129.0.0/16, 152.88.0.0/16, 192.33.118.0/24, 193.134.200.0/21, 195.176.244.0/23" );
   $cidr_ranges = explode( ",", str_replace( " ", "", strtr( $cidr_list, ";-\t", ",/ " ) ) );	// so tab considered as space, while semi-colon as separator, and minus (like slash) as min-max indicator
 
   // Transform an IPv4 CIDR block to an array containing the first and last IPs
@@ -366,56 +366,14 @@ function lib4ridora_menu_alter(&$items) {
 }
 
 /**
- * Implements hook_preprocess_menu_link().
- */
-function lib4ridora_preprocess_menu_link(&$vars) {
-  $element = &$vars['element'];
-  if ( $emSource = strchr($element['#href'],"?email-template.") ) {
-    $emSource = str_replace("?","/var/www/html/data/all/",$emSource);		// assigning the local path (hard-coded, could also be derivated from a clever/tweaked HTTP url...)
-    if ( $emData = @file_get_contents($emSource) ) {
-      $emExt = strrchr($emSource,".");
-      if ( strtolower($emExt) != ".html" ) {
-        foreach( array("<p>","<br>","<p/>","<br/>") as $brk ) { $emData = str_ireplace($brk,"\r\n",$emData); }
-      }
-      // get the link of the page where the user currently is:
-      $emLink = "https://www.dora" . ( strchr($_SERVER['HTTP_HOST'],"prod") ? "" : "-dev" ) . ".lib4ri.ch" . request_uri();
-      $emData = str_ireplace("Lib4RI:WebPageOrigin",$emLink,$emData);		// 'Lib4RI:WebPageOrigin' is a placeholder
-      // get the institute abbreviation:
-      $emInst = strtok(ltrim(substr(strchr($GLOBALS['base_url']."/",".ch/"),4),"/"),"/");
-      $emInst = empty($emInst) ? "Lib4RI" : ( strlen($emInst) > 3 ? ucfirst($emInst) : strtoupper($emInst) );
-      $emData = str_ireplace("Lib4RI:Eawag/Empa/PSI/WSL",$emInst,$emData);			// 'Lib4RI:Eawag/Empa/PSI/WSL' is a placeholder
-      // replace the defaults for e-mail subject+body:
-      $emSubject = "Feedback/Suggestion for " . $emInst;
-      if ( $pos = strpos($emData,"</title>") ) {
-        $emSubject = strchr(substr($emData,0,$pos),"<title");
-        $emSubject = trim(strip_tags($emSubject),":- \t\n\r\0\x0B");
-      }
-      $emBody = "Hello!\r\n";
-      if ( $pos = strpos($emData,"</body>") ) {
-        $emBody = strchr(substr($emData,0,$pos),"<body");
-        $emBody = ( strtolower($emExt) == ".html" ) ? trim($emBody) : str_ireplace("&nbsp;"," ",ltrim(strip_tags($emBody)));
-      }
-      // assigning the new e-mail/mailto link:
-      $element['#href'] = "mailto:dora@lib4ri.ch?subject=" . rawurlencode($emSubject) . "&body=" . rawurlencode($emBody);
-    }
-    else { // old link (before Aug 2019):
-      $element['#href'] = 'mailto:dora@lib4ri.ch?subject=DORA%20PROBLEM&body=PROBLEM%20REPORT%0D%0A%0D%0APAGE:%20' . urlencode($GLOBALS['base_url'].request_uri()) . '%0D%0AREFERRER:%20' . urlencode($_SERVER['HTTP_REFERER']) . '%0D%0A%0D%0ADESCRIPTION:%0D%0A%0D%0A%0D%0A';
-    }
-  }
-  if ($element['#href'] == 'http://www.lib4ri.ch/about/contact.html?pick_a_subject=submit') {
-      $element['#localized_options']['attributes']['target'][] = '_blank';
-  }
-}
-
-/**
- * Implements hook_block_view_alter().
- */
+ * Implements hook_block_view_alter() - currently not needed !(?)
+ *
 function lib4ridora_block_view_alter(&$data, $block) {
   if (isset($data['content']) && is_array($data['content']) && isset($data['content']['#markup']) && (strpos($data['content']['#markup'], '<a href="http://www.lib4ri.ch">') !== false)) {
     $data['content']['#markup'] = preg_replace('/<a href="http:\/\/www.lib4ri.ch">/', '<a href="http://www.lib4ri.ch" target="_blank">', $data['content']['#markup']);
   }
 }
-
+ */
 
 /**
  * Access callback, to determine whether or not to create the RoMEO tab.
@@ -1273,46 +1231,36 @@ function lib4ridora_form_islandora_scholar_citation_select_form_alter(&$form, &$
  */ 
 function lib4ridora_page_alter(&$page) {
 
-	$url = strtok(strtok($_SERVER['REQUEST_URI']."?","?")."#","#");
+  if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) ) {	// temporary work-around, in context with Redmine Issue #189: http://lib-dora-dev1.emp-eaw.ch:3000/issues/189
+    $jsCode = 'jQuery(document).ready(function() { ';
+    $jsCode .= 'document.title = document.title.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<").replace( /<\/?[^>]+(>|$)/g, ""); ';
+    $jsCode .= 'if ( ( elem = document.getElementById("page-title") ) && elem != "undefined" ) { document.getElementById("page-title").innerHTML = elem.innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } ';
+    $jsCode .= 'if ( ary = document.getElementsByTagName("caption") ) { for(i=0;i<ary.length;i++) { document.getElementsByTagName("caption")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+    $jsCode .= 'if ( ary = document.getElementsByClassName("page-title") )               { for(i=0;i<ary.length;i++) { document.getElementsByClassName("page-title")[i].innerHTML               = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+    $jsCode .= 'if ( ary = document.getElementsByClassName("islandora-object-caption") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("islandora-object-caption")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+    $jsCode .= 'if ( ary = document.getElementsByClassName("messages__item") )           { for(i=0;i<ary.length;i++) { document.getElementsByClassName("messages__item")[i].innerHTML           = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
+    $jsCode .= 'if ( ary = document.getElementsByClassName("placeholder") )              { for(i=0;i<ary.length;i++) { document.getElementsByClassName("placeholder")[i].innerHTML              = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+    $jsCode .= 'if ( ary = document.getElementsByClassName("csl-entry") )                { for(i=0;i<ary.length;i++) { document.getElementsByClassName("csl-entry")[i].innerHTML                = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
+    $jsCode .= 'if ( ( elem = document.getElementById("edit-object-label") ) && elem != "undefined" ) { document.getElementById("edit-object-label").value = elem.value.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } ';
+ // $jsCode .= 'if ( ( bttn = document.getElementById("edit-delete") ) && bttn != "undefined" ) { ary = bttn.value.split("\'",3); dt = document.title.substring(0,(document.title+" |").indexOf(" |")).trim(); ary[1] = ( dt.length > 32 ? dt.substring(0,30)+"..." : dt ); document.getElementById("edit-delete").value = ary.join("\'"); } ';
+ // Can be handled as form element, morever changing the value of the submit button may end up in a broken redirection to the 'confirm deletion' page,
+ // Note too that we (always?) can find the single-quote as &#039; within the form value... - however check out now the hook lib4ridora_form_alter()
+    $jsCode .= ' });';
+    drupal_add_js($jsCode,'inline');
+  }
 
-	/* ( strchr("/".strtok(substr($url,1)."/","/"),"/eawag/empa/psi/wsl/") || strchr($url,"/islandora/object/") || strchr($url,"/islandora/search/") ) */
-	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) ) {
-		// work-around (for the time being), in context with Redmine Issue #189: http://lib-dora-dev1.emp-eaw.ch:3000/issues/189
-		$jsCode = 'jQuery(document).ready(function() { ';
-		$jsCode .= 'document.title = document.title.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<").replace( /<\/?[^>]+(>|$)/g, ""); ';
-		$jsCode .= 'if ( ( elem = document.getElementById("page-title") ) && elem != "undefined" ) { document.getElementById("page-title").innerHTML = elem.innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } ';
-		$jsCode .= 'if ( ary = document.getElementsByTagName("caption") ) { for(i=0;i<ary.length;i++) { document.getElementsByTagName("caption")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
-		$jsCode .= 'if ( ary = document.getElementsByClassName("page-title") )               { for(i=0;i<ary.length;i++) { document.getElementsByClassName("page-title")[i].innerHTML               = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
-		$jsCode .= 'if ( ary = document.getElementsByClassName("islandora-object-caption") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("islandora-object-caption")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
-		$jsCode .= 'if ( ary = document.getElementsByClassName("messages__item") )           { for(i=0;i<ary.length;i++) { document.getElementsByClassName("messages__item")[i].innerHTML           = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
-		$jsCode .= 'if ( ary = document.getElementsByClassName("placeholder") )              { for(i=0;i<ary.length;i++) { document.getElementsByClassName("placeholder")[i].innerHTML              = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
-		$jsCode .= 'if ( ary = document.getElementsByClassName("csl-entry") )                { for(i=0;i<ary.length;i++) { document.getElementsByClassName("csl-entry")[i].innerHTML                = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
-		$jsCode .= 'if ( ( elem = document.getElementById("edit-object-label") ) && elem != "undefined" ) { document.getElementById("edit-object-label").value = elem.value.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } ';
-	//	$jsCode .= 'if ( ( bttn = document.getElementById("edit-delete") ) && bttn != "undefined" ) { ary = bttn.value.split("\'",3); dt = document.title.substring(0,(document.title+" |").indexOf(" |")).trim(); ary[1] = ( dt.length > 32 ? dt.substring(0,30)+"..." : dt ); document.getElementById("edit-delete").value = ary.join("\'"); } ';
-	// Can be handled as form element, morever changing the value of the submit button may end up in a broken redirection to the 'confirm deletion' page,
-	// Note too that we (always?) can find the single-quote as &#039; within the form value... - however check out now the hook lib4ridora_form_alter()
-		$jsCode .= ' });';
-		drupal_add_js($jsCode,'inline');
-	}
-
-	if ( substr($url,-16) == "/RELS-INT/delete" ) {		// safety tuning
-		// dpm(var_dump($page['content']['system_main']));
-		if ( $content = @$page['content']['system_main']['derivative_info']['#markup'] ) {
-			$page['content']['system_main']['derivative_info']['#markup'] = str_replace( ", RELS-EXT", " &plus; <font color='#e70707'><b>RELS-EXT</b> &nbsp; &nbsp; &nbsp; (warning: also the <a href='../../manage/datastreams'>RELS-EXT datastream</a> will be deleted, causing future editing problems)</font>", $content );
-			if ( $content = @$page['content']['system_main']['derivative_info']['#title'] ) {
-				$page['content']['system_main']['derivative_info']['#title'] = str_replace( "Datastream(s) to be purged", "Datastreams to be purged:", $content );
-			}
-		}
-	}
-	elseif ( strchr(substr(dirname($url)."/",-20),"/islandora/object/") && preg_match( '/^\w+:{1}\d+$/',urldecode(basename($url))) ) {
-		foreach( $page['footer']['menu_menu-footer-menu'] as $idx => $link ) {
-			if ( $title = @$page['footer']['menu_menu-footer-menu'][intval($idx)]['#title'] ) {		// = $link['#title'] failed for some reasons
-				if ( ( $pos = strpos($title,"Feedback on a Record") ) !== false ) {
-					$page['footer']['menu_menu-footer-menu'][intval($idx)]['#title'] = substr($title,0,$pos+9) . "on this" . substr($title,$pos+13);
-				}
-			}
-		}
-	}
+  if ( user_is_logged_in() ) {		// safety remark for editors/admins/super-users:
+    $url = strtok(strtok($_SERVER['REQUEST_URI']."?","?")."#","#");
+    if ( substr($url,-16) == "/RELS-INT/delete" ) {
+      // dpm(var_dump($page['content']['system_main']));
+      if ( $content = @$page['content']['system_main']['derivative_info']['#markup'] ) {
+        $page['content']['system_main']['derivative_info']['#markup'] = str_replace( ", RELS-EXT", " &plus; <font color='#e70707'><b>RELS-EXT</b> &nbsp; &nbsp; &nbsp; (warning: also the <a href='../../manage/datastreams'>RELS-EXT datastream</a> will be deleted, causing future editing problems)</font>", $content );
+        if ( $content = @$page['content']['system_main']['derivative_info']['#title'] ) {
+          $page['content']['system_main']['derivative_info']['#title'] = str_replace( "Datastream(s) to be purged", "Datastreams to be purged:", $content );
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -1387,9 +1335,10 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
   $form['full_text'] = array(
     '#type' => 'checkboxes',
     '#options' => array(
-      'open access' => t('Open Access'),
       'restricted' => t('Restricted'),
+      'open access' => t('Open Access'),
       'no full text' => t('No Full Text'),
+      'embargo-restricted' => t( variable_get('lib4ridora_term_embargo_restricted', 'Restricted (Embargo)') ),
     ),
     '#title' => t('Full Text'),
     // XXX: Wrapping element desired to counteract core CSS at this level, and
