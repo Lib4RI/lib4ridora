@@ -9,7 +9,7 @@
  */
 function lib4ridora_admin(array $form, array &$form_state) {
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-  $textfield_size = 120;		// Default 60, but sometimes too short even for some text field values.
+  $textfield_size = 128;		// Default 60, but sometimes too short even for some text field values.
 
   $lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options( TRUE /* true to get the PDF link order as required for Lib4RI */ );
   $lib4ridora_multi_pdf_options_availability = $lib4ridora_multi_pdf_options['availability'];
@@ -39,7 +39,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
 		'#default_value' => min( max( variable_get('lib4ridora_recent_additions_amount', 15), 2 ), 100 ),
 		'#description' => t("Number to define how many of the recently added publications will be listed when you click on the 'Browse' link."),
 		'#required' => FALSE,
-	    '#size' => 128,
+	    '#size' => 160,
 	  );
   }
   if ( @isset($_GET['all']) || @isset($_GET['dl']) ) {			// related to Redmine issue #67 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/67
@@ -49,7 +49,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
 		'#default_value' => variable_get('lib4ridora_pdf_download_name_tuning','+3,_'),
 		'#description' => t("Comma-separated list: [1] how many words of the title to use ('+' for cropping dots), [2] optional string to separate the filename parts, [3] optional space replacement. Quotes are OK for easier space/comma/empty-string handling."),
 		'#required' => FALSE,
-	    '#size' => 128,
+	    '#size' => 160,
 	  );
   }
   $form['lib4ridora_restricted_datastreams'] = array(
@@ -60,14 +60,14 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => FALSE,
     '#size' => $textfield_size,
   );
-/* if ( @isset($_GET['all']) || @isset($_GET['ip']) ) {		// IP assignments for intranet, see lib4ridora.module, function lib4ridora_check_ip(). The origin of the IPs is unknown - up-to-date!?
+/* if ( @isset($_GET['all']) || @isset($_GET['ip']) ) {		// IPv*4* assignments for intranet, see lib4ridora.module, function lib4ridora_check_ip(). The origin of the IPs is unknown - up-to-date!?
 	  $form['lib4ridora_intranet_ip_range_list'] = array(
 	    '#type' => 'textfield',
-	    '#title' => t('Intranet IP restriction'),
+	    '#title' => t('Intranet IPv4 restriction'),
 	    '#description' => t('If the publication is available on the intranet only, user\'s IP must be in one of the specified ranges (a comma-seperated list, slash allowed on the last IP part to indicate min/max).'),
 	    '#default_value' => variable_get( 'lib4ridora_intranet_ip_range_list', "129.129.0.0/16, 152.88.0.0/16, 192.33.118.0/24, 193.134.200.0/21, 195.176.244.0/23" ),
 	    '#required' => TRUE,
-	    '#size' => 128,
+	    '#size' => 160,
 	  );
   } */
   $form['lib4ridora_author_fullname_solr_field'] = array(
@@ -146,7 +146,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	    '#description' => t('Terms in CSV export if Journal Impact Factor evaluation failed (originally \'N/A\'). May be comma-separated to have different terms for factor and year field (quotes are allowed).'),
 	    '#default_value' => variable_get('lib4ridora_pseudo_solr_field_factor_failed', ''),
 	    '#required' => FALSE,
-	    '#size' => 128,
+	    '#size' => 160,
 	  );
 	  $form['lib4ridora_pseudo_solr_field_factor_none_yet'] = array(
 	    '#type' => 'textfield',
@@ -154,7 +154,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	    '#description' => t('You may replace given terms from the corresponding datastream resp. from the imported data file by a custom one (syntax: old1 = new1, old2 = new2, ...).'),
 	    '#default_value' => variable_get('lib4ridora_pseudo_solr_field_factor_none_yet', 'Not available = not available'),
 	    '#required' => FALSE,
-	    '#size' => 128,
+	    '#size' => 160,
 	  );
   }
   $form['lib4ri_citation_export_form_placeholder'] = array(		/*  for citations in Excel/CSV exports */
@@ -203,7 +203,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#description' => t("Placeholder where to put first author's affiliation into CSV/Ecxel exports. To be added as 'display field' at: /admin/islandora/search/islandora_solr/settings <br>Instead of one value only, this field here can also have two values (comma-separated) to put author name and author's unit into two columns."),
     '#default_value' => variable_get('lib4ri_affiliation_author1_form_export_placeholder','mods_personal_affiliation_author1_placeholder_lib4ri'),
     '#required' => FALSE,
-    '#size' => ( ( @isset($_GET['all']) || @isset($_GET['aa1']) ) ? 128 : $textfield_size ),
+    '#size' => $textfield_size,
   );
   $form['lib4ridora_solr_field_peer_review'] = array(
     '#type' => 'textfield',
@@ -237,14 +237,23 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => TRUE,
     '#size' => $textfield_size,
   );
-  if ( @isset($_GET['all']) || @isset($_GET['solr-ext']) ) {			// related to Redmine issue #250 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/250
-    $form['lib4ridora_solr_search_extension'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Solr Search Field Extension'),
-    '#default_value' => variable_get('lib4ridora_solr_search_extension','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'),
-    '#description' => t("Accepts a special list, example: 'field1|field2 + fieldA' means that the search in 'field1' or in 'field2' both will be expanded by searching in 'fieldA' too."),
-    '#required' => FALSE,
-      '#size' => 128,
+  if ( @isset($_GET['all']) || @isset($_GET['search']) ) {
+    $form['lib4ridora_solr_search_extension_omit_inst'] = array(		/* using here a 'negative' list just for simpler/faster main site handling */ 
+      '#type' => 'textfield',
+      '#title' => t('Expanded search: Omitted Institutes'),
+      '#description' => t("Related to publications with hundreds of authors: Only institutes listed here will check the 'originial author list' too."),
+      '#default_value' => variable_get('lib4ridora_solr_search_extension_omit_inst','Eawag, Empa, WSL'),
+      '#required' => FALSE,
+      '#size' => 160,
+    );
+    $form['lib4ridora_solr_search_extension_field_data'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Expanded search: Solr Field Data'),
+  //  '#description' => t("Accepts a special list, example: 'field1|field2 + fieldA' means that the search in 'field1' or in 'field2' both will be expanded by searching in 'fieldA' too."),
+      '#description' => t("Intension/Example: There is SolrField1 and SolrField2, and for both of them also the values in SolrFieldX should be checked. <br>Resulting syntax: SolrField1|SolrField2 + SolrFieldX"),
+      '#default_value' => variable_get('lib4ridora_solr_search_extension_field_data','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'),
+      '#required' => FALSE,
+      '#size' => 160,
     );
   }
   if ( @isset($_GET['all']) || @isset($_GET['prepo']) ) {			// 'prepo' ~= label prepositions, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/57
@@ -254,7 +263,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
       '#description' => t('A comma seperated list of name parts where the first letter shall not be upper-cased (affects ingest form and adv. search).'),
       '#default_value' => variable_get('lib4ridora_solr_field_org_terms_1on1', 'or, and, for, of, in, at'),
       '#required' => FALSE,
-      '#size' => ( ( @isset($_GET['all']) || @isset($_GET['prepo']) ) ? 128 : $textfield_size ),
+      '#size' => 160,
     );
   }
   if ( @isset($_GET['all']) || @isset($_GET['css']) ) {			// 'prepo' ~= label prepositions, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/57
@@ -264,7 +273,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
       '#description' => t('A space or comma seperated list of CSS classes to use for text labels in 1st/2nd sidebar without leading icons.'),
       '#default_value' => variable_get('lib4ridora_css_block_inert_iconless', 'availability-text'),
       '#required' => FALSE,
-      '#size' => ( ( @isset($_GET['all']) || @isset($_GET['css']) ) ? 128 : $textfield_size ),
+      '#size' => 160,
     );
   }
   // related to Redmine issue #189 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/189 (about HTML tags in page title)

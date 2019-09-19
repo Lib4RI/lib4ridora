@@ -1834,11 +1834,16 @@ function lib4ridora_pathauto_bulkupdate() {
  * Implements hook_element_info_alter()
  */
 function lib4ridora_element_info_alter(&$type) {
-  if (module_exists('islandora_authority') && isset($type['islandora_authority_textfield'])) {
-    $type['islandora_authority_textfield']['#attached']['js'][] = drupal_get_path('module', 'lib4ridora') . '/js/lib4ridora_authority.js';
+  if ( module_exists('islandora_authority') ) {
+    if ( isset($type['islandora_authority_textfield']) ) {
+      $type['islandora_authority_textfield']['#attached']['js'][] = drupal_get_path('module', 'lib4ridora') . '/js/lib4ridora_authority.js';
+    }
+    if ( isset($type['islandora_authority_hidden']) ) {
+      $type['islandora_authority_hidden']['#element_validate'][] = 'lib4ridora_authority_hidden_validate';
+    }
   }
-  if (module_exists('islandora_authority') && isset($type['islandora_authority_hidden'])) {
-    $type['islandora_authority_hidden']['#element_validate'][] = 'lib4ridora_authority_hidden_validate';
+  if ( user_is_logged_in() && isset($type['textfield']['#maxlength']) ) {
+    $type['textfield']['#maxlength'] = 192;	// increasing the default size (128) of textfields (for logged-in users)
   }
 }
 
@@ -1924,16 +1929,13 @@ function _lib4ridora_target_text_format_to_plain_text($element, &$form_state, $f
  */
 function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 
-	if ( !strchr($_SERVER['HTTP_HOST'],"localhost") ) {
-		$webSite = strtok(substr($_SERVER['REQUEST_URI']."/",1),"/");
-		if ( strchr(variable_get('lib4ridora_solr_search_extension_blacklist','eawag, empa, wsl'),$webSite) ) { return; }
-	}
-
 	$batch = batch_get();		// right now this is not intended for/when exporting results.
 	if ( !empty($batch) ) { return; }
 
-	$query = trim( $islandora_solr_query->solrQuery );		// expecting something like: lib4ri_all_authors_mt:(aaa) NOT lib4ri_all_authors_mt:(bbb)
+	$webSite = strtok(substr($_SERVER['REQUEST_URI']."/",1),"/");		// using here a 'negative' list just for simpler/faster main site handling
+	if ( stristr(variable_get('lib4ridora_solr_search_extension_omit_inst','Eawag, Empa, WSL'),$webSite) ) { return; }
 
+	$query = trim( $islandora_solr_query->solrQuery );		// expecting something like: lib4ri_all_authors_mt:(aaa) NOT lib4ri_all_authors_mt:(bbb)
 	if ( !strchr($query,":") || strlen($query) < 4 ) {
 		// This seems ti be a simple search!(?) However let's exclude searches with '*:*' only.s
 		// Our custom author list is an additional element inside the MODS, and the entire MODS content is available via catch_all_MODS_mt.
@@ -1941,7 +1943,7 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 		return;
 	}
 
-	$fieldSearch = trim( strtr( variable_get('lib4ridora_solr_search_extension','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'), "&", "+" ) );
+	$fieldSearch = trim( strtr( variable_get('lib4ridora_solr_search_extension_field_data','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'), "&", "+" ) );
 	if ( substr($fieldSearch,0,1) == "#" || !strchr($fieldSearch,"+") ) { return; }
 
 	$queryNew = $query . " OR " ;		// aux.

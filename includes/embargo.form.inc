@@ -166,6 +166,7 @@ function lib4ridora_multi_embargo_edit_form($form, &$form_state) {
     'submit' => array(
       '#type' => 'submit',
       '#value' => t('Update properties'),
+      '#suffix' => '<br>&nbsp;<br>',
     ),
   );
   return $form;
