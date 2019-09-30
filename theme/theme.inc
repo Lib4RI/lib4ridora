@@ -181,8 +181,8 @@ function template_process_lib4ridora_pdf_link(&$variables) {
   }
   $human_readable = lib4ridora_multi_pdf_get_options();
   $human_version = $human_readable['document_version'];
-  
-  // PDF downloand: let's assign a download name for the PDF that is as meaningful as possible.
+
+  // PDF download: let's assign a download name for the PDF that is as meaningful as possible.
   // Refers to Redmine issue #67 http://lib-dora-dev1.emp-eaw.ch:3000/issues/67
   $pid = $variables['datastream']->parent->id;
   if ( $ext = @trim(strchr($variables['datastream']->mimeType,"/"),"/") ) {
