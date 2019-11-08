@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains the admin form and callback functions for datastream manipulations.
+ * Contains the admin form and callback functions for datastream manipulations supporting/tuning exclusively the islandora_usage_stats module.
  */
 
 /**

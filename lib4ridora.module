@@ -501,6 +501,7 @@ function lib4ridora_menu_alter(&$items) {
   unset($items['islandora/object/%islandora_object/manage/embargo']);
   $items['islandora/object/%islandora_object/islandora_scholar_romeo']['access callback'] = 'lib4ridora_romeo_access';
 
+  // to support/tune islandora_usage_stats module:
   if ( strchr($_SERVER['HTTP_HOST'],"localhost") || module_exists("islandora_usage_stats") || module_exists("islandora_usage_stats_charts") ) {
 	$items['islandora/object/%islandora_object/datastream/%islandora_datastream/download']['page callback'] = 'lib4ridora_download_datastream';
 	$items['islandora/object/%islandora_object/datastream/%islandora_datastream/download']['file'] = 'includes/datastream.stats.inc';
