@@ -354,18 +354,6 @@ function lib4ridora_check_ip($ip_address = NULL) {
 }
 
 /**
- * Implements hook_menu_alter().
- */
-function lib4ridora_menu_alter(&$items) {
-  // Nuke old "Document" tab.
-  unset($items['islandora/object/%islandora_object/islandora_scholar_upload']);
-  // Nuke default "Embargo" submenu.
-  unset($items['islandora/object/%islandora_object/manage/embargo']);
-  $items['islandora/object/%islandora_object/islandora_scholar_romeo']['access callback']
-    = 'lib4ridora_romeo_access';
-}
-
-/**
  * Implements hook_block_view_alter() - currently not needed !(?)
  *
 function lib4ridora_block_view_alter(&$data, $block) {
@@ -383,6 +371,16 @@ function lib4ridora_block_view_alter(&$data, $block) {
  */
 function lib4ridora_romeo_access($object) {
   return islandora_scholar_romeo_access($object) && !user_is_anonymous();
+}
+
+/**
+ * Access callback for datastreams.
+ *
+ * Positive permissions on object access suggests on the datastream.
+ */
+function lib4ridora_datastream_access($op, $datastream, $user = NULL) {
+  module_load_include('inc', 'islandora', 'islandora');
+  return islandora_datastream_access($op, $datastream, $user);
 }
 
 /**
@@ -491,6 +489,24 @@ function lib4ridora_menu() {
     'access callback' => TRUE,
   );
   return $items;
+}
+
+/**
+ * Implements hook_menu_alter().
+ */
+function lib4ridora_menu_alter(&$items) {
+  // Nuke old "Document" tab.
+  unset($items['islandora/object/%islandora_object/islandora_scholar_upload']);
+  // Nuke default "Embargo" submenu.
+  unset($items['islandora/object/%islandora_object/manage/embargo']);
+  $items['islandora/object/%islandora_object/islandora_scholar_romeo']['access callback'] = 'lib4ridora_romeo_access';
+
+  if ( strchr($_SERVER['HTTP_HOST'],"localhost") || module_exists("islandora_usage_stats") || module_exists("islandora_usage_stats_charts") ) {
+	$items['islandora/object/%islandora_object/datastream/%islandora_datastream/download']['page callback'] = 'lib4ridora_download_datastream';
+	$items['islandora/object/%islandora_object/datastream/%islandora_datastream/download']['file'] = 'includes/datastream.stats.inc';
+	$items['islandora/object/%islandora_object/datastream/%islandora_datastream/download']['module'] = 'lib4ridora';
+	$items['islandora/object/%islandora_object/datastream/%islandora_datastream/download']['access callback'] = 'islandora_datastream_access';
+  }
 }
 
 /**
@@ -1978,4 +1994,3 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 
 	if ( $qOffset < 0 ) { $islandora_solr_query->solrQuery = trim($queryNew); }
 }
-
