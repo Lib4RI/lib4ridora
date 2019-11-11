@@ -319,7 +319,7 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 	$pid = $object->id;
 	$primary_file = lib4ridora_get_primary_file_for_datastream($form_state);
 	$pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
-	$error_msg_ary = array();
+	$errorAry = array();	// to hold error messages
 
 	if ( $primary_file == 'PDF' ) {
 		// just update the RELS-INT, and copy over the document version to its PDF/A
@@ -416,7 +416,7 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 		if ( $values['availability'] == "date" ) {
 			if ( $embargo_date_string = lib4ridora_get_embargo_date_string($values['embargo_date']) ) {
 				$embargo_date_unix = strtotime($embargo_date_string);		// working but unpretty, to be tuned
-				if ( $embargo_date_unix < time() ) { $error_msg .= lib4ridora_get_note_embargo_date_passed( $embargo_date_unix, $non_cached_object[$filename]->label ); }
+				if ( $embargo_date_unix < time() ) { $errorAry[] = lib4ridora_get_note_embargo_date_passed( $embargo_date_unix, $non_cached_object[$filename]->label ); }
 			}
 		}
 		// Construct the datastreams.
@@ -458,7 +458,7 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 	}
 
 	// If all datastreams keep their names/IDs, then islandora_derivative_logging() won't produce an update massage (about now/other derivatives), let's create an own one:
-	if ( $error_msg != "" ) { drupal_set_message( trim($error_msg), 'warning' ); }
+	if ( sizeof($errorAry) ) { drupal_set_message( trim(implode(" <br>\r\n",$errorAry)), 'warning' ); }
 	else { drupal_set_message(t('Derivatives successfully <a href="./datastream/RELS-INT/version/0/view">updated</a>.'), 'status'); }
 }
 

@@ -60,6 +60,8 @@ function lib4ridora_uninstall() {
 	'lib4ridora_term_embargo_restricted',
 	'lib4ridora_css_block_inert_iconless',
 	'lib4ridora_config_dummy_line',
+	'lib4ridora_download_count_file_type',
+	'lib4ridora_download_count_doc_version',
   );
   array_walk($variables, 'variable_del');
 }
