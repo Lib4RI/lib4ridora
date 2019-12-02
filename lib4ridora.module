@@ -377,9 +377,10 @@ function lib4ridora_romeo_access($object) {
  * Access callback for datastreams.
  *
  * Positive permissions on object access suggests on the datastream.
+ * So far however still managed by islandora itself.
  */
 function lib4ridora_datastream_access($op, $datastream, $user = NULL) {
-  module_load_include('inc', 'islandora', 'islandora');
+  module_load_include('module', 'islandora', 'islandora');
   return islandora_datastream_access($op, $datastream, $user);
 }
 
@@ -501,12 +502,19 @@ function lib4ridora_menu_alter(&$items) {
   unset($items['islandora/object/%islandora_object/manage/embargo']);
   $items['islandora/object/%islandora_object/islandora_scholar_romeo']['access callback'] = 'lib4ridora_romeo_access';
 
-  // to support/tune islandora_usage_stats module:
-  if ( module_exists("islandora_usage_stats") ) {		// assuming the function islandora_usage_stats_log_datastream_download() is available too.
-	$items['islandora/object/%islandora_object/datastream/%islandora_datastream/download']['page callback'] = 'lib4ridora_download_datastream';
-	$items['islandora/object/%islandora_object/datastream/%islandora_datastream/download']['file'] = 'includes/datastream.stats.inc';
-	$items['islandora/object/%islandora_object/datastream/%islandora_datastream/download']['module'] = 'lib4ridora';
-	$items['islandora/object/%islandora_object/datastream/%islandora_datastream/download']['access callback'] = 'islandora_datastream_access';
+  // to support/tune the islandora_usage_stats module if installed+activated:
+  if ( module_exists("islandora_usage_stats") ) {
+    $items['islandora/object/%islandora_object/datastream/%islandora_datastream'] = array(
+      'title' => ( stripos($_SERVER['REQUEST_URI'],"/datastream/PDF") ? 'Download PDF' : 'View datastream' ),
+      'page callback' => 'lib4ridora_provide_datastream',
+      'page arguments' => array(4, FALSE, NULL),
+      'type' => MENU_CALLBACK,
+      'file' => 'includes/datastream.stats.inc',
+      'module' => 'lib4ridora',
+      'access callback' => 'lib4ridora_datastream_access',
+      'access arguments' => array(ISLANDORA_VIEW_OBJECTS, 4),
+      'load arguments' => array(2),
+    );
   }
 }
 

@@ -194,9 +194,6 @@ function template_process_lib4ridora_pdf_link(&$variables) {
   }
   $dl_name = lib4ridora_download_name_pdf( $pid, $ext, $values['document_version'], $variables['datastream']->id );
   $dl_name = preg_replace('/[?*<\\/>:]+/', '-', strtr($dl_name,'"',"'") );		// rather for safety
-  if ( strchr($_SERVER['HTTP_HOST'],"localhost") || module_exists("islandora_usage_stats") || module_exists("islandora_usage_stats_charts") ) {
-    $dl_name = "download/" . $dl_name;			// test, pretending to have an extra folder (support for Hubi) 2019-09-20
-  }
   $variables['title_link'] = array(
     'title' => $human_version[$values['document_version']],
     'url' => url("islandora/object/{$variables['datastream']->parent->id}/datastream/{$variables['datastream']->id}/{$dl_name}"),
