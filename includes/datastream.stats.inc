@@ -35,7 +35,7 @@ function lib4ridora_provide_datastream(AbstractDatastream $datastream, $download
   }
 
   $dsInfo = array();
-  if ( strchr($_SERVER['HTTP_HOST'],"localhost") || module_exists("islandora_usage_stats") ) {
+  if ( module_exists("islandora_usage_stats") ) {
     $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
     if ( !substr(strval($datastream->id),0-strlen($pdfa_suffix)) != $pdfa_suffix ) {		// do not count PDF/A files
       module_load_include('inc', 'lib4ridora', 'includes/utilities');
@@ -54,7 +54,7 @@ function lib4ridora_provide_datastream(AbstractDatastream $datastream, $download
       }
     }
   }
-  lib4ridora_view_datastream($datastream, TRUE, NULL, $dsInfo);
+  lib4ridora_view_datastream($datastream, $download, NULL, $dsInfo);
 }
 
 /**
@@ -121,15 +121,6 @@ function lib4ridora_view_datastream(AbstractDatastream $datastream, $download = 
     }
   }
   islandora_view_datastream_set_cache_headers($datastream);
-
-// test
-/*
-  // Drupal/islandora may have its own way to handle downloadss (e.g. to offer/deliver a Jpeg as file to download/save).
-  // These days however it is more convenient to leave this decision to the browser/user, at least for PDF files:
-  if ( $download && strtoupper(substr($datastream->mimetype,-4)) == "/PDF" ) {
-    header('Content-Type: ' . $datastream->mimetype);
-  }
-*/
 
   drupal_page_is_cacheable(FALSE);
 
