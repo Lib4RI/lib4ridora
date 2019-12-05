@@ -1096,10 +1096,11 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
     $csled_authors = array_map("trim", explode(',', strip_tags($authors)));
     // added as work-around for/against publications with more than 1000 authors:
     $tagAuthorList = trim( variable_get('lib4ridora_author_list_original', 'originalAuthorList') );		// may exist (only) in MODS
-    $reqEtAl = FALSE;		// in context with $tagAuthorList
+    $reqEtAl = 0;		// in context with $tagAuthorList
     if ( strlen($tagAuthorList) > 1 && ( $posA = strpos($mods_content,"<{$tagAuthorList}>") ) ) {
       if ( $posZ = strpos($mods_content,"</{$tagAuthorList}>",$posA) ) {
-        if ( !empty( trim(strip_tags(substr($mods_content,$posA,$posZ-$posA))) /* check if originalAuthorList is empty */ ) ) { $reqEtAl = TRUE; }
+        $origAutList = trim(strip_tags(substr($mods_content,$posA,$posZ-$posA)));
+        if ( strlen($origAutList) > 1 ) { $reqEtAl = sizeof(explode("|",$origAutList)); }
       }
     }
     if (isset($author_json['author'])) {
@@ -1131,6 +1132,7 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
           ));
         }
         $author_list[] = $author_string;
+        $reqEtAl--;		// show 'et al' only if we have less authors than in originalAuthorList
       }
       if (!empty($author_list)) {
         // Pop the last author off for APA styleness.
@@ -1149,7 +1151,7 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
       }
     }
     // added as work-around for/against publications with more than 1000 authors:
-    if ( $reqEtAl && strlen($tagAuthorList) > 1 ) {
+    if ( $reqEtAl > 0 && strlen($tagAuthorList) > 1 ) {
       $metaData = $rendered['citation.tab']['metadata']['#markup'];
       if ( $posA = strpos($metaData,"Author(s)") ) {			// weak approach... - to be tuned
         if ( $posZ = strpos($metaData,"</dd>",$posA) ) {
@@ -1286,6 +1288,22 @@ function lib4ridora_page_alter(&$page) {
       }
     }
   }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Turning the text*field* for bot identifiers in the admin form of the islandora_usage_stats module into a text*area*.
+ * see: https://github.com/Islandora/islandora_usage_stats/blob/7.x/includes/admin.form.inc
+ */
+function lib4ridora_form_islandora_usage_stats_admin_form_alter(array &$form, array &$form_state) {
+  $form['usage']['islandora_usage_stats_exclude_bots_regex'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Bot Exclusion Regex'),
+    '#description' => t('The regular expression used to filter out bots'),
+    '#default_value' => variable_get('islandora_usage_stats_exclude_bots_regex', '/bot|rambler|spider|crawl|slurp|curl|^$/i'),
+  );
+  $form['usage']['islandora_usage_stats_exclude_bots']['#prefix'] = '<br>';
 }
 
 /**
@@ -1635,6 +1653,12 @@ function lib4ridora_islandora_datastream_modified($object, $datastream) {
     lib4ridora_pathauto_create_alias($object, $datastream, 'update');
     lib4ridora_update_full_text($object);
   }
+
+  if ( strval($datastream->id) == "MODS" && variable_get('lib4ridora_parse_orig_author_list',true) ) {
+    sleep(1);
+    module_load_include('inc', 'lib4ridora', 'includes/utilities.author');
+    lib4ridora_parse_orig_author_list($object);
+  }
 }
 
 /**
@@ -1651,6 +1675,12 @@ function lib4ridora_islandora_datastream_ingested($object, $datastream) {
     }
     lib4ridora_update_full_text($object);
     lib4ridora_pathauto_create_alias($object, $datastream, 'insert');
+  }
+
+  if ( strval($datastream->id) == "MODS" && variable_get('lib4ridora_parse_orig_author_list',true) ) {
+    sleep(1);
+    module_load_include('inc', 'lib4ridora', 'includes/utilities.author');
+    lib4ridora_parse_orig_author_list($object);
   }
 }
 

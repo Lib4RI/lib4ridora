@@ -14,26 +14,34 @@
  * Note: This function is the same as islandora_download_datastream(), however expanded to support the counting of downloads.
  */
 function lib4ridora_provide_datastream(AbstractDatastream $datastream, $download = FALSE, $version = NULL) {
-  $fileTypeOk = trim(variable_get('lib4ridora_download_count_file_type','application/pdf'));
-  if ( substr($fileTypeOk,0,1) == "#" ) {
-    module_load_include('inc', 'islandora', 'includes/datastream');
-    return islandora_view_datastream($datastream, $download, $version);
-  }
-  if ( user_is_logged_in() ) {		// do not count the DL if we are an editor/admin managing PDFs or datastreams.
+  if ( user_is_logged_in() ) {
+	// Do not do anything special if we are an editor/admin managing PDFs/datastreams:
 	$urlNow = $_SERVER['REQUEST_URI'];
     if ( stripos($urlNow,"/manage/datastreams") || stripos($urlNow,"/lib4ridora_pdf_list") || stripos($urlNow,"/lib4ridora_pdf_management") ) {
       module_load_include('inc', 'islandora', 'includes/datastream');
       return islandora_view_datastream($datastream, $download, $version);
     }
   }
+  $fileTypeOk = trim(variable_get('lib4ridora_download_count_file_type','application/pdf'));
+  if ( empty($fileTypeOk) || substr($fileTypeOk,0,1) == "#" ) {
+    if ( stripos($datastream->mimetype,"/pdf") ) {
+      return lib4ridora_view_datastream($datastream, $download, $version);		// for Lib4RI specific PDF file names
+    }
+    module_load_include('inc', 'islandora', 'includes/datastream');
+    return islandora_view_datastream($datastream, $download, $version);
+  }
   foreach( str_getcsv($fileTypeOk) as $type ) {
     if ( stripos($datastream->mimetype,trim($type)) !== false ) { $fileTypeOk = ""; break; }
   }
   if ( !empty($fileTypeOk) ) {
+    if ( stripos($datastream->mimetype,"/pdf") ) {
+      return lib4ridora_view_datastream($datastream, $download, $version);		// for Lib4RI specific PDF file names
+    }
     module_load_include('inc', 'islandora', 'includes/datastream');
     return islandora_view_datastream($datastream, $download, $version);
   }
 
+  // Try to count the download now. Assuming here the mime type is PDF (although no real need to restrict it explicitly):
   $dsInfo = array();
   if ( module_exists("islandora_usage_stats") ) {
     $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
@@ -54,7 +62,7 @@ function lib4ridora_provide_datastream(AbstractDatastream $datastream, $download
       }
     }
   }
-  lib4ridora_view_datastream($datastream, $download, NULL, $dsInfo);
+  return lib4ridora_view_datastream($datastream, $download, NULL, $dsInfo);
 }
 
 /**
