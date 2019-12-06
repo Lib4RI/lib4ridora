@@ -13,9 +13,49 @@
  */
 function lib4ridora_no_at_2( $term ) {
 	if ( strpos($term,"@") ) {
-		return rtrim( preg_replace( "/\s*@\d*\s*,/", ",", preg_replace( "/\s*@\d*\s*$/", "", $term ) ) );
+		return rtrim( preg_replace( "/\s*@\s*\d*\s*,/", ",", preg_replace( "/\s*@\s*\d*\s*$/", "", $term ) ) );
 	}
 	return $term;
+}
+
+/*
+ * function to remove spaces from the given name or from initials where needed.
+ * Example what can be treated here:
+ *	"F. M."       =>  "F.M."
+ *	"Frank M."    =>  "Frank M."
+ *	"F. Th. Ott"  =>  "F.Th. Ott"
+ *	"F. &#196;"   =>  "F.&#196;"
+ *  "Chr. E."     =>  "Chr.E."
+ */
+function lib4ridora_initials_tuning( $nameGiven, $fill = '' ) {
+	$nameGiven = trim(strtr($nameGiven,"\t\n\r\0\x0B","     ")," ");
+ 	if ( !strpos($nameGiven," ") ){
+		return $nameGiven;
+	}
+	$regAry = array(
+		"/[A-Z][a-z]{0,2}\.\s+[A-Z][a-z]{0,2}\./",
+		"/[A-Z|Ö|Ü|Ä|Å|Ø|É|Ï][a-z]{0,2}\.\s+[A-Z|Ö|Ü|Ä|Å|Ø|É|Ï][a-z]{0,2}\./s",
+		"/[A-Z|Ö|Ü|Ä|Å|Ø|É|Ï][a-z]{0,2}\.\s+\&\#[a-zA-Z0-9]+\;\./s",
+		"/\&\#[a-zA-Z0-9]+\;\.\s+[A-Z|Ö|Ü|Ä|Å|Ø|É|Ï][a-z]{0,2}\./s",
+		"/[A-Z|Ö|Ü|Ä|Å|Ø|É|Ï][a-z]*\.\s*$/",
+		"/\&\#[a-zA-Z0-9]+\;\.\s*$/s",
+	);
+	foreach( $regAry as $regEx ) {
+		while( !empty($regEx) ) {
+			$pos = 0;
+			$match = array();
+			preg_match_all($regEx, $nameGiven, $match, PREG_OFFSET_CAPTURE );
+			foreach( $match as $nAry ) {
+				foreach( $nAry as $pAry ) {
+					if ( $pos = strpos($nameGiven," ",$pAry[1]) ) {
+						$nameGiven = substr($nameGiven,0,$pos) . substr($fill,0,1) . ltrim(substr($nameGiven,$pos+1));
+					}
+				}
+			}
+			if ( !( $pos > 0 ) ) { $regEx = ""; }
+		}
+	}
+	return preg_replace( "/\s*-\s*/", $fill."-".$fill, $nameGiven );
 }
 	
 /*
@@ -31,15 +71,24 @@ function lib4ridora_no_at_2( $term ) {
  * and then to extract all object nodes/elements a far as needed.
  */
 function lib4ridora_mods_code_author( $nameFamily, $nameGiven, $pid, $authorCount, $unitId = '', $unitName = '' ) {
-	$unitNum = strpos($nameFamily,"@");
-	if ( empty($unitId) && empty($unitName) && $unitNum ) {
-		$uTmpAry = explode("@",$nameFamily,2);		// to split "Jones@1234" (from "Bucher, G.|Jones@1234, F.|Meier, J.D.")
-		$nameFamily = rtrim($uTmpAry[0]);
-		$unitNum = @intval(ltrim($uTmpAry[1]));		// tolerated if $unitNum becomes zero (as a placeholder)
-		$unitId = strtok($pid,":") . "-units:" . strval($unitNum);		// build the unit ID like 'psi-units:123'
-		if ( $uTmpObj = @islandora_object_load($unitId) ) {
-			$unitName = @strtok(substr(strchr($uTmpObj['DC']->Content,"<dc:title>"),10),"<");
+	$unitNum = -1;
+	if ( empty($unitId) ) {
+		if ( $pos = strrpos($nameFamily,"@") ) {		// to split "Jones@1234"
+			$unitNum = intval(trim(substr($nameFamily,$pos+1)));		// tolerated if $unitNum becomes zero (as a placeholder)
+			$nameFamily = trim(substr($nameFamily,0,$pos),"@ \t\n\r\0\x0B");
+			$unitId = strtok($pid,":") . "-units:" . strval($unitNum);		// build the unit ID like 'psi-units:123'
 		}
+		elseif ( $pos = strrpos($nameGiven,"@") ) {		// to split "Jones@1234"
+			$unitNum = intval(trim(substr($nameGiven,$pos+1)));		// tolerated if $unitNum becomes zero (as a placeholder)
+			$nameGiven = trim(substr($nameGiven,0,$pos),"@ \t\n\r\0\x0B");
+			$unitId = strtok($pid,":") . "-units:" . strval($unitNum);		// build the unit ID like 'psi-units:123'
+		}
+	}
+	if ( empty($unitName) && strpos($unitId,":") && $unitNum > 0 && ( $uTmpObj = @islandora_object_load($unitId) ) ) {
+		$unitName = @strtok(substr(strchr($uTmpObj['DC']->Content,"<dc:title>"),10),"<");
+	}
+	if ( !empty($unitId) && empty($unitName) ) {
+		$unitName = ( $unitNum == 0 ) ? "to be assigned" : "unknown";	// placeholders
 	}
 	$eCodeAry = array();
 	$eCodeAry[]     = '<name type="personal"' . ( empty($authorCount) ? ' usage="primary">' : '>' );
@@ -53,16 +102,16 @@ function lib4ridora_mods_code_author( $nameFamily, $nameGiven, $pid, $authorCoun
 		$eCodeAry[] = '    <namePart/>';
 		$eCodeAry[] = '    <nameIdentifier type="authorId"/>';
 		$eCodeAry[] = '  </alternativeName>';
-		$eCodeAry[] = '  <nameIdentifier type="organizational unit id"' . ( empty($unitId) ? "/>" : ">{$unitId}</nameIdentifier>" );
-		$eCodeAry[] = '  <affiliation type="group"' . ( !empty($unitId) ? ( ( empty($unitName) || $unitNum === 0 ) ? ">Unknown</affiliation>" : ">{$unitName}</affiliation>" ) : "/>" );
+		$eCodeAry[] = '  <nameIdentifier type="organizational unit id"' . ( !empty($unitId) ? ">{$unitId}</nameIdentifier>" : "/>" );
+		$eCodeAry[] = '  <affiliation type="group"' . ( !empty($unitId) ? ">{$unitName}</affiliation>" : "/>" );
 		$eCodeAry[] = '  <affiliation type="section"/>';
 		$eCodeAry[] = '  <affiliation type="department"/>';
 		$eCodeAry[] = '  <affiliation type="division"/>';
 	} else {
 		$eCodeAry[] = '  <fullName' . ( empty($nameGiven) ? "/>" : ">{$nameGiven} {$nameFamily}</fullName>" );
 		$eCodeAry[] = '  <nameIdentifier type="authorId"/>';
-		$eCodeAry[] = '  <nameIdentifier type="organizational unit id"' . ( empty($unitId) ? "/>" : ">{$unitId}</nameIdentifier>" );
-		$eCodeAry[] = '  <affiliation' . ( !empty($unitId) ? ( ( empty($unitName) || $unitNum === 0 ) ? ">Unknown</affiliation>" : ">{$unitName}</affiliation>" ) : "/>" );
+		$eCodeAry[] = '  <nameIdentifier type="organizational unit id"' . ( !empty($unitId) ? ">{$unitId}</nameIdentifier>" : "/>" );
+		$eCodeAry[] = '  <affiliation' . ( !empty($unitId) ? ">{$unitName}</affiliation>" : "/>" );
 	}
 	$eCodeAry[]     = '</name>';
 	return ("  " . implode("\n  ",$eCodeAry) . "\n");
@@ -108,8 +157,7 @@ function lib4ridora_parse_orig_author_list( &$object, $ignLimit = 50, $showLimit
 			if ( !$hasNameEtAl && $element->nodeName == "name" && $element->hasChildNodes() ) {
 				foreach($element->childNodes as $nameChild ) {
 					if ( $nameChild->nodeName == "etal" ) {
-						$hasNameEtAl = true;	// not as expected, so better cancel it instantly.
-						return;		// EXIT condition
+						$hasNameEtAl = true;
 					}
 				}
 			}
@@ -119,7 +167,7 @@ function lib4ridora_parse_orig_author_list( &$object, $ignLimit = 50, $showLimit
 						$textList = trim($extChild->nodeValue);
 						$origAutAry = explode("|",$textList);
 						if ( strpos($textList,"@") || strpos($textList," |") || strpos($textList,"| ") ) {
-							$textList = preg_replace( "/\s*@\d*\s*\|/", "|", lib4ridora_no_at_2($textList) );
+							$textList = preg_replace( "/\s*@\s*\d*\s*\|/", "|", lib4ridora_no_at_2($textList) );
 							$extChild->nodeValue = trim( preg_replace( "/\s*\|\s*/", "|", $textList ) );
 						}
 						break;
@@ -140,7 +188,13 @@ function lib4ridora_parse_orig_author_list( &$object, $ignLimit = 50, $showLimit
 					$posAux = $domRest->createElement($modsNeedle,'!');		// to get e.g.: <authorsHere>!</authorsHere>
 					$domRest->documentElement->appendChild($posAux);
 				}
-				$authorCount = ( str_replace(" ","",strtolower($nameFamily)) == "dummyname" ? -1 : 1 );
+				$authorCount = ( str_replace(" ","",strtolower($nameFamily)) == "use:list" ? -1 : 1 );
+			}
+			elseif ( $authorCount == 1 ) { // 'second chance'
+				// This is a work-flow related convenience tuning/condition for Lib4RI employees/editors, since on the edit tab/form
+				// sometimes (due to JavaScript perhaps) the 1st author field may drop down to the 2nd position right after entering it.
+				if ( str_replace(" ","",strtolower($nameFamily)) != "use:list" ) { return; }
+				$authorCount = -1;
 			}
 			elseif ( $authorCount > 0 ) {
 		//		$authorCount++;
@@ -179,7 +233,11 @@ function lib4ridora_parse_orig_author_list( &$object, $ignLimit = 50, $showLimit
 		$autAry = explode(",",$autData,2);
 		if ( $nameFamily = htmlentities(html_entity_decode(trim($autAry[0]))) ) {
 
-			$nameGiven = ( @empty(rtrim($autAry[1])) ? "" : htmlentities(html_entity_decode(trim($autAry[1]))) );
+			$nameGiven = "";
+			if( @!empty(rtrim($autAry[1])) ) {
+				$nameGiven = htmlentities(html_entity_decode(trim($autAry[1])));
+				$nameGiven = lib4ridora_initials_tuning( $nameGiven );
+			}
 
 			$nameArea = lib4ridora_mods_code_author( $nameFamily, $nameGiven, $pid, $authorCount );
 			$authorCount++; // afterwards!

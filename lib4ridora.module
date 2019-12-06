@@ -1654,10 +1654,15 @@ function lib4ridora_islandora_datastream_modified($object, $datastream) {
     lib4ridora_update_full_text($object);
   }
 
+  // originalAuthorList tuning: replacing the MODS by an other/tuned MODS (caution: endless loops!)
   if ( strval($datastream->id) == "MODS" && variable_get('lib4ridora_parse_orig_author_list',true) ) {
-    sleep(1);
-    module_load_include('inc', 'lib4ridora', 'includes/utilities.author');
-    lib4ridora_parse_orig_author_list($object);
+	$sIdx = strval($object->id) . "/mods/modify/oal";
+	if ( @intval($_SESSION[$sIdx]) > (time() - 5) ) { return; /* for safety: do not repeat unless 5 seconds have passed */ }
+	$_SESSION[$sIdx] = time() + 1;
+
+	sleep(1);
+	module_load_include('inc', 'lib4ridora', 'includes/utilities.author');
+	lib4ridora_parse_orig_author_list($object);
   }
 }
 
@@ -1677,10 +1682,11 @@ function lib4ridora_islandora_datastream_ingested($object, $datastream) {
     lib4ridora_pathauto_create_alias($object, $datastream, 'insert');
   }
 
+  // originalAuthorList tuning: replacing the MODS by an other/tuned MODS (caution: endless loops!)
   if ( strval($datastream->id) == "MODS" && variable_get('lib4ridora_parse_orig_author_list',true) ) {
-    sleep(1);
-    module_load_include('inc', 'lib4ridora', 'includes/utilities.author');
-    lib4ridora_parse_orig_author_list($object);
+	sleep(1);
+	module_load_include('inc', 'lib4ridora', 'includes/utilities.author');
+	lib4ridora_parse_orig_author_list($object);
   }
 }
 
@@ -1986,9 +1992,6 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 
 	$batch = batch_get();		// right now this is not intended for/when exporting results.
 	if ( !empty($batch) ) { return; }
-
-	$webSite = strtok(substr($_SERVER['REQUEST_URI']."/",1),"/");		// using here a 'negative' list just for simpler/faster main site handling
-	if ( stristr(variable_get('lib4ridora_solr_search_extension_omit_inst','Eawag, Empa, WSL'),$webSite) ) { return; }
 
 	$query = trim( $islandora_solr_query->solrQuery );		// expecting something like: lib4ri_all_authors_mt:(aaa) NOT lib4ri_all_authors_mt:(bbb)
 	if ( !strchr($query,":") || strlen($query) < 4 ) {

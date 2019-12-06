@@ -238,14 +238,6 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#size' => $textfield_size,
   );
   if ( @isset($_GET['all']) || @isset($_GET['search']) ) {
-    $form['lib4ridora_solr_search_extension_omit_inst'] = array(		/* using here a 'negative' list just for simpler/faster main site handling */ 
-      '#type' => 'textfield',
-      '#title' => t('Expanded search: Omitted Institutes'),
-      '#description' => t("Related to publications with hundreds of authors: Only institutes listed here will check the 'originial author list' too."),
-      '#default_value' => variable_get('lib4ridora_solr_search_extension_omit_inst','Eawag, Empa, WSL'),
-      '#required' => FALSE,
-      '#size' => 160,
-    );
     $form['lib4ridora_solr_search_extension_field_data'] = array(
       '#type' => 'textfield',
       '#title' => t('Expanded search: Solr Field Data'),
