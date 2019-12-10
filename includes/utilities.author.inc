@@ -10,9 +10,9 @@
  *
  * Example of initials (types of given name) that can be treated here:
  *	"F. M."          =>  "F.M."
- *	"Jan &#197;. D." =>  "Jan &#197;. D."
+ *	"Jan &#197;. D." =>  "Jan &#197;.D."
  *	"F. &#xD6;."     =>  "F.&#xD6;."
- *  "Chr. E. Th."    =>  "Chr.E.Th."
+ *	"Chr. E. Th."    =>  "Chr.E.Th."
  *	"H.R. J&#252;rg" =>  "H.R. J&#252;rg"
  */
 function lib4ridora_unspace_name_given( $nameGiven ) {
@@ -147,7 +147,8 @@ function lib4ridora_parse_orig_author_list( &$object, $ignLimit = 50, $showLimit
 	// ========================== MAIN EVALUATION AND DATA COLLECTION PART =======================
 
 	$authorCount = 0;
-	$autListNew = array();
+	$autListAll = array();
+	$autListTuned = array();
 	$autAffiliated = array();
 	$autLastCache = array();
 	$origAutAry = array();		// authors taken from the originalAuthorList element, per author there is an sub-array
@@ -276,28 +277,30 @@ function lib4ridora_parse_orig_author_list( &$object, $ignLimit = 50, $showLimit
 			// Going to produce the XML code, following call will also remove the '@' from family & given name:
 			$nameArea = lib4ridora_mods_code_author( $pid, $authorCount, $nameFamily, $nameGiven, $autAry['uName'], $autAry['uId'], $autAry['uNum'] );
 			$authorCount++; // afterwards!
-	
+			$autListAll[] = array( $nameArea, "{$nameFamily}, {$nameGiven}" );
+
 			$is_affiliated = strpos($autAry['uId'],":"); 	// just checking a unit id
 			if ( $is_affiliated ) {
 				$autAffiliated[] = array( $nameArea, "{$nameFamily}, {$nameGiven}" );
 			}
-			if ( sizeof($autListNew) < $showLimit ) {		// not elseif !
-				$autListNew[] = array( $nameArea, "{$nameFamily}, {$nameGiven}" );
+			if ( sizeof($autListTuned) < $showLimit ) {		// not elseif !
+				$autListTuned[] = array( $nameArea, "{$nameFamily}, {$nameGiven}" );
 			} elseif ( $is_affiliated ) {
-				$autListNew[] = array( $nameArea, "{$nameFamily}, {$nameGiven}" );
+				$autListTuned[] = array( $nameArea, "{$nameFamily}, {$nameGiven}" );
 				$autLastCache = array();
 			} else {
 				$autLastCache = array( $nameArea, "{$nameFamily}, {$nameGiven}" );
 			}
 		}
 	}
-	if ( $addAutLast && sizeof($autLastCache) ) { $autListNew[] = $autLastCache; }
+	if ( $authorCount <= $ignLimit ) { $autListTuned = $autListAll; }
+	elseif ( $addAutLast && sizeof($autLastCache) ) { $autListTuned[] = $autLastCache; }
 
 
 	// ====================================== UPDATE MODS ========================================
 
 	$nameArea = "";
-	foreach( $autListNew as $nAry ) { $nameArea .= $nAry[0]; }
+	foreach( $autListTuned as $nAry ) { $nameArea .= $nAry[0]; }
 	if ( !$hasNameEtAl && $authorCount > $ignLimit ) { $nameArea .= "\n  <name>\n    <etal/>\n  </name>"; }
 
 	if ( !empty($modsNeedle) ) {
@@ -340,7 +343,7 @@ function lib4ridora_parse_orig_author_list( &$object, $ignLimit = 50, $showLimit
 		}
 
 		$dcAry = array();
-		foreach( $autListNew as $nAry ) { 
+		foreach( $autListTuned as $nAry ) { 
 			$dcAry[] = "<dc:creator" . $dcAtt . ">" . $nAry[1] . " (author)</dc:creator>";
 		}
 
