@@ -130,7 +130,7 @@ function lib4ridora_download_name_pdf($pid,$fileExt,$docVer,$dsId) {
 			if ( empty($confAry[2]) ) {			// may happen if whithing quotes
 				$title = str_replace( " ", "", ucwords($title,"[{(_.,;!')}] \t\r\n\f\v") );
 			}
-			elseif ( @!empty(trim($confAry[2])) && !preg_match('/[<>\\/:\*\|\?]+/',trim($confAry[2])) ) {		// here safer if we trim, since it's not a space
+			elseif ( @trim($confAry[2]) != false && !preg_match('/[<>\\/:\*\|\?]+/',trim($confAry[2])) ) {		// here safer if we trim, since it's not a space
 				$title = str_replace( " ", trim($confAry[2]), $title );
 			}
 		}

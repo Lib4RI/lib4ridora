@@ -54,7 +54,6 @@ function lib4ridora_uninstall() {
     'lib4ridora_pdf_download_name_tuning',
     'lib4ridora_solr_field_org_terms_1on1',
 	'lib4ridora_page_title_tag_fix',
-	'lib4ridora_author_list_original',
 	'lib4ridora_solr_search_extension_field_data',
 	'lib4ridora_term_embargo_restricted',
 	'lib4ridora_css_block_inert_iconless',
