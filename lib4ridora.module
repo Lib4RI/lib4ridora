@@ -1290,6 +1290,17 @@ function lib4ridora_page_alter(&$page) {
   }
 }
 
+/*
+ * submit function used in lib4ridora_form_islandora_usage_stats_admin_form_alter()
+ * 
+ */
+function lib4ridora_islandora_usage_stats_admin_form_vars(array &$form, array &$form_state) {
+  variable_set('lib4ridora_download_count_ignore_role', $form_state['values']['lib4ridora_download_count_ignore_role']);
+  variable_set('lib4ridora_download_count_file_type' , $form_state['values']['lib4ridora_download_count_file_type']);
+  variable_set('lib4ridora_download_count_doc_version', $form_state['values']['lib4ridora_download_count_doc_version']);
+  drupal_set_message( t("The configuration options have been saved also for Lib4RI.") );
+}
+
 /**
  * Implements hook_form_FORM_ID_alter().
  *
@@ -1297,13 +1308,51 @@ function lib4ridora_page_alter(&$page) {
  * see: https://github.com/Islandora/islandora_usage_stats/blob/7.x/includes/admin.form.inc
  */
 function lib4ridora_form_islandora_usage_stats_admin_form_alter(array &$form, array &$form_state) {
+	
+  $form['lib4ri'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Lib4RI Optimizations'),
+    '#description' => t("Dominant filter settings specific to Lib4RI. An empty text field or a leading '#' will ignore these restrictions."),
+  );
+  $form['lib4ri']['lib4ridora_download_count_ignore_role'] = array(
+    '#type' => 'textfield',
+    '#title' => t('User Roles where Download is Ignored:'),
+    '#description' => t('Comma-delimited list of user roles where the download shall NOT increase the counter.'),
+    '#default_value' => variable_get('lib4ridora_download_count_ignore_role','editor, repo manager, administrator'),
+    '#size' => 96,
+  );
+  $form['lib4ri']['lib4ridora_download_count_file_type'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Download only counted for File Types:'),
+    '#description' => t('Comma-delimited list of MIME strings for those files that shall be counted when downloaded.'),
+    '#default_value' => variable_get('lib4ridora_download_count_file_type','application/pdf'),
+    '#size' => 96,
+  );
+  $form['lib4ri']['lib4ridora_download_count_doc_version'] = array(
+    '#type' => 'textfield',
+    '#title' => t("When downloading a PDF its 'document version' must be:"),
+    '#description' => t("Comma-delimited list of terms, one of these terms must be part of the Lib4RI 'document version' to count the."),
+    '#default_value' => variable_get('lib4ridora_download_count_doc_version','published, accepted'),
+    '#size' => 96,
+  );
+
+  // If there is $form['lib4ri'] let's move existing sub-arrays of the form onto the end:
+  foreach( array("usage","clear","save_configuration") as $idx ) {
+    if( $tmpAry = @$form[$idx] ) {
+      unset($form[$idx]);
+      $form[$idx] = $tmpAry;
+    }
+  }
+
   $form['usage']['islandora_usage_stats_exclude_bots_regex'] = array(
-    '#type' => 'textarea',
+    '#type' => 'textarea' /* originally a (too) short textfield */,
     '#title' => t('Bot Exclusion Regex'),
     '#description' => t('The regular expression used to filter out bots'),
     '#default_value' => variable_get('islandora_usage_stats_exclude_bots_regex', '/bot|rambler|spider|crawl|slurp|curl|^$/i'),
   );
   $form['usage']['islandora_usage_stats_exclude_bots']['#prefix'] = '<br>';
+
+  $form['#submit'][] = 'lib4ridora_islandora_usage_stats_admin_form_vars';
 }
 
 /**
@@ -1643,7 +1692,7 @@ function lib4ridora_ir_citationCModel_islandora_object_ingested($object) {
  */
 function lib4ridora_islandora_datastream_modified($object, $datastream) {
   $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
-  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf' && !substr(strval($datastream->id),0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
+  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf' && substr(strval($datastream->id),0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
     module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
     module_load_include('inc', 'lib4ridora', 'includes/full_text');
     if (!isset($object['RELS-INT'])) {
@@ -1660,7 +1709,7 @@ function lib4ridora_islandora_datastream_modified($object, $datastream) {
  */
 function lib4ridora_islandora_datastream_ingested($object, $datastream) {
   $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
-  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf' && !substr(strval($datastream->id),0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
+  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf' && substr(strval($datastream->id),0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
     module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
     module_load_include('inc', 'lib4ridora', 'includes/full_text');
     if (!isset($object['RELS-INT'])) {

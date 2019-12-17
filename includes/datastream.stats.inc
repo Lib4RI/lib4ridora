@@ -5,6 +5,19 @@
  * Contains the admin form and callback functions for datastream manipulations supporting/tuning exclusively the islandora_usage_stats module.
  */
 
+
+/**
+ * Helper function for lib4ridora_provide_datastream
+ *
+ */
+function lib4ridora_helper_datastream(AbstractDatastream $datastream, $download = FALSE, $version = NULL, $info = array() ) {
+  if ( stripos($datastream->mimetype,"/pdf") ) {
+    return lib4ridora_view_datastream($datastream, $download, $version, $info);		// for Lib4RI specific PDF file names
+  }
+  module_load_include('inc', 'islandora', 'includes/datastream');
+  return islandora_view_datastream($datastream, $download, $version);
+}
+
 /**
  * Callback to download the given datastream to the users computer.
  *
@@ -15,44 +28,65 @@
  */
 function lib4ridora_provide_datastream(AbstractDatastream $datastream, $download = FALSE, $version = NULL) {
   if ( user_is_logged_in() ) {
-	// Do not do anything special if we are an editor/admin managing PDFs/datastreams:
-	$urlNow = $_SERVER['REQUEST_URI'];
-    if ( stripos($urlNow,"/manage/datastreams") || stripos($urlNow,"/lib4ridora_pdf_list") || stripos($urlNow,"/lib4ridora_pdf_management") ) {
-      module_load_include('inc', 'islandora', 'includes/datastream');
-      return islandora_view_datastream($datastream, $download, $version);
+    $urlNow = @trim( strtok( " ".$_SERVER['HTTP_REFERER']."?" , "?" ) );
+    $ignPages = trim( variable_get('lib4ridora_download_count_ignore_page','/manage/, /datastream/, /lib4ridora_pdf_list') );
+    if ( !empty($urlNow) && !empty($ignPages) && substr($ignPages,0,1) != "#" ) {
+      // Generally do not do anything special if we are an editor/admin managing PDFs/datastreams:
+      foreach( str_getcsv($ignPages) as $page ) {
+        if ( stripos($urlNow,trim($page)) !== false ) {
+          module_load_include('inc', 'islandora', 'includes/datastream');
+          return islandora_view_datastream($datastream, $download, $version);		// so we get the Islandora's original file names.
+        }
+      }
     }
   }
+
+  if ( !module_exists("islandora_usage_stats") ) {
+    return lib4ridora_helper_datastream($datastream, $download, $version);
+  }
+
   $fileTypeOk = trim(variable_get('lib4ridora_download_count_file_type','application/pdf'));
-  if ( empty($fileTypeOk) || substr($fileTypeOk,0,1) == "#" ) {
-    if ( stripos($datastream->mimetype,"/pdf") ) {
-      return lib4ridora_view_datastream($datastream, $download, $version);		// for Lib4RI specific PDF file names
+  if ( !empty($fileTypeOk) && substr($fileTypeOk,0,1) != "#" ) {
+    foreach( str_getcsv($fileTypeOk) as $type ) {
+      if ( stripos($datastream->mimetype,trim($type)) !== false ) { $fileTypeOk = ""; break; }
     }
-    module_load_include('inc', 'islandora', 'includes/datastream');
-    return islandora_view_datastream($datastream, $download, $version);
-  }
-  foreach( str_getcsv($fileTypeOk) as $type ) {
-    if ( stripos($datastream->mimetype,trim($type)) !== false ) { $fileTypeOk = ""; break; }
-  }
-  if ( !empty($fileTypeOk) ) {
-    if ( stripos($datastream->mimetype,"/pdf") ) {
-      return lib4ridora_view_datastream($datastream, $download, $version);		// for Lib4RI specific PDF file names
+    if ( !empty($fileTypeOk) ) {
+      return lib4ridora_helper_datastream($datastream, $download, $version);
     }
-    module_load_include('inc', 'islandora', 'includes/datastream');
-    return islandora_view_datastream($datastream, $download, $version);
   }
+
+  $ignUserRoles = trim( variable_get('lib4ridora_download_count_ignore_role','editor, repo manager, administrator') );
+  if ( !empty($ignUserRoles) && substr($ignUserRoles,0,1) != "#" ) {
+    global $user;
+    foreach(str_getcsv($ignUserRoles) as $role) {
+      if ( in_array(trim(strtolower($role)),array_values($user->roles)) ) {
+        return lib4ridora_helper_datastream($datastream, $download, $version);
+      }
+    }
+  }
+
+  // Get a proprietary list of code keywords to know/influence what to do:
+  $filterList = trim( strtolower( variable_get('lib4ridora_download_count_skip_list', /* 'pdf/a,private' */ "" ) ) );
 
   // Try to count the download now. Assuming here the mime type is PDF (although no real need to restrict it explicitly):
   $dsInfo = array();
-  if ( module_exists("islandora_usage_stats") ) {
-    if ( !variable_get('lib4ridora_download_count_req_language',false) || @trim($_SERVER['HTTP_ACCEPT_LANGUAGE']) != false ) {
-      $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
-      if ( !substr(strval($datastream->id),0-strlen($pdfa_suffix)) != $pdfa_suffix ) {		// do not count PDF/A files
+  if ( !variable_get('lib4ridora_download_count_req_language',false) || @!empty(trim($_SERVER['HTTP_ACCEPT_LANGUAGE'])) ) {
+    $docVerOk = trim(variable_get('lib4ridora_download_count_doc_version','published, accepted'));
+    if ( !stripos($datastream->mimetype,"/pdf") || empty($docVerOk) || substr($docVerOk,0,1) == "#" ) {
+      module_load_include('inc', 'islandora_usage_stats', 'includes/utilities'); 
+      if ( function_exists('islandora_usage_stats_log_datastream_download') ) {
+        islandora_usage_stats_log_datastream_download($datastream->parent->id, $datastream->id);
+      }
+    } else {  // for PDFs only
+      $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');		// option not to count PDF/A files
+      if ( strpos($filterList,"pdf/a") === false || substr(strval($datastream->id),0-strlen($pdfa_suffix)) != $pdfa_suffix ) {
         module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
         $dsInfo = lib4ridora_get_embargo_info($datastream);
-        if ( stripos($dsInfo['availability'],"private") === false ) {		// do not count private files/datastreams
-          $docVerOk = trim(variable_get('lib4ridora_download_count_doc_version','published,accepted'));
-          foreach( str_getcsv($docVerOk) as $docVer ) {
-            if ( stripos($dsInfo['document_version'],trim($docVer)) !== false ) { $docVerOk = ""; break; }
+        if ( strpos($filterList,"private") === false || stripos($dsInfo['availability'],"private") === false ) {
+          if ( !empty($docVerOk) && substr($docVerOk,0,1) != "#" ) {
+            foreach( str_getcsv($docVerOk) as $docVer ) {
+              if ( stripos($dsInfo['document_version'],trim($docVer)) !== false ) { $docVerOk = ""; break; }
+            }
           }
           if ( empty($docVerOk) || substr($docVerOk,0,1) == "#" ) {
             module_load_include('inc', 'islandora_usage_stats', 'includes/utilities'); 
@@ -64,7 +98,7 @@ function lib4ridora_provide_datastream(AbstractDatastream $datastream, $download
       }
     }
   }
-  return lib4ridora_view_datastream($datastream, $download, NULL, $dsInfo);
+  return lib4ridora_helper_datastream($datastream, $download, ( stripos($datastream->mimetype,"/pdf") ? NULL : $version ), $dsInfo);
 }
 
 /**
