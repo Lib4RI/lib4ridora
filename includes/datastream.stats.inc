@@ -45,6 +45,22 @@ function lib4ridora_provide_datastream(AbstractDatastream $datastream, $download
     return lib4ridora_helper_datastream($datastream, $download, $version);
   }
 
+  // By default simply allow registering/counting this download, then leave/return:
+  if ( !variable_get('lib4ridora_download_count_extra_tuning',FALSE) ) {
+    if ( !variable_get('lib4ridora_download_count_req_language',false) || @!empty(trim($_SERVER['HTTP_ACCEPT_LANGUAGE'])) ) {
+      module_load_include('inc', 'islandora_usage_stats', 'includes/utilities'); 
+      if ( function_exists('islandora_usage_stats_log_datastream_download') ) {
+        islandora_usage_stats_log_datastream_download($datastream->parent->id, $datastream->id);
+      }
+    }
+    return lib4ridora_helper_datastream($datastream, $download, ( stripos($datastream->mimetype,"/pdf") ? NULL : $version ) );
+  }
+
+  // -----------------------------------------------------------------------------------------------------------------------
+  // Code below is intended only if the extra tuning are enabled.
+  // Right now this code is not needed and probably can be removed after download count analysis in mid 2020.
+  // Also see ../lib4ridora.module
+
   $fileTypeOk = trim(variable_get('lib4ridora_download_count_file_type','application/pdf'));
   if ( !empty($fileTypeOk) && substr($fileTypeOk,0,1) != "#" ) {
     foreach( str_getcsv($fileTypeOk) as $type ) {
@@ -65,9 +81,6 @@ function lib4ridora_provide_datastream(AbstractDatastream $datastream, $download
     }
   }
 
-  // Get a proprietary list of code keywords to know/influence what to do:
-  $filterList = trim( strtolower( variable_get('lib4ridora_download_count_skip_list', /* 'pdf/a,private' */ "" ) ) );
-
   // Try to count the download now. Assuming here the mime type is PDF (although no real need to restrict it explicitly):
   $dsInfo = array();
   if ( !variable_get('lib4ridora_download_count_req_language',false) || @!empty(trim($_SERVER['HTTP_ACCEPT_LANGUAGE'])) ) {
@@ -79,6 +92,8 @@ function lib4ridora_provide_datastream(AbstractDatastream $datastream, $download
       }
     } else {  // for PDFs only
       $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');		// option not to count PDF/A files
+      // Get a proprietary list of code keywords to know/influence what to do:
+      $filterList = trim( strtolower( variable_get('lib4ridora_download_count_skip_list', /* 'pdf/a,private' */ "" ) ) );
       if ( strpos($filterList,"pdf/a") === false || substr(strval($datastream->id),0-strlen($pdfa_suffix)) != $pdfa_suffix ) {
         module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
         $dsInfo = lib4ridora_get_embargo_info($datastream);

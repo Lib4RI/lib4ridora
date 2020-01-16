@@ -1291,7 +1291,7 @@ function lib4ridora_page_alter(&$page) {
 }
 
 /*
- * submit function used in lib4ridora_form_islandora_usage_stats_admin_form_alter()
+ * submit function possibly used in lib4ridora_form_islandora_usage_stats_admin_form_alter()
  * 
  */
 function lib4ridora_islandora_usage_stats_admin_form_vars(array &$form, array &$form_state) {
@@ -1309,6 +1309,23 @@ function lib4ridora_islandora_usage_stats_admin_form_vars(array &$form, array &$
  */
 function lib4ridora_form_islandora_usage_stats_admin_form_alter(array &$form, array &$form_state) {
 	
+  $form['usage']['islandora_usage_stats_exclude_bots_regex'] = array(	/* keep! explicitely requested for Lib4RI purpose */
+    '#type' => 'textarea' 	/* originally a (too) short textfield */,
+    '#title' => t('Bot Exclusion Regex'),
+    '#description' => t('The regular expression used to filter out bots'),
+    '#default_value' => variable_get('islandora_usage_stats_exclude_bots_regex', '/bot|rambler|spider|crawl|slurp|curl|^$/i'),
+  );
+  $form['usage']['islandora_usage_stats_exclude_bots']['#prefix'] = '<br>';
+
+  if ( !variable_get('lib4ridora_download_count_extra_tuning',FALSE) ) {
+	  return;
+  }
+
+  // -----------------------------------------------------------------------------------------------------------------------
+  // Code below is intended only if the extra tuning are enabled.
+  // Right now this code is not needed and probably can be removed after download count analysis in mid 2020.
+  // Also see ./includes/datastream.stats.inc
+
   $form['lib4ri'] = array(
     '#type' => 'fieldset',
     '#title' => t('Lib4RI Optimizations'),
@@ -1317,41 +1334,30 @@ function lib4ridora_form_islandora_usage_stats_admin_form_alter(array &$form, ar
   $form['lib4ri']['lib4ridora_download_count_ignore_role'] = array(
     '#type' => 'textfield',
     '#title' => t('User Roles where Download is Ignored:'),
-    '#description' => t('Comma-delimited list of user roles where the download shall NOT increase the counter.'),
-    '#default_value' => variable_get('lib4ridora_download_count_ignore_role','editor, repo manager, administrator'),
+    '#description' => t("Comma-delimited list of user roles where the download shall NOT increase the counter. Example value for this field: 'editor, repo manager, administrator'"),
+    '#default_value' => variable_get('lib4ridora_download_count_ignore_role', /* 'editor, repo manager, administrator' */ ''),
     '#size' => 96,
   );
   $form['lib4ri']['lib4ridora_download_count_file_type'] = array(
     '#type' => 'textfield',
     '#title' => t('Download only counted for File Types:'),
-    '#description' => t('Comma-delimited list of MIME strings for those files that shall be counted when downloaded.'),
-    '#default_value' => variable_get('lib4ridora_download_count_file_type','application/pdf'),
+    '#description' => t("Comma-delimited list of MIME strings for those files that shall be counted when downloaded. Example value for this field: 'application/pdf'"),
+    '#default_value' => variable_get('lib4ridora_download_count_file_type', /* 'application/pdf' */ ''),
     '#size' => 96,
   );
   $form['lib4ri']['lib4ridora_download_count_doc_version'] = array(
     '#type' => 'textfield',
     '#title' => t("When downloading a PDF its 'document version' must be:"),
-    '#description' => t("Comma-delimited list of terms, one of these terms must be part of the Lib4RI 'document version' to count the."),
-    '#default_value' => variable_get('lib4ridora_download_count_doc_version','published, accepted'),
+    '#description' => t("Comma-delimited list of terms, one of these terms must be part of the Lib4RI 'document version' to count the. Example value for this field: 'published, accepted'"),
+    '#default_value' => variable_get('lib4ridora_download_count_doc_version', /* 'published, accepted' */ ''),
     '#size' => 96,
   );
-
-  // If there is $form['lib4ri'] let's move existing sub-arrays of the form onto the end:
-  foreach( array("usage","clear","save_configuration") as $idx ) {
+  foreach( array("usage","clear","save_configuration") as $idx ) { 	 // moving existing sub-arrays of the form onto the end:
     if( $tmpAry = @$form[$idx] ) {
       unset($form[$idx]);
       $form[$idx] = $tmpAry;
     }
   }
-
-  $form['usage']['islandora_usage_stats_exclude_bots_regex'] = array(
-    '#type' => 'textarea' /* originally a (too) short textfield */,
-    '#title' => t('Bot Exclusion Regex'),
-    '#description' => t('The regular expression used to filter out bots'),
-    '#default_value' => variable_get('islandora_usage_stats_exclude_bots_regex', '/bot|rambler|spider|crawl|slurp|curl|^$/i'),
-  );
-  $form['usage']['islandora_usage_stats_exclude_bots']['#prefix'] = '<br>';
-
   $form['#submit'][] = 'lib4ridora_islandora_usage_stats_admin_form_vars';
 }
 
