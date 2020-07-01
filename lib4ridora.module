@@ -1162,14 +1162,12 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
 
     // Decode for human readability.
     $persistent_url = urldecode(url("islandora/object/{$object->id}", array('absolute' => TRUE)));
-    $brSpace = "<i style='font-size:0pt;'> </i>";		// we want to show the complete link, but it needs to break (e.g. on cell phones)
-    $brLink = str_replace('/', '/'.$brSpace, $persistent_url);
-    $brLink = str_replace('lib4ri.ch', $brSpace.'lib4ri.ch', $brLink);
     $rendered['citation.tab']['persistent_url'] = array(
       '#type' => 'item',
-      '#title' => "Persistent&nbsp;<i> </i>URL&nbsp;",	/* t('Persistent URL'), */
-  /*  '#markup' => format_string('<a href="@url">@brLink</a>', array( '@url' => $persistent_url ),	*/
-      '#markup' => "<a style='line-height:1em;' href='{$persistent_url}'>{$brLink}</a>",
+      '#title' => t('Persistent URL'),
+  /*  '#markup' => format_string('<a href="@url">@url</a>', array( '@url' => $persistent_url ) ),  */
+  /*   some better presenation for Chrome + Safari browser:		*/
+      '#markup' => format_string('<a href="@url" style="word-break:break-word;">@url</a>', array( '@url' => $persistent_url ) ),
       '#weight' => 3,
     );
     $rendered['citation.tab']['citation_wrapper'] = array(

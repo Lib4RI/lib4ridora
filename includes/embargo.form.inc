@@ -137,6 +137,18 @@ function lib4ridora_multi_embargo_form($form, &$form_state) {
   );
   lib4ridora_append_document_information($step_storage['files'], $form);
   lib4ridora_append_romeo_information($form, $form_state);
+
+  // Adding a JS function to switch the availability to 'private' for 'internal documents'.
+  // This shall help the user, to enforce 'private' in DORA we better should use a valiation or submit hook.
+  // drupal_add_js( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.js', 'file' );
+  $jsPath = drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.txt';
+  drupal_add_js( file_get_contents($jsPath), 'inline' );	// this is less 'caching-resistent'
+  foreach($form['files'] as $uuid => $uAry ) {
+    if ( @is_array($uAry['document_version']) ) {
+      $form['files'][$uuid]['document_version']['#attributes']['onchange'] = "PdfInternalAsPrivate('{$uuid}');";
+    }
+  }
+
   return $form;
 }
 
@@ -169,6 +181,19 @@ function lib4ridora_multi_embargo_edit_form($form, &$form_state) {
       '#suffix' => '<br>&nbsp;<br>',
     ),
   );
+
+  // Adding a JS function to switch the availability to 'private' for 'internal documents'.
+  // This shall help the user, to enforce 'private' in DORA we better should use a valiation or submit hook.
+  // drupal_add_js( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.js', 'file' );
+  $jsPath = drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.txt';
+  drupal_add_js( file_get_contents($jsPath), 'inline' );	// this is less 'caching-resistent'
+
+  foreach($form['files'] as $pdfId => $pAry ) {
+    if ( @is_array($pAry['document_version']) ) {
+      $form['files'][$pdfId]['document_version']['#attributes']['onchange'] = "PdfInternalAsPrivate('".strtolower($pdfId)."');";
+    }
+  }
+
   return $form;
 }
 
@@ -550,9 +575,10 @@ function lib4ridora_multi_pdf_get_options($sort = TRUE) {
     $document_versions = array(
       'published version' => t('Published Version'),
       'accepted version' => t('Accepted Version'),
- /*   'updated version' => t('Updated Version'),		<== not needed anymore, see PDF_Fix_Order.pdf ( http://lib-dora-dev1.emp-eaw.ch:3000/issues/79 ) */
+   /* 'updated version' => t('Updated Version'),		<== not needed anymore, see PDF_Fix_Order.pdf ( http://lib-dora-dev1.emp-eaw.ch:3000/issues/79 ) */
       'erratum' => t('Erratum'),
       'supplemental material' => t('Supplemental Material'),
+      'internal document' => t('Internal Document'),	/* only for admins, see below */
       'unspecified' => t('Unspecified PDF'),
     );
   }
@@ -560,12 +586,19 @@ function lib4ridora_multi_pdf_get_options($sort = TRUE) {
     $document_versions = array(
       'accepted version' => t('Accepted Version'),
       'published version' => t('Published Version'),
- /*   'updated version' => t('Updated Version'),		<== not needed anymore, see PDF_Fix_Order.pdf ( http://lib-dora-dev1.emp-eaw.ch:3000/issues/79 ) */
-      'erratum' => t('Erratum'),
       'supplemental material' => t('Supplemental Material'),
+   /* 'updated version' => t('Updated Version'),		<== not needed anymore, see PDF_Fix_Order.pdf ( http://lib-dora-dev1.emp-eaw.ch:3000/issues/79 ) */
+      'erratum' => t('Erratum'),
+      'internal document' => t('Internal Document'),	/* only for admins, see below */
       'unspecified' => t('Unspecified PDF'),
     );
   }
+  
+  global $user;		// see http://lib-dora-dev1.emp-eaw.ch:3000/issues/314
+  if ( !user_is_logged_in() || !$user || !in_array('administrator',array_values($user->roles)) ) {
+	unset($document_versions['internal document']);
+  }
+
   return array(
     'availability' => array(
       'public' => t('Public'),

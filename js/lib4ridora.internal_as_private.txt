@@ -1,0 +1,15 @@
+// JS function for the ingest+editing form to automatically set 'private'
+// as availability as soon as the document version is 'internal document'.
+// possible ids can be 'edit-files-0x45dea23f7-availability' or 'edit-files-pdf2-availability' or just 'edit-file-availability'
+
+function PdfInternalAsPrivate(uuOrPdfId) {
+	var expId = ( uuOrPdfId != null && uuOrPdfId != '' ) ? ( 's-' + uuOrPdfId ) : '';
+	var docVer = document.getElementById("edit-file" + expId + "-document-version");
+	if ( docVer != null && docVer.value == 'internal document' ) {
+		var avail = document.getElementById("edit-file" + expId + "-availability");
+		for(c=0;c<avail.options.length;c++) {
+			if ( avail.options[c].value == "private" ) { avail.selectedIndex = c; break; }
+		}
+	}
+}
+

@@ -197,7 +197,7 @@ function lib4ridora_retrieve_filtered_pdfs(AbstractObject $object) {
 	// 2018-Oct-17: get the desired order for PDFs (corresponding to possible 'document versions' in RELS-INT), see also Redmine-Issue #79.
 	$lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options( TRUE /* true to get the PDF link order as required for Lib4RI */ );
 	$default_list = implode( ", ", array_map( function($ver) { return strtok(ltrim($ver),' '); }, $lib4ridora_multi_pdf_options['document_version'] ) );
-	$orderAry = explode(",", variable_get('lib4ridora_multi_pdf_link_order', /* 'Published, Accepted, Supplemental, Erratum, Unspecified' */ $default_list ) );
+	$orderAry = explode(",", variable_get('lib4ridora_multi_pdf_link_order', /* Published, Accepted, Supplemental, ... */ $default_list ) );
 
 	if ( !empty( trim( implode("",$orderAry) ) ) && @isset($object['RELS-INT']) ) {		// safety check
 		$relsIntCode = $object['RELS-INT']->content;

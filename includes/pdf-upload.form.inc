@@ -70,6 +70,13 @@ function lib4ridora_single_pdf_upload_form($form, &$form_state, AbstractObject $
     '#prefix' => '<br>',
     '#suffix' => '<br><br><br>',
   );
+  
+  // Adding a JS function to switch the availability to 'private' for 'internal documents'.
+  // This shall help the user, to enforce 'private' in DORA we better should use a valiation or submit hook.
+  // drupal_add_js( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.js', 'file' );
+  $jsPath = drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.txt';
+  drupal_add_js( file_get_contents($jsPath), 'inline' );	// this is less 'caching-resistent'
+  $form['file']['document_version']['#attributes']['onchange'] = "PdfInternalAsPrivate('');"; // here we not need an UUID or a PDF-ID
 
   return $form;
 }
