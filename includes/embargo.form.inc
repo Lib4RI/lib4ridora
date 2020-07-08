@@ -5,6 +5,25 @@
  * Ingest step form and friends.
  */
 
+function lib4ridora_internal_doc_access( $infoAry, $access_other_type = TRUE ) {
+  if ( @!isset($infoAry['document_version']) || @!isset($infoAry['availability']) ) {
+    return FALSE;
+  }
+  if ( stripos($infoAry['document_version'],'internal') === false || stripos($infoAry['availability'],'private') === false ) {
+    return $access_other_type;
+  }
+  if ( !user_is_logged_in() ) { return FALSE; }
+  global $user;
+  $accessAry = array_map('trim',explode(',',variable_get('lib4ridora_internal_doc_user_list','editor, repo manager, administrator')));
+  if ( in_array($user->name,$accessAry) ) { return TRUE; }
+  if ( $userRoleAry = @array_values($user->roles) ) {
+    foreach( $accessAry as $role ) {
+      if ( in_array(strtolower($role),$userRoleAry) ) { return TRUE; }
+    }
+  }
+  return FALSE;
+}
+
 // @XXX silencing and including like legacy tuque wrapper implementation.
 @include_once 'sites/all/libraries/tuque/FedoraRelationships.php';
 define('LIB4RIDORA_RELS_URI', ISLANDORA_RELS_INT_URI);
@@ -647,6 +666,9 @@ function lib4ridora_append_document_information($files, &$form ) {
     if ( $is_pdfa && $skip_pdfa ) { continue; }
  
     $defaults = $edit ? lib4ridora_get_embargo_info($file,(!$is_pdfa)) : lib4ridora_multi_pdf_defaults_properties();
+    
+	if ( !lib4ridora_internal_doc_access($defaults) ) { continue; }
+
     $filename = $edit ? $file->label : $file->filename;
     $form['files'][$uuid] = array(
       '#type' => 'fieldset',

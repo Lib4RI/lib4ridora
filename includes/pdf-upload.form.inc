@@ -158,6 +158,31 @@ function lib4ridora_single_pdf_upload_form_submit(&$form, &$form_state) {
 }
 
 /**
+ * Implements validation from the Form API.
+ * 
+ * @param $form
+ *   A copy as structured array containing the elements and properties of the form.
+ * @param $form_state
+ *   An array that hold the submitted information about the form's current state during processing.
+ * 
+ * Used here to force the 'private' availability for internal documents.
+ */
+function lib4ridora_single_pdf_upload_form_validate($form, &$form_state) {
+  $forced_intdoc_as_priv = false;
+  if ( stripos($form_state['values']['file']['document_version'],'internal') !== false && stripos($form_state['values']['file']['availability'],'private') === false ) {
+    $form_state['values']['file']['availability'] = 'private';
+    $forced_intdoc_as_priv = true;
+  }
+  if ( stripos($form_state['input']['file']['document_version'],'internal') !== false && stripos($form_state['input']['file']['availability'],'private') === false ) {
+    $form_state['input']['file']['availability'] = 'private';
+    $forced_intdoc_as_priv = true;
+  }
+  if ( $forced_intdoc_as_priv ) {
+    drupal_set_message("The availability of the 'Internal Document' was set to 'Private'.", 'warning');
+  }
+}
+
+/**
  * Get info for all PDFs on the object.
  *
  * @param AbstractObject $object

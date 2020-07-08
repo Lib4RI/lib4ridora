@@ -10,15 +10,17 @@
 function template_preprocess_lib4ridora_pdf_materials(&$variables) {
   $object = $variables['object'];
   module_load_include('inc', 'lib4ridora', 'includes/utilities');
+  module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
   $pdfs = lib4ridora_retrieve_filtered_pdfs($object);
-  $variables['pdf_listing'] = array();
   foreach ($pdfs as $pdf) {
+    if( !lib4ridora_internal_doc_access(lib4ridora_get_embargo_info($pdf)) ) { continue; }
     $variables['pdf_listing'][$pdf->id] = array(
       '#theme' => 'lib4ridora_pdf_link',
       '#datastream' => $pdf,
       '#statement' => $variables['statement'],
     );
   }
+  if ( @!isset($variables['pdf_listing']) ) { $variables['pdf_listing'] = array(); }
 }
 
 /**

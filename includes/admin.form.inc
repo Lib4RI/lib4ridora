@@ -32,6 +32,14 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => FALSE,
     '#size' => $textfield_size,
   );
+  $form['lib4ridora_internal_doc_user_list'] = array(		/* see http://lib-dora-dev1.emp-eaw.ch:3000/issues/314 */
+    '#type' => 'textfield',
+    '#title' => t("User name/role to see an 'Internal Document'"),
+    '#default_value' => variable_get('lib4ridora_internal_doc_user_list','editor, repo manager, administrator'),
+    '#description' => t("Comma-separated list of user names or user roles (both case-sensitive) allowed to see PDFs hold as 'Internal Document' in DORA." ),
+    '#required' => FALSE,
+    '#size' => $textfield_size,
+  );
   if ( @isset($_GET['all']) || @isset($_GET['add']) ) {
 	  $form['lib4ridora_recent_additions_amount'] = array(
 		'#type' => 'textfield',
