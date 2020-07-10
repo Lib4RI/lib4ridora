@@ -5,25 +5,6 @@
  * Ingest step form and friends.
  */
 
-function lib4ridora_internal_doc_access( $infoAry, $access_other_type = TRUE ) {
-  if ( @!isset($infoAry['document_version']) || @!isset($infoAry['availability']) ) {
-    return FALSE;
-  }
-  if ( stripos($infoAry['document_version'],'internal') === false || stripos($infoAry['availability'],'private') === false ) {
-    return $access_other_type;
-  }
-  if ( !user_is_logged_in() ) { return FALSE; }
-  global $user;
-  $accessAry = array_map('trim',explode(',',variable_get('lib4ridora_internal_doc_user_list','editor, repo manager, administrator')));
-  if ( in_array($user->name,$accessAry) ) { return TRUE; }
-  if ( $userRoleAry = @array_values($user->roles) ) {
-    foreach( $accessAry as $role ) {
-      if ( in_array(strtolower($role),$userRoleAry) ) { return TRUE; }
-    }
-  }
-  return FALSE;
-}
-
 // @XXX silencing and including like legacy tuque wrapper implementation.
 @include_once 'sites/all/libraries/tuque/FedoraRelationships.php';
 define('LIB4RIDORA_RELS_URI', ISLANDORA_RELS_INT_URI);
@@ -63,7 +44,7 @@ function lib4ridora_multi_embargo_get_object($form_state) {
  *   the "lib4ridora_extra_pdf_datastream_prefix" Drupal variable; otherwise,
  *   FALSE.
  */
-function lib4ridora_multi_embargo_pdf_filter_soft(AbstractDatastream $datastream) {		// original function, with '_all' attached onto its name.
+function lib4ridora_multi_embargo_pdf_filter_soft(AbstractDatastream $datastream) {		// original function, with '_soft' attached onto its name.
   return ( $datastream->id == 'PDF' || strpos($datastream->id, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 );
 }
 
@@ -86,6 +67,22 @@ function lib4ridora_multi_embargo_pdf_filter_hard(AbstractDatastream $datastream
     return ( @!empty($infoAry['availability']) && strtolower($infoAry['availability']) != 'private' );		// 'private' must be hard-coded here, as in lib4ridora_islandora_datastream_access()
   }
   return FALSE;
+}
+
+function lib4ridora_internal_document_as_private(&$form_state) {
+	$warning = NULL;
+	foreach( array('values','input') as $idxMain ) {
+		if ( @empty($form_state[$idxMain]['files']) ) { continue; }
+		foreach($form_state[$idxMain]['files'] as $pdfId => $pAry ) {
+			if ( @stripos($form_state[$idxMain]['files'][$pdfId]['document_version'],'internal') !== false ) {
+				if ( @stripos($form_state[$idxMain]['files'][$pdfId]['availability'],'private') === false ) {
+					$form_state[$idxMain]['files'][$pdfId]['availability'] = 'private';	// enforce 'private' for internal documents
+					$warning = "The availability of the 'Internal Document' was set to 'Private'.";
+				}
+			}
+		}
+	}
+	return $warning;
 }
 
 /**
@@ -206,7 +203,6 @@ function lib4ridora_multi_embargo_edit_form($form, &$form_state) {
   // drupal_add_js( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.js', 'file' );
   $jsPath = drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.txt';
   drupal_add_js( file_get_contents($jsPath), 'inline' );	// this is less 'caching-resistent'
-
   foreach($form['files'] as $pdfId => $pAry ) {
     if ( @is_array($pAry['document_version']) ) {
       $form['files'][$pdfId]['document_version']['#attributes']['onchange'] = "PdfInternalAsPrivate('".strtolower($pdfId)."');";
@@ -215,7 +211,6 @@ function lib4ridora_multi_embargo_edit_form($form, &$form_state) {
 
   return $form;
 }
-
 
 /**
  * Get info about the datastream.
@@ -259,6 +254,8 @@ function lib4ridora_get_embargo_info(AbstractDatastream $datastream, $keep_defau
  */
 function lib4ridora_multi_embargo_form_submit(&$form, &$form_state) {
 	module_load_include('inc', 'islandora', 'includes/ingest.form');
+
+	if ( $warning = lib4ridora_internal_document_as_private($form_state) ) { drupal_set_message($warning, 'warning'); }
 
 	$step_storage = islandora_ingest_form_get_step_storage($form_state, 'lib4ridora_multi_pdf_upload');
 	$object = lib4ridora_multi_embargo_get_object($form_state);
@@ -326,6 +323,11 @@ function lib4ridora_multi_embargo_form_undo_submit(&$form, &$form_state) {
   }
 }
 
+function lib4ridora_multi_embargo_form_validate(&$form, &$form_state) {
+	// dpm( 'lib4ridora_multi_embargo_form_validate: ' . print_r($form_state,TRUE) );
+	if ( $warning = lib4ridora_internal_document_as_private($form_state) ) { drupal_set_message($warning, 'warning'); }
+}
+
 /**
  * function to instantly set open access or restricted
  *
@@ -358,12 +360,14 @@ function lib4ridora_get_note_embargo_date_passed( $embargo_date_unix, $ds_label 
  */
 function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 
+	$errorAry = array();	// to hold error messages
+	if ( $warning = lib4ridora_internal_document_as_private($form_state) ) { $errorAry[] = $warning; }
+
 	date_default_timezone_set('GMT');
 	$object = lib4ridora_multi_embargo_get_object($form_state);
 	$pid = $object->id;
 	$primary_file = lib4ridora_get_primary_file_for_datastream($form_state);
 	$pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
-	$errorAry = array();	// to hold error messages
 
 	if ( $primary_file == 'PDF' ) {
 		// just update the RELS-INT, and copy over the document version to its PDF/A
@@ -404,7 +408,7 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 	//	$object->relationships->commitRelationships();		// part 2/2
 
 		// If all datastreams keep their names/IDs, then islandora_derivative_logging() won't produce an update massage (about now/other derivatives), let's create an own one:
-		if ( $error_msg != "" ) { drupal_set_message( trim($error_msg), 'warning' ); }
+		if ( sizeof($errorAry) ) { drupal_set_message( trim(implode(" <br>\r\n",$errorAry)), 'warning' ); }
 		else { drupal_set_message(t('Derivatives successfully <a href="./datastream/RELS-INT/version/0/view">updated</a>.'), 'status'); }
 
  		return;
@@ -444,7 +448,7 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 	}
 
 	$pdf_nr_suffix = 2;
-	foreach ($form_state['values']['files'] as $filename => $values) {		// $filename is the DS Id
+	foreach( @$form_state['values']['files'] as $filename => $values) {		// $filename is the DS Id
 		if ( substr($filename,0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
 			continue;
 		}
@@ -504,6 +508,11 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
 	// If all datastreams keep their names/IDs, then islandora_derivative_logging() won't produce an update massage (about now/other derivatives), let's create an own one:
 	if ( sizeof($errorAry) ) { drupal_set_message( trim(implode(" <br>\r\n",$errorAry)), 'warning' ); }
 	else { drupal_set_message(t('Derivatives successfully <a href="./datastream/RELS-INT/version/0/view">updated</a>.'), 'status'); }
+}
+
+function lib4ridora_multi_embargo_edit_form_validate(&$form, &$form_state) {
+	// dpm( 'lib4ridora_multi_embargo_edit_form_validate: ' . print_r($form_state,TRUE) );
+	if ( $warning = lib4ridora_internal_document_as_private($form_state) ) { drupal_set_message($warning, 'warning'); }
 }
 
 /**
@@ -650,6 +659,7 @@ function lib4ridora_multi_pdf_get_options($sort = TRUE) {
  *   The array to be rendered within Drupal.
  */
 function lib4ridora_append_document_information($files, &$form ) {
+  module_load_include('inc', 'lib4ridora', 'includes/utilities');
   // See if we are ingesting or editing.
   $type_file = reset($files);
   $edit = ( $type_file instanceof IslandoraFedoraDatastream );
@@ -887,7 +897,7 @@ function lib4ridora_append_romeo_information(&$form, &$form_state) {
  *   The file to be used as the PDF datastream.
  */
 function lib4ridora_get_primary_file_for_datastream($form_state) {
-  return lib4ridora_get_primary_file_for_datastream_info($form_state['values']['files']);
+  return @lib4ridora_get_primary_file_for_datastream_info($form_state['values']['files']);
 }
 
 /**
@@ -902,9 +912,9 @@ function lib4ridora_get_primary_file_for_datastream($form_state) {
  */
 function lib4ridora_get_primary_file_for_datastream_info($info) {
   $options = lib4ridora_multi_pdf_get_options(TRUE);
-  $primary_group = array_fill_keys(array_keys($options['document_version']), FALSE);
+  $primary_group = @array_fill_keys(array_keys($options['document_version']), FALSE);
   foreach ($info as $filename => $values) {
-    if (!$primary_group[$values['document_version']]) {
+    if (@!$primary_group[$values['document_version']]) {
       $primary_group[$values['document_version']] = $filename;
     }
   }
@@ -969,4 +979,3 @@ function lib4ridora_update_datastream_relationships(AbstractDatastream $datastre
     }
   }
 }
-

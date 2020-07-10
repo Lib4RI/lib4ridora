@@ -9,8 +9,8 @@
  */
 function template_preprocess_lib4ridora_pdf_materials(&$variables) {
   $object = $variables['object'];
-  module_load_include('inc', 'lib4ridora', 'includes/utilities');
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+  module_load_include('inc', 'lib4ridora', 'includes/utilities');
   $pdfs = lib4ridora_retrieve_filtered_pdfs($object);
   foreach ($pdfs as $pdf) {
     if( !lib4ridora_internal_doc_access(lib4ridora_get_embargo_info($pdf)) ) { continue; }
@@ -20,20 +20,22 @@ function template_preprocess_lib4ridora_pdf_materials(&$variables) {
       '#statement' => $variables['statement'],
     );
   }
-  if ( @!isset($variables['pdf_listing']) ) { $variables['pdf_listing'] = array(); }
 }
 
 /**
  * Implements hook_process_lib4ridora_pdf_materials().
  */
 function template_process_lib4ridora_pdf_materials(&$variables) {
-  $variables['pdf_listing'] = drupal_render($variables['pdf_listing']);
+  if ( !@empty($variables['pdf_listing']) ) {
+    $variables['pdf_listing'] = drupal_render($variables['pdf_listing']);
+  }
 }
 
 /**
  * Implements hook_preprocess_lib4ridora_pdf_link().
  */
 function template_preprocess_lib4ridora_pdf_link(&$variables) {
+	
   $values = lib4ridora_get_embargo_info($variables['datastream']);
   $access = $values['availability'];
 
@@ -144,6 +146,7 @@ function lib4ridora_download_name_pdf($pid,$fileExt,$docVer,$dsId) {
  * Implements hook_process_lib4ridora_pdf_link().
  */
 function template_process_lib4ridora_pdf_link(&$variables) {
+
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
   $values = $variables['pdf_link'];
   if ($variables['statement']) {

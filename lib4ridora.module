@@ -1695,35 +1695,139 @@ function lib4ridora_ir_citationCModel_islandora_object_ingested($object) {
 
 /**
  * Implements hook_islandora_datastream_modified().
+ *
+ * Take care reacting on changes on RELS-INT. Exchanging/replacing 1 value in RELS-INT my require 2 actions until done,
+ * resp. triggering this hook 2x and it will be called over and other again (or 'just' slow down the system).
  */
 function lib4ridora_islandora_datastream_modified($object, $datastream) {
-  $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
-  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf' && substr(strval($datastream->id),0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
-    module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-    module_load_include('inc', 'lib4ridora', 'includes/full_text');
-    if (!isset($object['RELS-INT'])) {
-      $values = lib4ridora_multi_pdf_defaults_properties();
-      lib4ridora_update_datastream_relationships($datastream, $values);
+  if ( !in_array('ir:citationCModel', $object->models) ) { return; }
+  if ( stripos($datastream->id,'PDF') === 0 && stripos($datastream->mimetype,'/pdf') ) {
+    $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
+    if ( substr($datastream->id,0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
+      module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+      module_load_include('inc', 'lib4ridora', 'includes/full_text');
+	  $relsUpdate = !isset($object['RELS-INT']);
+	  $values = $relsUpdate ? lib4ridora_multi_pdf_defaults_properties() : lib4ridora_get_embargo_info($datastream);
+      if ( stripos($values['document_version'],'internal') !== false && stripos($values['availability'],'private') === false ) {
+        $values['availability'] = 'private';
+        $relsUpdate = true;
+      }
+      if ( $relsUpdate ) {
+        lib4ridora_update_datastream_relationships($datastream, $values);
+      }
+      lib4ridora_pathauto_create_alias($object, $datastream, 'update');
+      lib4ridora_update_full_text($object);
     }
-    lib4ridora_pathauto_create_alias($object, $datastream, 'update');
-    lib4ridora_update_full_text($object);
+  }
+  elseif ( strtoupper($datastream->id) == 'RELS-INT' ) {
+ // $datastreams = @iterator_to_array($object);
+ // $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter_soft');
+ // foreach ($pdf_datastreams as $pdf_datastream) {
+ //   if ( stripos($pdf_datastream->id,'PDF') !== 0 ) { continue; }
+ //   if ( substr($pdf_datastream->id,0-strlen($pdfa_suffix)) == $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) { continue; }
+ //   $values = lib4ridora_get_embargo_info($pdf_datastream);
+ //   if ( stripos($values['document_version'],'internal') !== false && stripos($values['availability'],'private') === false ) {
+ //     $values['availability'] = 'private';
+ //     usleep( 375000 );		// rather for safety
+ //     lib4ridora_update_datastream_relationships($pdf_datastream, $values);
+ //   }
+ // }
+ // If we need to change RELS-INT, we need to change it in ONE step - so primitive work-around ahead (but working):
+    if ( $xmlCode = @$object['RELS-INT']->Content ) {
+      $dom = new DomDocument;
+      $dom->preserveWhiteSpace = false;
+      $dom->formatOutput = true;
+      $dom->loadXml( $xmlCode );
+      $xpath = new DOMXPath($dom);
+   // $xpath->registerNamespace('islandora', "http://islandora.ca/ontology/relsint#");
+      $xpath->registerNamespace('rdf', "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+      $rdfNew = false;
+      foreach( $xpath->query("//rdf:RDF/rdf:Description") as $item ) {
+        if ( stripos($item->getAttribute('rdf:about'),'/PDF') === false ) { continue; }
+        foreach( $item->getElementsByTagName('lib4ridora-multi-embargo-document_version') as $docVer ) {
+          if ( stripos($docVer->nodeValue,'internal') === false ) { continue; }
+          foreach( $item->getElementsByTagName('lib4ridora-multi-embargo-availability') as $avail ) {
+            if ( strtolower($avail->nodeValue) != 'private') {
+              $avail->nodeValue = 'private';
+              $rdfNew = true;
+            }
+          }
+        }
+      }
+      if ( $rdfNew ) {
+        $xmlCode = $dom->saveXML();
+        $object['RELS-INT']->content = $xmlCode;
+      }
+    }
   }
 }
 
 /**
  * Implements hook_islandora_datastream_ingested().
+ *
+ * Take care reacting on changes on RELS-INT. Exchanging/replacing 1 value in RELS-INT my require 2 actions until done,
+ * resp. triggering this hook 2x and it will be called over and other again (or 'just' slow down the system).
  */
 function lib4ridora_islandora_datastream_ingested($object, $datastream) {
-  $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
-  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf' && substr(strval($datastream->id),0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
-    module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-    module_load_include('inc', 'lib4ridora', 'includes/full_text');
-    if (!isset($object['RELS-INT'])) {
-      $values = lib4ridora_multi_pdf_defaults_properties();
-      lib4ridora_update_datastream_relationships($datastream, $values);
+  if ( !in_array('ir:citationCModel', $object->models) ) { return; }
+  if ( stripos($datastream->id,'PDF') === 0 && stripos($datastream->mimetype,'/pdf') ) {
+    $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
+    if ( substr($datastream->id,0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
+      module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+      module_load_include('inc', 'lib4ridora', 'includes/full_text');
+	  $relsUpdate = !isset($object['RELS-INT']);
+	  $values = $relsUpdate ? lib4ridora_multi_pdf_defaults_properties() : lib4ridora_get_embargo_info($datastream);
+      if ( stripos($values['document_version'],'internal') !== false && stripos($values['availability'],'private') === false ) {
+        $values['availability'] = 'private';
+        $relsUpdate = true;
+      }
+      if ( $relsUpdate ) {
+        lib4ridora_update_datastream_relationships($datastream, $values);
+      }
+      lib4ridora_update_full_text($object);
+      lib4ridora_pathauto_create_alias($object, $datastream, 'insert');
     }
-    lib4ridora_update_full_text($object);
-    lib4ridora_pathauto_create_alias($object, $datastream, 'insert');
+  }
+  elseif ( strtoupper($datastream->id) == 'RELS-INT' ) {
+ //	$datastreams = @iterator_to_array($object);
+ // $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter_soft');
+ // foreach ($pdf_datastreams as $pdf_datastream) {
+ //   if ( stripos($pdf_datastream->id,'PDF') !== 0 ) { continue; }
+ //   if ( substr($pdf_datastream->id,0-strlen($pdfa_suffix)) == $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) { continue; }
+ //   $values = lib4ridora_get_embargo_info($pdf_datastream);
+ //   if ( stripos($values['document_version'],'internal') !== false && stripos($values['availability'],'private') === false ) {
+ //     $values['availability'] = 'private';
+ //     usleep( 250000 );		// rather for safety
+ //     lib4ridora_update_datastream_relationships($pdf_datastream, $values);
+ //   }
+ // }
+ // If we need to change RELS-INT, we need to change it in ONE step - so primitive work-around ahead (but working):
+    if ( $xmlCode = @$object['RELS-INT']->Content ) {
+      $dom = new DomDocument;
+      $dom->preserveWhiteSpace = false;
+      $dom->formatOutput = true;
+      $dom->loadXml( $xmlCode );
+      $xpath = new DOMXPath($dom);
+   // $xpath->registerNamespace('islandora', "http://islandora.ca/ontology/relsint#");
+      $xpath->registerNamespace('rdf', "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+      $rdfNew = false;
+      foreach( $xpath->query("//rdf:RDF/rdf:Description") as $item ) {
+        if ( stripos($item->getAttribute('rdf:about'),'/PDF') === false ) { continue; }
+        foreach( $item->getElementsByTagName('lib4ridora-multi-embargo-document_version') as $docVer ) {
+          if ( stripos($docVer->nodeValue,'internal') === false ) { continue; }
+          foreach( $item->getElementsByTagName('lib4ridora-multi-embargo-availability') as $avail ) {
+            if ( strtolower($avail->nodeValue) != 'private') {
+              $avail->nodeValue = 'private';
+              $rdfNew = true;
+            }
+          }
+        }
+      }
+      if ( $rdfNew ) {
+        $xmlCode = $dom->saveXML();
+        $object['RELS-INT']->content = $xmlCode;
+      }
+    }
   }
 }
 
@@ -1989,7 +2093,7 @@ function lib4ridora_authority_hidden_validate($element, &$form_state, $form) {
  */
 function _lib4ridora_target_text_format_to_fully_escaped($element, &$form_state, $form) {
   form_load_include($form_state, 'inc', 'lib4ridora', 'includes/text_format');
-  $value = check_plain(
+  $value = @check_plain(
     _lib4ridora_target_text_format_fetch_markup($element, $form_state, $form)
   );
 

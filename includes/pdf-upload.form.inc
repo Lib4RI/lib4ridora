@@ -111,6 +111,15 @@ function lib4ridora_single_pdf_upload_form_submit(&$form, &$form_state) {
   $info = lib4ridora_assemble_pdf_info($object);
   $max_index = lib4ridora_determine_max_extra_pdf_index($info);
 
+  $forced_intdoc_as_priv = false;
+  foreach( array('values','input') as $idxMain ) {
+    if ( stripos($form_state[$idxMain]['file']['document_version'],'internal') !== false && stripos($form_state[$idxMain]['file']['availability'],'private') === false ) {
+      $form_state[$idxMain]['file']['availability'] = 'private';
+      $forced_intdoc_as_priv = true;
+    }
+  }
+  if ( $forced_intdoc_as_priv ) { drupal_set_message("The availability of the 'Internal Document' was set to 'Private'.", 'warning'); }
+
   $new_token = '--NEW--';
   $info[$new_token] = $form_state['values']['file'];
 
@@ -167,19 +176,15 @@ function lib4ridora_single_pdf_upload_form_submit(&$form, &$form_state) {
  * 
  * Used here to force the 'private' availability for internal documents.
  */
-function lib4ridora_single_pdf_upload_form_validate($form, &$form_state) {
+function lib4ridora_single_pdf_upload_form_validate(&$form, &$form_state) {
   $forced_intdoc_as_priv = false;
-  if ( stripos($form_state['values']['file']['document_version'],'internal') !== false && stripos($form_state['values']['file']['availability'],'private') === false ) {
-    $form_state['values']['file']['availability'] = 'private';
-    $forced_intdoc_as_priv = true;
+  foreach( array('values','input') as $idxMain ) {
+    if ( stripos($form_state[$idxMain]['file']['document_version'],'internal') !== false && stripos($form_state[$idxMain]['file']['availability'],'private') === false ) {
+      $form_state[$idxMain]['file']['availability'] = 'private';
+      $forced_intdoc_as_priv = true;
+    }
   }
-  if ( stripos($form_state['input']['file']['document_version'],'internal') !== false && stripos($form_state['input']['file']['availability'],'private') === false ) {
-    $form_state['input']['file']['availability'] = 'private';
-    $forced_intdoc_as_priv = true;
-  }
-  if ( $forced_intdoc_as_priv ) {
-    drupal_set_message("The availability of the 'Internal Document' was set to 'Private'.", 'warning');
-  }
+  if ( $forced_intdoc_as_priv ) { drupal_set_message("The availability of the 'Internal Document' was set to 'Private'.", 'warning'); }
 }
 
 /**

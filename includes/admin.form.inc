@@ -36,7 +36,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#type' => 'textfield',
     '#title' => t("User name/role to see an 'Internal Document'"),
     '#default_value' => variable_get('lib4ridora_internal_doc_user_list','editor, repo manager, administrator'),
-    '#description' => t("Comma-separated list of user names or user roles (both case-sensitive) allowed to see PDFs hold as 'Internal Document' in DORA." ),
+    '#description' => t("Comma-separated list of user names or user roles allowed to see PDFs hold as 'Internal Document' in DORA. <br> You may add a leading minus in front of an item in this list to exclude a name/role (will be dominant), for example '-D_Trump'." ),
     '#required' => FALSE,
     '#size' => $textfield_size,
   );
