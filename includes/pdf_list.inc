@@ -64,7 +64,6 @@ function lib4ridora_list_pdfs(AbstractObject $object) {
       return $value;
     }
   };
-  module_load_include('inc', 'lib4ridora', 'includes/utilities');
   foreach ($pdf_datastreams as $pdf_datastream) {
     if (!islandora_datastream_access(ISLANDORA_VIEW_OBJECTS, $pdf_datastream)) {
       continue;

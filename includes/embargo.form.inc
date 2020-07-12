@@ -29,6 +29,35 @@ function lib4ridora_multi_embargo_get_object($form_state) {
   return $object;
 }
 
+/*
+ * filter function to evaluate config-setting who is allowed to see 'internal documents'.
+ * see 
+ */
+function lib4ridora_internal_doc_access( $infoAry, $access_non_internal = TRUE, $access_non_private = TRUE ) {
+  if ( @!isset($infoAry['document_version']) || @empty($infoAry['availability']) ) { return FALSE; }
+  if ( stripos($infoAry['document_version'],'internal') === false ) { return $access_non_internal; }
+  if ( stripos($infoAry['availability'],'private') === false ) { return $access_non_private; }
+  if ( user_is_logged_in() ) {
+    global $user;
+    $userRoleAry = @array_map('strtolower',array_values($user->roles));
+    $accessAry = array_map('trim',explode(',',strtolower(variable_get('lib4ridora_internal_doc_user_list','editor, repo manager, administrator'))));
+    // if a user has a minus in front of his name, or if this 'negative' name matches one of his groups, then deny + exit instantly:
+    foreach( $accessAry as $userItem ) {
+      if ( substr($userItem,0,1) == '-' && ltrim($userItem,"- \t\n\r\0\x0B") == strtolower($user->name) ) { return FALSE; }
+    }
+    foreach( $accessAry as $userItem ) {
+      if ( substr($userItem,0,1) != '-' && $userItem == strtolower($user->name) ) { return TRUE; }
+    }
+    foreach( $accessAry as $userItem ) { // denying access as soon as a user has a bad role - rather untypical handling...!?
+      if ( substr($userItem,0,1) == '-' && @in_array(ltrim($userItem,"- \t\n\r\0\x0B"),$userRoleAry) ) { return FALSE; }
+    }
+    foreach( $accessAry as $userItem ) {
+      if ( substr($userItem,0,1) != '-' && !empty($userItem) && in_array($userItem,$userRoleAry) ) { return TRUE; }
+    }
+  }
+  return FALSE;
+}
+
 /**
  * Filter callback function.
  *
@@ -45,10 +74,12 @@ function lib4ridora_multi_embargo_get_object($form_state) {
  *   FALSE.
  */
 function lib4ridora_multi_embargo_pdf_filter_soft(AbstractDatastream $datastream) {		// original function, with '_soft' attached onto its name.
+  if ( !lib4ridora_internal_doc_access( lib4ridora_get_embargo_info($datastream) ) ) { return FALSE; }
   return ( $datastream->id == 'PDF' || strpos($datastream->id, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 );
 }
 
 function lib4ridora_multi_embargo_pdf_filter(AbstractDatastream $datastream) {	// modified version of the original function, now also excluding DS ending on 'PDF-A'. Mime-type check still skipped.
+  if ( !lib4ridora_internal_doc_access( lib4ridora_get_embargo_info($datastream) ) ) { return FALSE; }
   $dsId = strval( $datastream->id );
   if ( $dsId == 'PDF' || strpos($dsId, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 ) {
     $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
@@ -58,12 +89,13 @@ function lib4ridora_multi_embargo_pdf_filter(AbstractDatastream $datastream) {	/
 }
 
 function lib4ridora_multi_embargo_pdf_filter_hard(AbstractDatastream $datastream) {	// modified version of the original function, now also excluding DS ending on 'PDF-A'. Mime-type check still skipped.
+  $infoAry = lib4ridora_get_embargo_info($datastream);
+  if ( !lib4ridora_internal_doc_access( $infoAry ) ) { return FALSE; }
   $dsId = strval( $datastream->id );
   if ( $dsId == 'PDF' || strpos($dsId, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 ) {
     $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
     if ( substr($dsId,0-strlen($pdfa_suffix)) != $pdfa_suffix ) { return TRUE; }
     // skipping PDF/A file if its availability is set to private
-    $infoAry = lib4ridora_get_embargo_info($datastream);
     return ( @!empty($infoAry['availability']) && strtolower($infoAry['availability']) != 'private' );		// 'private' must be hard-coded here, as in lib4ridora_islandora_datastream_access()
   }
   return FALSE;

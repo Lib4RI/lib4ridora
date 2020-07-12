@@ -5,35 +5,6 @@
  * Utility functions for the module.
  */
 
-/*
- * function to evaluate config-setting who is allowed to see 'internal documents'.
- * see 
- */
-function lib4ridora_internal_doc_access( $infoAry, $access_non_internal = TRUE, $access_non_private = FALSE ) {
-  if ( @!isset($infoAry['document_version']) || @empty($infoAry['availability']) ) { return FALSE; }
-  if ( stripos($infoAry['document_version'],'internal') === false ) { return $access_non_internal; }
-  if ( stripos($infoAry['availability'],'private') === false ) { return $access_non_private; }
-  if ( user_is_logged_in() ) {
-    global $user;
-    $userRoleAry = @array_map('strtolower',array_values($user->roles));
-    $accessAry = array_map('trim',explode(',',strtolower(variable_get('lib4ridora_internal_doc_user_list','editor, repo manager, administrator'))));
-    // if a user has a minus in front of his name, or if this 'negative' name matches one of his groups, then deny + exit instantly:
-    foreach( $accessAry as $userItem ) {
-      if ( substr($userItem,0,1) == '-' && ltrim($userItem,"- \t\n\r\0\x0B") == strtolower($user->name) ) { return FALSE; }
-    }
-    foreach( $accessAry as $userItem ) {
-      if ( substr($userItem,0,1) != '-' && $userItem == strtolower($user->name) ) { return TRUE; }
-    }
-    foreach( $accessAry as $userItem ) { // denying access as soon as a user has a bad role - rather untypical handling...!?
-      if ( substr($userItem,0,1) == '-' && @in_array(ltrim($userItem,"- \t\n\r\0\x0B"),$userRoleAry) ) { return FALSE; }
-    }
-    foreach( $accessAry as $userItem ) {
-      if ( substr($userItem,0,1) != '-' && !empty($userItem) && in_array($userItem,$userRoleAry) ) { return TRUE; }
-    }
-  }
-  return FALSE;
-}
-
 /**
  * Retrieve the journal identified via an ISSN or EISSN.
  *
@@ -249,15 +220,12 @@ function lib4ridora_retrieve_filtered_pdfs(AbstractObject $object) {
 					}
 				}
 				foreach( $dsPdfAry as $pIdx => $pAry ) {		// add PDFs possibly missed because they matched no item in the order list
-					if ( @!isset($rankAry[$pIdx]) ) { $rankAry[$pIdx] = $pIdx; }
+					if ( @!isset($rankAry[$pIdx]) ) { $rankAry[$pIdx] = $pAry; }
 				}
 
 				if ( sizeof($dses) == sizeof($rankAry) ) {	// for safety
 					$dsesAry = array();
-					foreach( $rankAry as $pIdx => $pAry ) {
-						if ( !lib4ridora_internal_doc_access($pAry) ) { continue; }
-						$dsesAry[$pIdx] = $dses[$pIdx];
-					}
+					foreach( $rankAry as $pIdx => $pAry ) { $dsesAry[$pIdx] = $dses[$pIdx]; }
 					return $dsesAry;
 				}
 			}
