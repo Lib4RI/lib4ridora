@@ -7,6 +7,7 @@
 // Permissions.
 define('LIB4RIDORA_ADMINISTRATOR_PERMISSION', 'administer lib4ridora objects');
 define('LIB4RIDORA_JOURNAL_IMPACT_FACTOR_PERMISSION', 'import journal impact factors');
+define('LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION', 'visibility of internal documents');
 
 // PIDS.
 define('LIB4RIDORA_JOURNAL_CONTENT_MODEL', 'lib4ri:journalCModel');
@@ -558,7 +559,10 @@ function lib4ridora_permission() {
     'title' => t('Import Journal Impact Factor CSV'),
     'description' => t('Permit importing of journal impact factor CSVs.'),
   );
-
+  $perms[LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION] = array(
+    'title' => t("Visbility of Internal Documents"),
+    'description' => t("Permit reading/replacing/removing 'internal documents' (usually DORA-private PDF files)."),
+  );
   return $perms;
 }
 

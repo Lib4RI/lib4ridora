@@ -62,7 +62,6 @@ function lib4ridora_uninstall() {
 	'lib4ridora_download_count_doc_version',
 	'lib4ridora_download_count_ignore_role',
 	'lib4ridora_download_count_extra_tuning',
-	'lib4ridora_internal_doc_user_list',
   );
   array_walk($variables, 'variable_del');
 }

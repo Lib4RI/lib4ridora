@@ -37,6 +37,7 @@ function lib4ridora_internal_doc_access( $infoAry, $access_non_internal = TRUE, 
   if ( @!isset($infoAry['document_version']) || @empty($infoAry['availability']) ) { return FALSE; }
   if ( stripos($infoAry['document_version'],'internal') === false ) { return $access_non_internal; }
   if ( stripos($infoAry['availability'],'private') === false ) { return $access_non_private; }
+  /*
   if ( user_is_logged_in() ) {
     global $user;
     $userRoleAry = @array_map('strtolower',array_values($user->roles));
@@ -56,6 +57,8 @@ function lib4ridora_internal_doc_access( $infoAry, $access_non_internal = TRUE, 
     }
   }
   return FALSE;
+  */
+  return ( user_is_logged_in() && user_access(LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION) );
 }
 
 /**
