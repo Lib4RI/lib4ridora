@@ -641,7 +641,7 @@ function lib4ridora_multi_pdf_get_options($sort = TRUE) {
    /* 'updated version' => t('Updated Version'),		<== not needed anymore, see PDF_Fix_Order.pdf ( http://lib-dora-dev1.emp-eaw.ch:3000/issues/79 ) */
       'erratum' => t('Erratum'),
       'supplemental material' => t('Supplemental Material'),
-      'internal document' => t('Internal Document'),	/* only for admins, see below */
+      'internal document' => t('Internal Document'),
       'unspecified' => t('Unspecified PDF'),
     );
   }
@@ -652,16 +652,10 @@ function lib4ridora_multi_pdf_get_options($sort = TRUE) {
       'supplemental material' => t('Supplemental Material'),
    /* 'updated version' => t('Updated Version'),		<== not needed anymore, see PDF_Fix_Order.pdf ( http://lib-dora-dev1.emp-eaw.ch:3000/issues/79 ) */
       'erratum' => t('Erratum'),
-      'internal document' => t('Internal Document'),	/* only for admins, see below */
       'unspecified' => t('Unspecified PDF'),
+      'internal document' => t('Internal Document'),
     );
   }
-  
-  global $user;		// see http://lib-dora-dev1.emp-eaw.ch:3000/issues/314
-  if ( !user_is_logged_in() || !$user || !in_array('administrator',array_values($user->roles)) ) {
-	unset($document_versions['internal document']);
-  }
-
   return array(
     'availability' => array(
       'public' => t('Public'),
