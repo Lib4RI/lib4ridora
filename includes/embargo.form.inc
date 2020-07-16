@@ -78,13 +78,13 @@ function lib4ridora_internal_doc_access( $infoAry, $access_non_internal = TRUE, 
  */
 function lib4ridora_multi_embargo_pdf_filter_soft(AbstractDatastream $datastream) {		// original function, with '_soft' attached onto its name.
   if ( !lib4ridora_internal_doc_access( lib4ridora_get_embargo_info($datastream) ) ) { return FALSE; }
-  return ( $datastream->id == 'PDF' || strpos($datastream->id, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 );
+  return ( $datastream->id == 'PDF'  || stripos($datastream->mimetype,'/pdf') || stripos($datastream->id, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 );
 }
 
 function lib4ridora_multi_embargo_pdf_filter(AbstractDatastream $datastream) {	// modified version of the original function, now also excluding DS ending on 'PDF-A'. Mime-type check still skipped.
   if ( !lib4ridora_internal_doc_access( lib4ridora_get_embargo_info($datastream) ) ) { return FALSE; }
   $dsId = strval( $datastream->id );
-  if ( $dsId == 'PDF' || strpos($dsId, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 ) {
+  if ( $dsId == 'PDF' || stripos($datastream->mimetype,'/pdf') || stripos($dsId, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 ) {
     $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
     return ( substr($dsId,0-strlen($pdfa_suffix)) != $pdfa_suffix );
   }
@@ -95,7 +95,7 @@ function lib4ridora_multi_embargo_pdf_filter_hard(AbstractDatastream $datastream
   $infoAry = lib4ridora_get_embargo_info($datastream);
   if ( !lib4ridora_internal_doc_access( $infoAry ) ) { return FALSE; }
   $dsId = strval( $datastream->id );
-  if ( $dsId == 'PDF' || strpos($dsId, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 ) {
+  if ( $dsId == 'PDF' || stripos($datastream->mimetype,'/pdf') || stripos($dsId, variable_get('lib4ridora_extra_pdf_datastream_prefix', 'PDF')) === 0 ) {
     $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
     if ( substr($dsId,0-strlen($pdfa_suffix)) != $pdfa_suffix ) { return TRUE; }
     // skipping PDF/A file if its availability is set to private
