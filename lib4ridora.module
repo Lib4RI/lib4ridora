@@ -284,14 +284,14 @@ function lib4ridora_islandora_datastream_access($op, AbstractDatastream $datastr
     // Note, if a user has the LIB4RIDORA_ADMINISTRATOR_PERMISSION it does not mean the user is a *system* administrator (it is just related to Lib4RI objects)
     $can_do_admin4ri = ( user_is_logged_in() && user_access(LIB4RIDORA_ADMINISTRATOR_PERMISSION, $user) );
     $can_do_internal = ( $can_do_admin4ri && user_access(LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION, $user) ); // ...presuming the user must be a 'Lib4RI admin' already.
-    // Allow owner or admins.
-    if ( user_is_logged_in() && isset($user->name) && $datastream->parent->owner == $user->name ) {
-      $result['lib4ridora_admin_or_owner'] = TRUE;
-    }
-    elseif ( $is_internal_doc && $can_do_internal ) {
+    // Allow owner or admins, expect of internal documents, since these documents also could be uploaded afterwards by somebody else (like an administrator).
+    if ( !$is_internal_doc && @isset($user->name) && $datastream->parent->owner == $user->name ) {
       $result['lib4ridora_admin_or_owner'] = TRUE;
     }
     elseif ( !$is_internal_doc && $can_do_admin4ri ) {
+      $result['lib4ridora_admin_or_owner'] = TRUE;
+    }
+    elseif ( $is_internal_doc && $can_do_internal ) {
       $result['lib4ridora_admin_or_owner'] = TRUE;
     }
     elseif ($availability == 'private') {
@@ -386,7 +386,7 @@ function lib4ridora_romeo_access($object) {
  * Access callback for datastreams.
  *
  * Positive permissions on object access suggests on the datastream.
- * So far however still managed by islandora itself.
+ * So far however still managed by islandora itself expect of internal documents.
  */
 function lib4ridora_datastream_access($op, $datastream, $user = NULL) {
   module_load_include('module', 'islandora', 'islandora');
