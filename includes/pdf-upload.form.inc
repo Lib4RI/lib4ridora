@@ -12,7 +12,7 @@ function lib4ridora_single_pdf_upload_form($form, &$form_state, AbstractObject $
   form_load_include($form_state, 'inc', 'lib4ridora', 'includes/pdf-upload.form');
   form_load_include($form_state, 'inc', 'lib4ridora', 'includes/embargo.form');
   $options = lib4ridora_multi_pdf_get_options();
-  $defaults = lib4ridora_multi_pdf_defaults_properties();
+  $defaults = lib4ridora_multi_pdf_defaults_properties(TRUE);
 
   $form['#tree'] = TRUE;
   $form['pdf'] = array(
@@ -188,6 +188,14 @@ function lib4ridora_single_pdf_upload_form_validate(&$form, &$form_state) {
 }
 
 /**
+ * heloper function for lib4ridora_assemble_pdf_info()
+ */
+function lib4ridora_assemble_pdf_info_helper(AbstractDatastream $datastream) {
+  module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+  return lib4ridora_get_embargo_info($datastream, TRUE, TRUE);
+}
+
+/**
  * Get info for all PDFs on the object.
  *
  * @param AbstractObject $object
@@ -203,5 +211,5 @@ function lib4ridora_assemble_pdf_info(AbstractObject $object) {
   $datastreams = iterator_to_array($object);
   $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter');
 
-  return array_map('lib4ridora_get_embargo_info', $pdf_datastreams);
+  return array_map('lib4ridora_assemble_pdf_info_helper', $pdf_datastreams);
 }
