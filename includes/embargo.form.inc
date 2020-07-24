@@ -37,27 +37,6 @@ function lib4ridora_internal_doc_access( $infoAry, $access_non_internal = TRUE, 
   if ( @!isset($infoAry['document_version']) || @empty($infoAry['availability']) ) { return FALSE; }
   if ( stripos($infoAry['document_version'],'internal') === false ) { return $access_non_internal; }
   if ( stripos($infoAry['availability'],'private') === false ) { return $access_non_private; }
-  /*
-  if ( user_is_logged_in() ) {
-    global $user;
-    $userRoleAry = @array_map('strtolower',array_values($user->roles));
-    $accessAry = array_map('trim',explode(',',strtolower(variable_get('lib4ridora_internal_doc_user_list','editor, repo manager, administrator'))));
-    // if a user has a minus in front of his name, or if this 'negative' name matches one of his groups, then deny + exit instantly:
-    foreach( $accessAry as $userItem ) {
-      if ( substr($userItem,0,1) == '-' && ltrim($userItem,"- \t\n\r\0\x0B") == strtolower($user->name) ) { return FALSE; }
-    }
-    foreach( $accessAry as $userItem ) {
-      if ( substr($userItem,0,1) != '-' && $userItem == strtolower($user->name) ) { return TRUE; }
-    }
-    foreach( $accessAry as $userItem ) { // denying access as soon as a user has a bad role - rather untypical handling...!?
-      if ( substr($userItem,0,1) == '-' && @in_array(ltrim($userItem,"- \t\n\r\0\x0B"),$userRoleAry) ) { return FALSE; }
-    }
-    foreach( $accessAry as $userItem ) {
-      if ( substr($userItem,0,1) != '-' && !empty($userItem) && in_array($userItem,$userRoleAry) ) { return TRUE; }
-    }
-  }
-  return FALSE;
-  */
   return ( user_is_logged_in() && user_access(LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION) );
 }
 
@@ -190,10 +169,15 @@ function lib4ridora_multi_embargo_form($form, &$form_state) {
   lib4ridora_append_romeo_information($form, $form_state);
 
   // Adding a JS function to switch the availability to 'private' for 'internal documents'.
-  // This shall help the user, to enforce 'private' in DORA we better should use a valiation or submit hook.
+  // This shall assist the work-flow, but to enforce 'private' in DORA we better should use a valiation or submit hook.
   // drupal_add_js( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.js', 'file' );
-  $jsPath = drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.txt';
-  drupal_add_js( file_get_contents($jsPath), 'inline' );    // this is less 'caching-resistent'
+  if ( $jsCode = file_get_contents( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.js' ) ) {
+    if ( $jsCode = strchr(substr($jsCode,strpos($jsCode,'<script')),'>') ) {
+      if ( $jsCode = trim(substr($jsCode,0,strpos($jsCode,'</script>'))," </-!>\t") ) {
+        drupal_add_js( $jsCode, 'inline' );		// This is less 'caching-resistent', also a reset of ['#attached']['js'] cannot drop it.
+      }
+    }
+  }
   foreach($form['files'] as $uuid => $uAry ) {
     if ( @is_array($uAry['document_version']) ) {
       $form['files'][$uuid]['document_version']['#attributes']['onchange'] = "PdfInternalAsPrivate('{$uuid}');";
@@ -605,6 +589,12 @@ function lib4ridora_multi_pdf_defaults_properties($for_forms = FALSE) {
     'month' => $date['mon'],
     'day' => $date['mday'],
   );
+  if ( !$for_forms ) {
+    // For safety reasons, using lib4ridora_multi_pdf_defaults_properties() for/on froms requires now (since internal documents)
+    // an additional boolean (to be TRUE). Until this is established everythere let's allowit for auto-complete - to be tuned.
+    global $base_path;
+    $for_forms = ( strtok($_SERVER['REQUEST_URI'].'?','?') == $base_path.'system/ajax' );
+  }
   return array(
     'availability' => ( $for_forms ? trim(strtolower(variable_get('lib4ridora_multi_pdf_defaults_property_availability', 'intranet'))) : 'private' ),
     'embargo_date' => $embargo_date,

@@ -8,9 +8,10 @@
 <script type="text/javascript"><!--
 
 function PdfInternalAsPrivate(uuOrPdfId) {
-	var docVer = document.getElementById("edit-files-" + uuOrPdfId + "-document-version");
+	var expId = ( uuOrPdfId != null && uuOrPdfId != '' ) ? ( 's-' + uuOrPdfId ) : '';
+	var docVer = document.getElementById("edit-file" + expId + "-document-version");
 	if ( docVer != null && docVer.value == 'internal document' ) {
-		var avail = document.getElementById("edit-files-" + uuOrPdfId + "-availability");
+		var avail = document.getElementById("edit-file" + expId + "-availability");
 		for(c=0;c<avail.options.length;c++) {
 			if ( avail.options[c].value == "private" ) { avail.selectedIndex = c; break; }
 		}

@@ -278,8 +278,13 @@ function lib4ridora_islandora_datastream_access($op, AbstractDatastream $datastr
   }
 
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-  $infoAry = lib4ridora_get_embargo_info($datastream);
-  if ( ( $availability = @$infoAry['availability'] ) && ( $doc_version = @$infoAry['document_version'] ) ) {
+  $availability = $datastream->relationships->get(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('availability'));
+  $availability = reset($availability);
+  $doc_version = $datastream->relationships->get(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('document_version'));
+  $doc_version = reset($doc_version);
+  if ($availability && $doc_version) {
+    $availability = $availability['object']['value'];
+    $doc_version = $doc_version['object']['value'];
     $is_internal_doc = ( @stripos($doc_version,'internal') !== false && stripos($availability,'private') !== false );
     // Note, if a user has the LIB4RIDORA_ADMINISTRATOR_PERMISSION it does not mean the user is a *system* administrator (it is just related to Lib4RI objects)
     $can_do_admin4ri = ( user_is_logged_in() && user_access(LIB4RIDORA_ADMINISTRATOR_PERMISSION, $user) );
