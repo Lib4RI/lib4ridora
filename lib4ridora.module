@@ -183,6 +183,7 @@ function lib4ridora_ir_citationCModel_islandora_ingest_steps_alter(array &$steps
   unset($steps['xml_form_builder_association_step']);
   unset($steps['islandora_scholar_file_upload']);
   unset($steps['islandora_populator_select']);
+  unset($steps['islandora_mini_workflow_form']);
 }
 
 /**
@@ -206,13 +207,13 @@ function lib4ridora_ir_citationCModel_islandora_ingest_steps(array &$form_state)
     'module' => 'lib4ridora',
     'file' => 'includes/upload.form.inc',
   );
-  $steps['lib4ridora_license'] = array(
-    'weight' => 49,
-    'type' => 'form',
-    'form_id' => 'lib4ridora_license_form',
-    'module' => 'lib4ridora',
-    'file' => 'includes/license.form.inc',
-  );
+//   $steps['lib4ridora_license'] = array(
+//     'weight' => 49,
+//     'type' => 'form',
+//     'form_id' => 'lib4ridora_license_form',
+//     'module' => 'lib4ridora',
+//     'file' => 'includes/license.form.inc',
+//   );
 
   // Only continue with more steps if there are files being ingested,
   // otherwise it should be ingested right away.
