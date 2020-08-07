@@ -6,6 +6,7 @@
 
 // Permissions.
 define('LIB4RIDORA_ADMINISTRATOR_PERMISSION', 'administer lib4ridora objects');
+define('LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION', 'visibility of internal documents');
 define('LIB4RIDORA_JOURNAL_IMPACT_FACTOR_PERMISSION', 'import journal impact factors');
 
 // PIDS.
@@ -280,10 +281,23 @@ function lib4ridora_islandora_datastream_access($op, AbstractDatastream $datastr
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
   $availability = $datastream->relationships->get(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('availability'));
   $availability = reset($availability);
-  if ($availability) {
+  $doc_version = $datastream->relationships->get(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('document_version'));
+  $doc_version = reset($doc_version);
+  if ($availability && $doc_version) {
     $availability = $availability['object']['value'];
-    if ((isset($user->name) && $datastream->parent->owner == $user->name) || user_access(LIB4RIDORA_ADMINISTRATOR_PERMISSION, $user)) {
-      // Allow owner or admins.
+    $doc_version = $doc_version['object']['value'];
+    $is_internal_doc = ( @stripos($doc_version,'internal') !== false && stripos($availability,'private') !== false );
+    // Note, if a user has the LIB4RIDORA_ADMINISTRATOR_PERMISSION it does not mean the user is a *system* administrator (it is just related to Lib4RI objects)
+    $can_do_admin4ri = ( user_is_logged_in() && user_access(LIB4RIDORA_ADMINISTRATOR_PERMISSION, $user) );
+    $can_do_internal = ( $can_do_admin4ri && user_access(LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION, $user) ); // ...presuming the user must be a 'Lib4RI admin' already.
+    // Allow owner or admins, expect of internal documents, since these documents also could be uploaded afterwards by somebody else (like an administrator).
+    if ( !$is_internal_doc && @isset($user->name) && $datastream->parent->owner == $user->name ) {
+      $result['lib4ridora_admin_or_owner'] = TRUE;
+    }
+    elseif ( !$is_internal_doc && $can_do_admin4ri ) {
+      $result['lib4ridora_admin_or_owner'] = TRUE;
+    }
+    elseif ( $is_internal_doc && $can_do_internal ) {
       $result['lib4ridora_admin_or_owner'] = TRUE;
     }
     elseif ($availability == 'private') {
@@ -378,10 +392,24 @@ function lib4ridora_romeo_access($object) {
  * Access callback for datastreams.
  *
  * Positive permissions on object access suggests on the datastream.
- * So far however still managed by islandora itself.
+ * So far however still managed by islandora itself expect of internal documents.
  */
 function lib4ridora_datastream_access($op, $datastream, $user = NULL) {
   module_load_include('module', 'islandora', 'islandora');
+
+  // following may be not required - already before adding this code portion LIB4RIDORA_ADMINISTRATOR_PERMISSION was not examined in this function!(?)
+  if ( stripos($datastream->id,'PDF') === 0 || stripos($datastream->mimetype,'/pdf') ) {
+    module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+    $infoAry = lib4ridora_get_embargo_info($datastream);
+    if ( @empty($infoAry['document_version']) || @empty($infoAry['availability']) ) {
+      return NULL;	// as it happens in islandora.module/islandora_datastream_access()
+    }
+    $is_internal_doc = ( @stripos($infoAry['document_version'],'internal') !== false && @stripos($infoAry['availability']) !== false );
+    if ( $is_internal_doc && !user_access(LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION, $user) ) {
+      return NULL;	// as it happens in islandora.module/islandora_datastream_access()
+    }
+  }
+
   return islandora_datastream_access($op, $datastream, $user);
 }
 
@@ -530,7 +558,7 @@ function lib4ri_access_denied() {
   $pid = arg(2, $destination['destination']);
   $ds = arg(4, $destination['destination']);
   $object = islandora_object_load($pid);
-  if ($object && $ds && strpos($ds, 'PDF') === 0 && isset($object[$ds]) && in_array('ir:citationCModel', $object->models)) {
+  if ($object && $ds && isset($object[$ds]) && ( stripos($ds,'PDF') === 0 || stripos($object[$ds]->mimetype,'/pdf') ) && in_array('ir:citationCModel', $object->models)) {
     module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
     $datastreams = iterator_to_array($object);
     $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter');
@@ -552,14 +580,17 @@ function lib4ridora_permission() {
   $perms = array();
 
   $perms[LIB4RIDORA_ADMINISTRATOR_PERMISSION] = array(
-    'title' => t('Administer Lib4Ri Objects'),
+    'title' => t('Administer Lib4Ri objects generally'),
     'description' => t('Permit access and management of datastream.'),
+  );
+  $perms[LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION] = array(
+    'title' => t('Administer Lib4Ri Internal Documents'),
+    'description' => t("Permit reading/replacing/removing 'internal documents' (usually DORA-private PDF files)."),
   );
   $perms[LIB4RIDORA_JOURNAL_IMPACT_FACTOR_PERMISSION] = array(
     'title' => t('Import Journal Impact Factor CSV'),
     'description' => t('Permit importing of journal impact factor CSVs.'),
   );
-
   return $perms;
 }
 
@@ -637,7 +668,7 @@ function lib4ridora_islandora_solr_search_rss_item_alter(&$item, $doc) {
     if (isset($citation['MODS'])) {
       $items_to_set = array();
       $items_to_set['pubDate'] = $citation->createdDate->format(DATETIME::RSS);
-#      $items_to_set['pubDate'] = $citation->createdDate->format(DATETIME::RFC822);
+  //  $items_to_set['pubDate'] = $citation->createdDate->format(DATETIME::RFC822);
       foreach ($items_to_set as $key => $value) {
         foreach ($item['items'] as &$sub_item) {
           if ($sub_item['key'] == $key) {
@@ -1154,8 +1185,8 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
     // Handling of 'too many authors', adding 'et al' if there are more authors in originalAuthorList that we got in/via $author_json:
     if ( $reqEtAl > 0 && strlen($modsPathOAL) > 2 ) {
       $metaData = $rendered['citation.tab']['metadata']['#markup'];
-      if ( $posA = strpos($metaData,"Author(s)") ) {			// quite a tweak... - to be tuned
-        if ( $posZ = strpos($metaData,"</dd>",$posA) ) {
+      if ( $posA = stripos($metaData,"Author(s)") ) {			// quite a tweak... - to be tuned
+        if ( $posZ = stripos($metaData,"</dd>",$posA) ) {
           $rendered['citation.tab']['metadata']['#markup'] = substr($metaData,0,$posZ) . "<p>et al.</p>" . substr($metaData,$posZ);
         }
       }
@@ -1166,14 +1197,14 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
     $rendered['citation.tab']['persistent_url'] = array(
       '#type' => 'item',
       '#title' => t('Persistent URL'),
-      '#markup' => format_string('<a href="@url">@url</a>', array(
-        '@url' => $persistent_url)
-      ),
+  /*  '#markup' => format_string('<a href="@url">@url</a>', array( '@url' => $persistent_url ) ),  */
+  /*   some better presenation for Chrome + Safari browser:		*/
+      '#markup' => format_string('<a href="@url" style="word-break:break-word;">@url</a>', array( '@url' => $persistent_url ) ),
       '#weight' => 3,
     );
     $rendered['citation.tab']['citation_wrapper'] = array(
       '#type' => 'item',
-      '#title' => t('Citation'),
+      '#title' => t('Citation&nbsp;'),
       '#weight' => 2,
       'citation' => $rendered['citation.tab']['citation'],
     );
@@ -1696,35 +1727,101 @@ function lib4ridora_ir_citationCModel_islandora_object_ingested($object) {
 
 /**
  * Implements hook_islandora_datastream_modified().
+ *
+ * Take care reacting on changes on RELS-INT. Exchanging/replacing 1 value in RELS-INT my require 2 actions until done,
+ * resp. triggering this hook 2x and it will be called over and other again (or 'just' slow down the system).
  */
 function lib4ridora_islandora_datastream_modified($object, $datastream) {
-  $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
-  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf' && substr(strval($datastream->id),0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
-    module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-    module_load_include('inc', 'lib4ridora', 'includes/full_text');
-    if (!isset($object['RELS-INT'])) {
-      $values = lib4ridora_multi_pdf_defaults_properties();
-      lib4ridora_update_datastream_relationships($datastream, $values);
+  if ( !in_array('ir:citationCModel', $object->models) ) { return; }
+  if ( stripos($datastream->id,'PDF') === 0 || stripos($datastream->mimetype,'/pdf') ) {
+    $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
+    if ( substr($datastream->id,0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
+      module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+      module_load_include('inc', 'lib4ridora', 'includes/full_text');
+	  $relsUpdate = !isset($object['RELS-INT']);
+	  $values = $relsUpdate ? lib4ridora_multi_pdf_defaults_properties() : lib4ridora_get_embargo_info($datastream);
+      if ( stripos($values['document_version'],'internal') !== false && stripos($values['availability'],'private') === false ) {
+        $values['availability'] = 'private';
+        $relsUpdate = true;
+      }
+      if ( $relsUpdate ) {
+        lib4ridora_update_datastream_relationships($datastream, $values);
+      }
+      lib4ridora_pathauto_create_alias($object, $datastream, 'update');
+      lib4ridora_update_full_text($object);
     }
-    lib4ridora_pathauto_create_alias($object, $datastream, 'update');
-    lib4ridora_update_full_text($object);
+  }
+  elseif ( strtoupper($datastream->id) == 'RELS-INT' ) {
+ // $datastreams = @iterator_to_array($object);
+ // $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter_soft');
+ // foreach ($pdf_datastreams as $pdf_datastream) {
+ //   if ( stripos($pdf_datastream->id,'PDF') !== 0 ) { continue; }
+ //   if ( substr($pdf_datastream->id,0-strlen($pdfa_suffix)) == $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) { continue; }
+ //   $values = lib4ridora_get_embargo_info($pdf_datastream);
+ //   if ( stripos($values['document_version'],'internal') !== false && stripos($values['availability'],'private') === false ) {
+ //     $values['availability'] = 'private';
+ //     usleep( 375000 );		// rather for safety
+ //     lib4ridora_update_datastream_relationships($pdf_datastream, $values);
+ //   }
+ // }
+ // If we need to change RELS-INT, we need to change it in ONE step - so primitive work-around ahead (but working):
+    /*
+    if ( $xmlCode = @$object['RELS-INT']->Content ) {
+      $dom = new DomDocument;
+      $dom->preserveWhiteSpace = false;
+      $dom->formatOutput = true;
+      $dom->loadXml( $xmlCode );
+      $xpath = new DOMXPath($dom);
+   // $xpath->registerNamespace('islandora', "http://islandora.ca/ontology/relsint#");
+      $xpath->registerNamespace('rdf', "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+      $rdfNew = false;
+      foreach( $xpath->query("//rdf:RDF/rdf:Description") as $item ) {
+        if ( stripos($item->getAttribute('rdf:about'),'/PDF') === false ) { continue; }
+        foreach( $item->getElementsByTagName('lib4ridora-multi-embargo-document_version') as $docVer ) {
+          if ( stripos($docVer->nodeValue,'internal') === false ) { continue; }
+          foreach( $item->getElementsByTagName('lib4ridora-multi-embargo-availability') as $avail ) {
+            if ( strtolower($avail->nodeValue) != 'private') {
+              $avail->nodeValue = 'private';
+              $rdfNew = true;
+            }
+          }
+        }
+      }
+      if ( $rdfNew ) {
+        $xmlCode = $dom->saveXML();
+        $object['RELS-INT']->content = $xmlCode;
+      }
+    }
+    // re-revised+disabeld: this code is OK and generally working well, but it may cause a conflict with
+    // the resorting feature of multiple PDFs, possibly leaving an incomplete RELS-INT datastream! */
   }
 }
 
 /**
  * Implements hook_islandora_datastream_ingested().
+ *
+ * Take care reacting on changes on RELS-INT. Exchanging/replacing 1 value in RELS-INT my require 2 actions until done,
+ * resp. triggering this hook 2x and it will be called over and other again (or 'just' slow down the system).
  */
 function lib4ridora_islandora_datastream_ingested($object, $datastream) {
-  $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
-  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf' && substr(strval($datastream->id),0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
-    module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-    module_load_include('inc', 'lib4ridora', 'includes/full_text');
-    if (!isset($object['RELS-INT'])) {
-      $values = lib4ridora_multi_pdf_defaults_properties();
-      lib4ridora_update_datastream_relationships($datastream, $values);
+  if ( !in_array('ir:citationCModel', $object->models) ) { return; }
+  if ( stripos($datastream->id,'PDF') === 0 || stripos($datastream->mimetype,'/pdf') ) {
+    $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
+    if ( substr($datastream->id,0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
+      module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+      module_load_include('inc', 'lib4ridora', 'includes/full_text');
+	  $relsUpdate = !isset($object['RELS-INT']);
+	  $values = $relsUpdate ? lib4ridora_multi_pdf_defaults_properties() : lib4ridora_get_embargo_info($datastream);
+      if ( stripos($values['document_version'],'internal') !== false && stripos($values['availability'],'private') === false ) {
+        $values['availability'] = 'private';
+        $relsUpdate = true;
+      }
+      if ( $relsUpdate ) {
+        lib4ridora_update_datastream_relationships($datastream, $values);
+      }
+      lib4ridora_update_full_text($object);
+      lib4ridora_pathauto_create_alias($object, $datastream, 'insert');
     }
-    lib4ridora_update_full_text($object);
-    lib4ridora_pathauto_create_alias($object, $datastream, 'insert');
   }
 }
 
@@ -1733,7 +1830,7 @@ function lib4ridora_islandora_datastream_ingested($object, $datastream) {
  */
 function lib4ridora_islandora_datastream_purged($object, $dsid) {
   // Check if the dsid contains PDF for objects with multiple PDF datastreams.
-  if (strpos($dsid, 'PDF') !== FALSE) {
+  if ( stripos($dsid,'PDF') === 0 ) {
     if (in_array('ir:citationCModel', $object->models)) {
       module_load_include('inc', 'lib4ridora', 'includes/full_text');
       module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
@@ -1903,7 +2000,7 @@ function lib4ridora_pathauto_bulkupdate() {
         $pid = $result['object']['value'];
         $object = islandora_object_load($pid);
         foreach ($object as $dsid => $datastream) {
-          if (strpos($dsid, 'PDF') !== FALSE) {
+          if ( stripos($dsid,'PDF') === 0 || stripos($datastream->mimetype,'/pdf') ) {
             $result = lib4ridora_pathauto_create_alias($object, $datastream, 'bulkupdate');
             if ($result != '') {
               $count += $result;
@@ -1990,7 +2087,7 @@ function lib4ridora_authority_hidden_validate($element, &$form_state, $form) {
  */
 function _lib4ridora_target_text_format_to_fully_escaped($element, &$form_state, $form) {
   form_load_include($form_state, 'inc', 'lib4ridora', 'includes/text_format');
-  $value = check_plain(
+  $value = @check_plain(
     _lib4ridora_target_text_format_fetch_markup($element, $form_state, $form)
   );
 

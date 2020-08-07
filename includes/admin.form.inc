@@ -11,16 +11,15 @@ function lib4ridora_admin(array $form, array &$form_state) {
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
   $textfield_size = 128;		// Default 60, but sometimes too short even for some text field values.
 
-  $lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options( TRUE /* true to get the PDF link order as required for Lib4RI */ );
-  $lib4ridora_multi_pdf_options_availability = $lib4ridora_multi_pdf_options['availability'];
-  $lib4ridora_multi_pdf_options_availability_exclude = array('date' => $lib4ridora_multi_pdf_options_availability['date']);
-  $lib4ridora_multi_pdf_options_availability_effective = array_diff_key($lib4ridora_multi_pdf_options_availability, $lib4ridora_multi_pdf_options_availability_exclude);
+  $lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options();
+  unset($lib4ridora_multi_pdf_options['availability']['date']);
+  $default = variable_get('lib4ridora_multi_pdf_defaults_property_availability', 'intranet');
   $form['lib4ridora_multi_pdf_defaults_property_availability'] = array(
     '#type' => 'select',
     '#title' => t('Default PDF availability at ingest'),
-    '#options' => $lib4ridora_multi_pdf_options_availability_effective,
-    '#default_value' => variable_get('lib4ridora_multi_pdf_defaults_property_availability', 'intranet'),
-    '#description' => t("Choose the default availability of ingested PDFs. Default is \"" . $lib4ridora_multi_pdf_options_availability['intranet'] . "\"."),
+    '#options' => $lib4ridora_multi_pdf_options['availability'],
+    '#default_value' => $default,
+    '#description' => t("Choose the default availability of PDFs to ingest. Default is \"" . $lib4ridora_multi_pdf_options['availability'][$default] . "\"."),
     '#multiple' => FALSE,
     '#required' => TRUE,
   );

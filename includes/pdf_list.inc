@@ -68,8 +68,10 @@ function lib4ridora_list_pdfs(AbstractObject $object) {
     if (!islandora_datastream_access(ISLANDORA_VIEW_OBJECTS, $pdf_datastream)) {
       continue;
     }
-
     $info = lib4ridora_get_embargo_info($pdf_datastream);
+	if ( !lib4ridora_internal_doc_access($info) ) {
+		continue;
+	}
     $pid = $object->id;
 	$dsId = $pdf_datastream->id;
     $dsLabel = $pdf_datastream->label;

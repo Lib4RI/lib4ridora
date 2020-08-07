@@ -23,9 +23,11 @@ function lib4ridora_update_full_text(AbstractObject $object) {
   $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
   foreach ($pdf_datastreams as $datastream) {
     $info = lib4ridora_get_embargo_info($datastream);
-    // skip evaluating PDF/A files at Lib4RI if they are 'private' (default/convention):
-    if ( $info['availability'] == "private" && substr(strval($datastream->id),0-strlen($pdfa_suffix)) == $pdfa_suffix ) {
-      continue;
+    if ( $info['availability'] == "private" ) {
+      // skip evaluating PDF/A files at Lib4RI if they are 'private' (default/convention):
+      if ( substr(strval($datastream->id),0-strlen($pdfa_suffix)) == $pdfa_suffix ) { continue; }
+      // skip 'Internal Documents, they are 'private' (default/convention):
+      if ( stripos($info['document_version'],'internal') !== false ) { continue; }
     }
     $pdf_ds_count += 1;
     $is_ds_acc_or_pub = FALSE;		// only considering this datastream

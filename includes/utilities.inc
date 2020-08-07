@@ -168,14 +168,17 @@ function lib4ridora_get_embargo_data( $relsIntCode, $dsPdfAry ) {		// $dsPdfAry 
 			foreach( $dsPdfAry as $dsPdfIdx => $dsPdfName ) {		// $dsName may be e.g. 'PDF2' or 'PDF_PDF-A'
 				if ( $dsPdfName == $dsId ) {
 					// remind, a replacement happened above, so do not use 'lib4ridora-multi-embargo-document_version' or 'lib4ridora-multi-embargo-availability' here!
-					$dataAry[$dsPdfName] = array( 'doc_ver' => strval($dElem->islandora_lib4ridora_multi_embargo_document_version), 'avail' => strval($dElem->islandora_lib4ridora_multi_embargo_availability) );
+					$dataAry[$dsPdfName] = array(
+						'document_version' => strval($dElem->islandora_lib4ridora_multi_embargo_document_version),
+						'availability' => strval($dElem->islandora_lib4ridora_multi_embargo_availability),
+					);
 					unset($dsPdfAry[$dsPdfIdx]);
 					break;
 				}
 			}
 		}
 	}
-	return $dataAry;		// array( 'PDF' => array( 'doc_ver' => "Published", 'avail' => "intranet"), 'PDF2' => array...
+	return $dataAry;		// array( 'PDF' => array( 'document_version' => "Published", 'availability' => "intranet"), 'PDF2' => array...
 }
 
 /**
@@ -197,29 +200,32 @@ function lib4ridora_retrieve_filtered_pdfs(AbstractObject $object) {
 	// 2018-Oct-17: get the desired order for PDFs (corresponding to possible 'document versions' in RELS-INT), see also Redmine-Issue #79.
 	$lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options( TRUE /* true to get the PDF link order as required for Lib4RI */ );
 	$default_list = implode( ", ", array_map( function($ver) { return strtok(ltrim($ver),' '); }, $lib4ridora_multi_pdf_options['document_version'] ) );
-	$orderAry = explode(",", variable_get('lib4ridora_multi_pdf_link_order', /* 'Published, Accepted, Supplemental, Erratum, Unspecified' */ $default_list ) );
+	$orderAry = array_map('trim',explode(',', variable_get('lib4ridora_multi_pdf_link_order', /* Published, Accepted, Supplemental, ... */ $default_list ) ));
 
-	if ( !empty( trim( implode("",$orderAry) ) ) && @isset($object['RELS-INT']) ) {		// safety check
+	if ( !empty(implode('',$orderAry)) && @isset($object['RELS-INT']) ) {		// safety check
 		$relsIntCode = $object['RELS-INT']->content;
 		if ( !empty($relsIntCode) ) {
 			$dsPdfAry = lib4ridora_get_embargo_data( $relsIntCode, array_keys($dses) );	// array_keys() for array( 0 => 'PDF', 1 => "PDF_PDF-A", 2 => "PDF...
 			if ( sizeof($dses) == sizeof($dsPdfAry) ) {		// for safety
 				$rankAry = array();	// for all index of PDFs that have a version label that is inside our order list
 				while( sizeof($orderAry) ) {
-					$wanted = trim( strtolower( array_shift($orderAry) ) );
-					foreach( $dsPdfAry as $pIdx => $pAry ) {			// $pIdx may be 'PDF3' or 'PDF2_PDF-A', etc., $pAry may be array( 'doc_ver' => "Erratum", 'avail' => "intranet" )
-						if ( gettype($pAry) == "array" && substr(strtolower($pAry['doc_ver']),0,strlen($wanted)) == $wanted ) {
-							$rankAry[$pIdx] = $pIdx;
+					$wanted = array_shift($orderAry);
+					foreach( $dsPdfAry as $pIdx => $pAry ) {			
+						// $pIdx may be 'PDF3' or 'PDF2_PDF-A', etc.
+						// $pAry may be array( 'document_version' => "Erratum", 'availability' => "intranet" )
+						if ( gettype($pAry) == "array" && @stripos($pAry['document_version'],$wanted) === 0 ) {
+							$rankAry[$pIdx] = $pAry;
 					//		break;		// better do not, there may be more than one PDF all with the same document version.
 						}
 					}
 				}
 				foreach( $dsPdfAry as $pIdx => $pAry ) {		// add PDFs possibly missed because they matched no item in the order list
-					if ( @!isset($rankAry[$pIdx]) ) { $rankAry[$pIdx] = $pIdx; }
+					if ( @!isset($rankAry[$pIdx]) ) { $rankAry[$pIdx] = $pAry; }
 				}
+
 				if ( sizeof($dses) == sizeof($rankAry) ) {	// for safety
 					$dsesAry = array();
-					foreach( $rankAry as $pIdx ) { $dsesAry[$pIdx] = $dses[$pIdx]; }
+					foreach( $rankAry as $pIdx => $pAry ) { $dsesAry[$pIdx] = $dses[$pIdx]; }
 					return $dsesAry;
 				}
 			}
