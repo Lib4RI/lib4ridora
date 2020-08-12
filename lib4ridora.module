@@ -204,30 +204,13 @@ function lib4ridora_ir_citationCModel_islandora_ingest_steps(array &$form_state)
   $steps['lib4ridora_multi_pdf_upload'] = array(
     'weight' => 8,
     'type' => 'form',
-    'form_id' => 'lib4ridora_upload_form',
+    'form_id' => 'lib4ridora_jpdf_form',
     'module' => 'lib4ridora',
     'file' => 'includes/upload.form.inc',
   );
-//   $steps['lib4ridora_license'] = array(
-//     'weight' => 49,
-//     'type' => 'form',
-//     'form_id' => 'lib4ridora_license_form',
-//     'module' => 'lib4ridora',
-//     'file' => 'includes/license.form.inc',
-//   );
-
-  // Only continue with more steps if there are files being ingested,
-  // otherwise it should be ingested right away.
-  $upload_step_storage =& islandora_ingest_form_get_step_storage($form_state, 'lib4ridora_multi_pdf_upload');
-  if (isset($upload_step_storage['files']) && $upload_step_storage['files']) {
-    $steps['lib4ridora_pdf_embargo'] = array(
-      'weight' => 16,
-      'type' => 'form',
-      'form_id' => 'lib4ridora_multi_embargo_form',
-      'module' => 'lib4ridora',
-      'file' => 'includes/embargo.form.inc',
-    );
-  }
+  
+  
+  
   return $steps;
 }
 
