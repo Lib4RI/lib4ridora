@@ -1175,14 +1175,14 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
       }
     }
 
-    // Decode for human readability.
-    $persistent_url = urldecode(url("islandora/object/{$object->id}", array('absolute' => TRUE)));
+    // Persistent URL:
+    $pUrlEnc = url("islandora/object/".$object->id, array('absolute' => TRUE));
+    $pUrlDec = urldecode($pUrlEnc);	/* Decode for human readability */
     $rendered['citation.tab']['persistent_url'] = array(
       '#type' => 'item',
       '#title' => t('Persistent URL'),
-  /*  '#markup' => format_string('<a href="@url">@url</a>', array( '@url' => $persistent_url ) ),  */
-  /*   some better presenation for Chrome + Safari browser:		*/
-      '#markup' => format_string('<a href="@url" style="word-break:break-word;">@url</a>', array( '@url' => $persistent_url ) ),
+       // additional style definition for better presentation for Chrome + Safari browser (as Lothar has):
+      '#markup' => '<a href="' . ( variable_get('lib4ri_sitemap_semicolon_decoded',FALSE) ? $pUrlDec : $pUrlEnc ) . '" style="word-break:break-word;">' . $pUrlDec . '</a>',
       '#weight' => 3,
     );
     $rendered['citation.tab']['citation_wrapper'] = array(

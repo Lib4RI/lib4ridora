@@ -15,7 +15,6 @@
  *   The object that is the journal or FALSE if none found.
  */
 function lib4ridora_get_journal($identifier) {
-  $journal = FALSE;
   $issn_field = variable_get('lib4ridora_issn_solr_field', 'mods_identifier_issn_s');
   $e_issn_field = variable_get('lib4ridora_e_issn_solr_field', 'mods_identifier_e-issn_s');
   $solr = new IslandoraSolrQueryProcessor();
@@ -32,8 +31,9 @@ function lib4ridora_get_journal($identifier) {
   $solr->executeQuery(FALSE);
   if (isset($solr->islandoraSolrResult['response']['objects'][0])) {
     $journal = $solr->islandoraSolrResult['response']['objects'][0]['solr_doc']['PID'];
+	return islandora_object_load($journal);
   }
-  return islandora_object_load($journal);
+  return FALSE;
 }
 
 /**
@@ -69,19 +69,16 @@ function lib4ridora_set_impact_factor(AbstractObject $journal, $year, $factor) {
   if (isset($journal[LIB4RIDORA_FACTOR_DSID])) {
     $factor_datastream = $journal[LIB4RIDORA_FACTOR_DSID];
     $factors = json_decode($factor_datastream->content, TRUE);
-  }
-  else {
+    $factors[$year] = $factor;
+    $factor_datastream->content = json_encode($factors);
+  } else {
     $factor_datastream = $journal->constructDatastream(LIB4RIDORA_FACTOR_DSID, 'M');
     $factor_datastream->label = 'Journal Impact Factors';
     $factor_datastream->mimetype = 'application/json';
-    $factors = array();
+    $factors = array( $year => $factor );
+    $factor_datastream->content = json_encode($factors);
+    $journal->ingestDatastream($factor_datastream);
   }
-
-  $factors[$year] = $factor;
-  $factor_datastream->content = json_encode($factors);
-
-  // Doesn't do anything if ingested already.
-  $journal->ingestDatastream($factor_datastream);
 }
 
 /**
