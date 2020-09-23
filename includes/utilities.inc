@@ -621,3 +621,65 @@ function lib4ridora_doi_validate($element, &$form_state, $form, $ingesting=FALSE
   }
   return $mods;
 }
+
+/*
+ * function to return an array with data of the PDF datastream that is Open Access.
+ * By default the array-*key* with the ID of this datastream is called 'dsid'.
+ *
+ * If available the (first) published version will be favored if available, otherwise the 
+ * (first) accepted version is taken - supposed it is public or the embargo date expired.
+ */
+function lib4ridora_get_open_access_pdf(AbstractObject $object, $keyDsIdPdf = 'dsid') {
+	module_load_include('inc', 'lib4ridora', 'includes/pdf-upload.form');
+	$pdfInfoAry = @lib4ridora_assemble_pdf_info($object);
+	$pdfOA = array();
+	foreach( $pdfInfoAry as $pdfDsId => $pInfoAry ) {
+		/*
+			"PDF2" => array(4) {
+				["availability"]=>
+				string(4) "date"
+				["embargo_date"]=>
+				array(3) {
+				  ["year"]=>
+				  int(2019)
+				  ["month"]=>
+				  int(7)
+				  ["day"]=>
+				  int(26)
+				}
+				["document_version"]=>
+				string(16) "accepted version"
+				["use_permission"]=>
+				string(11) "CC BY-NC-ND"
+			}
+		*/
+		$docVer = $pInfoAry['document_version'];
+		if ( stripos($docVer,'published') !== 0 && stripos($docVer,'accepted') !== 0 ) { continue; }
+
+		if ( !preg_match('/^PDF\d*$/i',$pdfDsId) ) { /* for safety, if 'assemble filter' fails */ continue; }
+
+		$isOA = false;
+		if ( stripos($pInfoAry['availability'],'public') === 0 ) {
+			$isOA = true;
+		} elseif ( stripos($pInfoAry['availability'],'date') === 0 ) {
+			date_default_timezone_set('GMT');
+			$edAry = $pInfoAry['embargo_date'];
+			$edEnd = @strtotime($edAry['year'].'-'.$edAry['month'].'-'.$edAry['day']);
+			$isOA = ( $edEnd && $edEnd < time() );
+		}
+		if ( !$isOA ) { continue; }
+		
+		if ( stripos($docVer,'published') === 0 ) {
+			$pdfOA = $pInfoAry;
+			$pdfOA['pid'] = $pdfDsId;
+			$pdfOA[$keyDsIdPdf] = $pdfDsId;
+			return $pdfOA;	// can't get any better
+		}
+		if ( empty($pdfOA) ) {
+			$pdfOA = $pInfoAry;
+			$pdfOA['pid'] = $pdfDsId;
+			$pdfOA[$keyDsIdPdf] = $pdfDsId;
+		}
+	}
+	return $pdfOA;
+}
