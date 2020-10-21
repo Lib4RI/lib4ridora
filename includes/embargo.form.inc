@@ -153,6 +153,19 @@ function lib4ridora_get_pdfa_label( $label_pdf_orig, $parent_dsid = '', $term_ne
     return $label_insert;        // aux.
 }
 
+/* 
+ * Function to forward the determination of the label to another module is installed
+ *
+ * The 'lib4ri_pdfa' module will handle the label, so just skip any treatment here
+ */
+function lib4ridora_get_pdfa_label_helper( $label_pdf_orig, $parent_dsid, $filePathDrupal ) {
+    if ( module_exists('lib4ri_pdfa') ) {
+		module_load_include('inc', 'lib4ri_pdfa', 'includes/utilities');
+		return lib4ri_pdfa_label_by_file( drupal_realpath($filePathDrupal), ( @empty($label_pdf_orig) ? $parent_dsid : $label_pdf_orig ) );
+	}
+	return lib4ridora_get_pdfa_label( $label_pdf_orig, $parent_dsid );
+}
+
 /**
  * Form building function; build multi-PDF embargo form.
  */
@@ -218,10 +231,15 @@ function lib4ridora_multi_embargo_edit_form($form, &$form_state) {
   );
 
   // Adding a JS function to switch the availability to 'private' for 'internal documents'.
-  // This shall help the user, to enforce 'private' in DORA we better should use a valiation or submit hook.
+  // This shall assist the work-flow, but to enforce 'private' in DORA we better should use a valiation or submit hook.
   // drupal_add_js( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.js', 'file' );
-  $jsPath = drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.txt';
-  drupal_add_js( file_get_contents($jsPath), 'inline' );    // this is less 'caching-resistent'
+  if ( $jsCode = file_get_contents( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.js' ) ) {
+    if ( $jsCode = strchr(substr($jsCode,strpos($jsCode,'<script')),'>') ) {
+      if ( $jsCode = trim(substr($jsCode,0,strpos($jsCode,'</script>'))," </-!>\t") ) {
+        drupal_add_js( $jsCode, 'inline' );		// This is less 'caching-resistent', also a reset of ['#attached']['js'] cannot drop it.
+      }
+    }
+  }
   foreach($form['files'] as $pdfId => $pAry ) {
     if ( @is_array($pAry['document_version']) ) {
       $form['files'][$pdfId]['document_version']['#attributes']['onchange'] = "PdfInternalAsPrivate('".strtolower($pdfId)."');";
@@ -307,7 +325,8 @@ function lib4ridora_multi_embargo_form_submit(&$form, &$form_state) {
             $dsid_new_pdfa = $dsid_new . $pdfa_suffix;        // new datastream name
             $datastream = /* ( @isset($mapped_files[$dsid_new_pdfa]) ) ? $mapped_files[$dsid_new_pdfa] : */ $object->constructDatastream($dsid_new_pdfa, 'M');
             $datastream->mimetype = $mapped_files[$dsid_pdfa]->filemime;
-            $datastream->label = lib4ridora_get_pdfa_label( $mapped_files[$filename]->filename, $dsid_new );        // by default $mapped_files[$filename]->filename is the original PDF filename
+            // Note, by default $mapped_files[$filename]->filename is the original PDF filename
+            $datastream->label = lib4ridora_get_pdfa_label_helper( $mapped_files[$filename]->filename, $dsid_new, $mapped_files[$dsid_pdfa]->uri );
             $datastream->setContentFromFile($mapped_files[$dsid_pdfa]->uri, FALSE);
             $object->ingestDatastream($datastream);
             $values_pdfa = $values;     // $values is an array with the following indices: document_version | availability | embargo_date | use_permission
@@ -492,7 +511,8 @@ function lib4ridora_multi_embargo_edit_form_submit(&$form, &$form_state) {
             $dsid_new_pdfa = $dsid_new . $pdfa_suffix;        // new datastream name
             $datastream = $non_cached_object->constructDatastream($dsid_new_pdfa, 'M');
             $datastream->mimetype = $mapped_files[$dsid_pdfa]['mime'];
-            $datastream->label = lib4ridora_get_pdfa_label( $mapped_files[$filename]['label'], $dsid_new );        // by default $mapped_files[$filename]['label'] is the original PDF filename
+            // Note, by default $mapped_files[$filename]['label'] is the original PDF filename
+            $datastream->label = $mapped_files[$dsid_pdfa]['label'];
             $datastream->setContentFromFile($mapped_files[$dsid_pdfa]['content'], FALSE);
             $non_cached_object->ingestDatastream($datastream);
             file_unmanaged_delete($mapped_files[$dsid_pdfa]['content']);
