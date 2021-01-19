@@ -1273,6 +1273,25 @@ function lib4ridora_form_islandora_scholar_citation_select_form_alter(&$form, &$
  */ 
 function lib4ridora_page_alter(&$page) {
 
+  $url = strtolower( strtok(strtok($_SERVER['REQUEST_URI']."?","?")."#","#") );
+
+  if ( variable_get('lib4ridora_frame_approval',TRUE) ) {
+    $frameOk = true; // to be challenged
+    $skipAry = array( 'system', 'ajax', 'admin', 'login', 'edit', 'submission' );
+    foreach( $skipAry as $skipPart ) {
+      if ( strpos($url,'/'.$skipPart) || strpos($url,$skipPart.'/') || strpos($url,'_'.$skipPart) || strpos($url,$skipPart.'_') ) {
+ 	    $frameOk = false;
+ 	    break;
+ 	  }
+    }
+    if ( $frameOk ) { 	// see: https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
+	  // Do NOT add e.g. "default-src 'self' *.lib4ri.ch; script-src 'self' *.lib4ri.ch" too (caused wide-spread problems!)
+      drupal_add_http_header("Content-Security-Policy", "frame-ancestors 'self' *.lib4ri.ch");
+      drupal_add_http_header("X-Content-Security-Policy", "frame-ancestors 'self' *.lib4ri.ch");
+      drupal_add_http_header("X-WebKit-CSP", "frame-ancestors 'self' *.lib4ri.ch");
+    }
+  }
+
   if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) ) {	// temporary work-around, in context with Redmine Issue #189: http://lib-dora-dev1.emp-eaw.ch:3000/issues/189
     $jsCode = 'jQuery(document).ready(function() { ';
     $jsCode .= 'document.title = document.title.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<").replace( /<\/?[^>]+(>|$)/g, ""); ';
@@ -1292,8 +1311,7 @@ function lib4ridora_page_alter(&$page) {
   }
 
   if ( user_is_logged_in() ) {		// safety remark for editors/admins/super-users:
-    $url = strtok(strtok($_SERVER['REQUEST_URI']."?","?")."#","#");
-    if ( substr($url,-16) == "/RELS-INT/delete" ) {
+    if ( substr($url,-16) == "/rels-int/delete" ) {	 // remind, we made $url lower case!
       // dpm(var_dump($page['content']['system_main']));
       if ( $content = @$page['content']['system_main']['derivative_info']['#markup'] ) {
         $page['content']['system_main']['derivative_info']['#markup'] = str_replace( ", RELS-EXT", " &plus; <font color='#e70707'><b>RELS-EXT</b> &nbsp; &nbsp; &nbsp; (warning: also the <a href='../../manage/datastreams'>RELS-EXT datastream</a> will be deleted, causing future editing problems)</font>", $content );
