@@ -8,6 +8,7 @@
 define('LIB4RIDORA_ADMINISTRATOR_PERMISSION', 'administer lib4ridora objects');
 define('LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION', 'visibility of internal documents');
 define('LIB4RIDORA_JOURNAL_IMPACT_FACTOR_PERMISSION', 'import journal impact factors');
+if ( !defined('LIB4RIDORA_SOLR_EXPORT_AUTHOR_WITH_UNIT') ) { define('LIB4RIDORA_SOLR_EXPORT_AUTHOR_WITH_UNIT', 'add affiliation to author in export'); }
 
 // PIDS.
 define('LIB4RIDORA_JOURNAL_CONTENT_MODEL', 'lib4ri:journalCModel');
@@ -574,6 +575,13 @@ function lib4ridora_permission() {
     'title' => t('Import Journal Impact Factor CSV'),
     'description' => t('Permit importing of journal impact factor CSVs.'),
   );
+  if ( module_exists('lib4ri_affiliation_author1') ) {
+	// leaving this here (currently) since quite Lib4RI resp. Eawag/Empa/WSL/PSI specific
+    $perms[LIB4RIDORA_SOLR_EXPORT_AUTHOR_WITH_UNIT] = array(
+      'title' => t('Extended Solr Export: Author with org. Unit'),
+      'description' => t("Attach affiliated unit onto author's name in CSV/Excel export."),
+    );
+  }
   return $perms;
 }
 
