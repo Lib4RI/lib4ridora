@@ -1285,7 +1285,7 @@ function lib4ridora_page_alter(&$page) {
 
   if ( variable_get('lib4ridora_frame_approval',TRUE) ) {
     $frameOk = true; // to be challenged
-    $skipAry = array( 'system', 'ajax', 'admin', 'login', 'edit', 'submission' );
+    $skipAry = array( 'system', 'ajax', 'ckeditor', 'admin', 'login', 'edit', 'submission', 'ingestion', 'manage' );
     foreach( $skipAry as $skipPart ) {
       if ( strpos($url,'/'.$skipPart) || strpos($url,$skipPart.'/') || strpos($url,'_'.$skipPart) || strpos($url,$skipPart.'_') ) {
  	    $frameOk = false;
