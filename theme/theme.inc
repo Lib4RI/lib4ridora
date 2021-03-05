@@ -36,9 +36,15 @@ function template_process_lib4ridora_pdf_materials(&$variables) {
  */
 function template_preprocess_lib4ridora_pdf_link(&$variables) {
 	
+  module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
   $values = lib4ridora_get_embargo_info($variables['datastream']);
+  
+  // for Google bot only show the open Access PDF as in the scholar meta tags (realized by 'lib4ri_sitemap' module):
+  if ( module_exists('lib4ri_sitemap') && ( stripos($_SERVER['HTTP_USER_AGENT'],'Googlebot/') || stripos($_GET['bot'],'Google') === 0 ) ) {
+    if ( !lib4ridora_is_embargo_info_oa($values,true) ) { return; }
+  }
+ 
   $access = $values['availability'];
-
   $variables['pdf_link'] = $values;
   $variables['availability_classes'] = str_getcsv( variable_get('lib4ridora_css_block_inert_iconless', 'availability-text') );
 
@@ -149,6 +155,12 @@ function template_process_lib4ridora_pdf_link(&$variables) {
 
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
   $values = $variables['pdf_link'];
+  
+  // for Google bot only show the open Access PDF as in the scholar meta tags (realized by 'lib4ri_sitemap' module):
+  if ( module_exists('lib4ri_sitemap') && ( stripos($_SERVER['HTTP_USER_AGENT'],'Googlebot/') || stripos($_GET['bot'],'Google') === 0 ) ) {
+    if ( !lib4ridora_is_embargo_info_oa($values,true) ) { return; }
+  }
+
   if ($variables['statement']) {
     $availability = $values['availability'];
     if ($availability == 'intranet') {

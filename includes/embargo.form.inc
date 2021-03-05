@@ -286,6 +286,32 @@ function lib4ridora_get_embargo_info(AbstractDatastream $datastream, $keep_defau
   return $to_return;
 }
 
+/*
+ * function to examine an array as e.g. returned by lib4ridora_get_embargo_info()
+ * if the containing information about the PDF/PDF-datastream makes it Open Access.
+ *
+ * Will return true for open access, otherwise false.
+ * 
+ * Note: there is no check whether or not the ds info in the array belong to a PDF!
+ */
+function lib4ridora_is_embargo_info_oa($pInfoAry, $mustBeAccOrPub = false ) {
+	if ( $mustBeAccOrPub ) {
+		if ( stripos($pInfoAry['document_version'],'published') !== 0 && stripos($pInfoAry['document_version'],'accepted') !== 0 ) {
+			return FALSE;
+		}
+	}
+	if ( stripos($pInfoAry['availability'],'public') === 0 ) {
+		return TRUE;
+	}
+	if ( stripos($pInfoAry['availability'],'date') === 0 ) {
+		date_default_timezone_set('GMT');
+		$edAry = $pInfoAry['embargo_date'];
+		$edEnd = @strtotime($edAry['year'].'-'.$edAry['month'].'-'.$edAry['day']);
+		return ( $edEnd && $edEnd < time() );
+	}
+	return FALSE;
+}
+
 /**
  * Form submission handler; apply multi-PDF embargoes and properties.
  */
