@@ -195,6 +195,9 @@ function lib4ridora_multi_embargo_form($form, &$form_state) {
     if ( @is_array($uAry['document_version']) ) {
       $form['files'][$uuid]['document_version']['#attributes']['onchange'] = "PdfInternalAsPrivate('{$uuid}');";
     }
+    if ( @is_array($uAry['availability']) ) {
+      $form['files'][$uuid]['availability']['#attributes']['onchange'] = "PdfInternalAsPrivate('{$uuid}');";
+    }
   }
 
   return $form;
@@ -243,6 +246,9 @@ function lib4ridora_multi_embargo_edit_form($form, &$form_state) {
   foreach($form['files'] as $pdfId => $pAry ) {
     if ( @is_array($pAry['document_version']) ) {
       $form['files'][$pdfId]['document_version']['#attributes']['onchange'] = "PdfInternalAsPrivate('".strtolower($pdfId)."');";
+    }
+    if ( @is_array($pAry['availability']) ) {
+      $form['files'][$pdfId]['availability']['#attributes']['onchange'] = "PdfInternalAsPrivate('".strtolower($pdfId)."');";
     }
   }
 
