@@ -21,7 +21,8 @@ define('LIB4RIDORA_JOURNAL_FORM', 'Lib4RI Journal MODS Form');
 // Datastream ID.
 define('LIB4RIDORA_FACTOR_DSID', 'IMPACT-FACTORS');
 
-const LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD = 'lib4ridora_mods_pseudo_field';
+const LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD = 'lib4ridora_mods_pseudo_field';  // see inside: admin/islandora/search/islandora_solr_metadata
+const LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDER_PSEUDO_FIELD = 'mods_extension_fundingReferences_fundingReference_fundingStream_ms';
 
 /**
  * Implements hook_islandora_required_objects().
@@ -926,6 +927,29 @@ function lib4ridora_theme($existing, $type, $theme, $path) {
         ),
       ),
     ),
+    'lib4ridora_islandora_solr_metadata_injected_funder_info' => array(
+      'file' => 'theme/theme.inc',
+      'template' => 'theme/lib4ridora-islandora-solr-metadata-injected-funder-info',
+      'variables' => array(
+        'object' => NULL,
+        'info' => NULL,
+        'fundername_attributes' => array(
+          'class' => array(
+            'fundername',
+          ),
+        ),
+        'awardtitle_attributes' => array(
+          'class' => array(
+            'awardtitle',
+          ),
+        ),
+        'awardnumber_attributes' => array(
+          'class' => array(
+            'awardnumber',
+          ),
+        ),
+      ),
+    ),
   );
 }
 
@@ -1559,10 +1583,10 @@ function lib4ridora_solr_advanced_search_form_submit($form, &$form_state) {
  * Implements hook_preprocess_islandora_solr_metadata_display().
  */
 function lib4ridora_preprocess_islandora_solr_metadata_display(&$variables) {
+  module_load_include('inc', 'lib4ridora', 'includes/utilities');
+
   if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD])) {
     $pseudo_field =& $variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD];
-
-    module_load_include('inc', 'lib4ridora', 'includes/utilities');
 
     $author_info = lib4ridora_get_author_info($variables['islandora_object']);
     $renderable_map = function (array $info) {
@@ -1571,7 +1595,7 @@ function lib4ridora_preprocess_islandora_solr_metadata_display(&$variables) {
         '#info' => $info,
       );
     };
-    $pseudo_field['lib4ridora_renderable'] = array_map($renderable_map, $author_info);
+    $pseudo_field['lib4ridora_renderable_author'] = array_map($renderable_map, $author_info);
 
     // Need to populate "value" with something, so the "omit empty values" stuff
     // doesn't strip out our pseudo-field.
@@ -1588,17 +1612,47 @@ function lib4ridora_preprocess_islandora_solr_metadata_display(&$variables) {
     };
     $pseudo_field['value'] = array_map($value_map, $author_info);
   }
+
+  if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDER_PSEUDO_FIELD])) {
+    $funder_field =& $variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDER_PSEUDO_FIELD];
+    if ( @!empty($funder_field) ) {
+      $funder_info = lib4ridora_get_funder_info($variables['islandora_object']);
+      if ( isset($funder_info['fundingstream']) ) {
+        unset($funder_info['fundingstream']);		// no used currently
+      }
+      $renderable_map = function (array $info) {
+        return array(
+        '#theme' => 'lib4ridora_islandora_solr_metadata_injected_funder_info',
+        '#info' => $info,
+        );
+      };
+      $funder_field['lib4ridora_renderable_funder'] = array_map($renderable_map, $funder_info);
+
+      $value_map = function (array $info) {
+        return t( '@fundername: @awardtitle (@awardnumber)', array(	/* this should match: lib4ridora-islandora-solr-metadata-injected-funder-info.tpl.php */
+          '@fundername' => $info['fundername']['name'],
+          '@awardtitle' => $info['awardtitle']['title'],
+          '@awardnumber' => $info['awardnumber']['number'],
+        ));
+      };
+      $funder_field['value'] = array_map($value_map, $funder_info);
+    }
+  }
 }
 
 /**
  * Implements hook_process_islandora_solr_metadata_display().
  */
 function lib4ridora_process_islandora_solr_metadata_display(&$variables) {
-  if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD]['lib4ridora_renderable'])) {
+  if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD]['lib4ridora_renderable_author'])) {
     $pseudo_field =& $variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD];
-    // Need to render each individually, since Solr metadata expects separate
-    // values separately.
-    $pseudo_field['value'] = array_map('drupal_render', $pseudo_field['lib4ridora_renderable']);
+    // Need to render each individually, since Solr metadata expects separate values separately.
+    $pseudo_field['value'] = array_map('drupal_render', $pseudo_field['lib4ridora_renderable_author']);
+  }
+  if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDER_PSEUDO_FIELD]['lib4ridora_renderable_funder'])) {
+    $funder_field =& $variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDER_PSEUDO_FIELD];
+    // Need to render each individually, since Solr metadata expects separate values separately.
+    $funder_field['value'] = array_map('drupal_render', $funder_field['lib4ridora_renderable_funder']);
   }
 }
 

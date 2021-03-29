@@ -286,3 +286,70 @@ function template_process_lib4ridora_islandora_solr_metadata_injected_author_inf
     $variables['org_attributes']['href'] = call_user_func_array('url', $variables['org_attributes']['href']);
   }
 }
+
+/**
+ * Implements hook_preprocess_HOOK() - for funder information
+ */
+function template_preprocess_lib4ridora_islandora_solr_metadata_injected_funder_info(&$variables) {
+  module_load_include('inc', 'islandora_solr', 'includes/utilities');
+  if ($variables['info']['fundername']['name']) {
+    $variables['fundername_attributes']['href'] = array(
+      'islandora/search',
+      array(
+        'query' => array(
+          'f' => array(
+            format_string('!field:"!value"', array(
+              '!field' => islandora_solr_lesser_escape('mods_extension_fundingReferences_fundingReference_funderName_ms'),
+              '!value' => $variables['info']['fundername']['name'],
+            )),
+          ),
+        ),
+      ),
+    );
+  }
+  if ($variables['info']['awardtitle']['title']) {
+    $variables['awardtitle_attributes']['href'] = array(
+      'islandora/search',
+      array(
+        'query' => array(
+          'f' => array(
+            format_string('!field:"!value"', array(
+              '!field' => islandora_solr_lesser_escape('mods_extension_fundingReferences_fundingReference_awardTitle_ms'),
+              '!value' => $variables['info']['awardtitle']['title'],
+            )),
+          ),
+        ),
+      ),
+    );
+  }
+  if ($variables['info']['awardnumber']['number']) {
+    $variables['awardnumber_attributes']['href'] = array(
+      'islandora/search',
+      array(
+        'query' => array(
+          'f' => array(
+            format_string('!field:"!value"', array(
+              '!field' => islandora_solr_lesser_escape('mods_extension_fundingReferences_fundingReference_awardNumber_ms'),
+              '!value' => $variables['info']['awardnumber']['number'],
+            )),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/**
+ * Implements hook_process_THEME() - for funder information
+ */
+function template_process_lib4ridora_islandora_solr_metadata_injected_funder_info(&$variables) {
+  if (isset($variables['fundername_attributes']['href'])) {
+    $variables['fundername_attributes']['href'] = call_user_func_array('url', $variables['fundername_attributes']['href']);
+  }
+  if (isset($variables['awardtitle_attributes']['href'])) {
+    $variables['awardtitle_attributes']['href'] = call_user_func_array('url', $variables['awardtitle_attributes']['href']);
+  }
+  if (isset($variables['awardnumber_attributes']['href'])) {
+    $variables['awardnumber_attributes']['href'] = call_user_func_array('url', $variables['awardnumber_attributes']['href']);
+  }
+}

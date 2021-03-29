@@ -279,6 +279,47 @@ function lib4ridora_get_author_info(AbstractObject $object) {
 }
 
 /**
+ * Extract funder info from an object.
+ *
+ * @param AbstractObject $object
+ *   An object from which to extract a list of authors.
+ *
+ * @return array
+ *   Similar to lib4ridora_get_author_info()
+ *
+ * Not checked/parsed currently:
+ *   <funderIdentifier funderIdentifierType="Crossref_Funder"/>
+ */
+function lib4ridora_get_funder_info(AbstractObject $object) {
+  $dom = new DOMDocument();
+  $dom->loadXML($object['MODS']->content);
+  $xpath = new DOMXPath($dom);
+  $xpath->registerNamespace('mods', 'http://loc.gov/mods/v3');
+
+  $funders = array();
+  foreach ($xpath->query('//mods:mods/mods:extension/mods:fundingReferences/mods:fundingReference') as $funder) {
+    $info = array(
+      'fundingstream' => array(
+        'stream' => $xpath->evaluate('normalize-space(mods:fundingStream)', $funder),
+      ),
+      'fundername' => array(
+        'name' => $xpath->evaluate('normalize-space(mods:funderName)', $funder),
+      ),
+      'awardtitle' => array(
+        'title' => $xpath->evaluate('normalize-space(mods:awardTitle)', $funder),
+      ),
+      'awardnumber' => array(
+        'number' => $xpath->evaluate('string(mods:awardNumber/text())', $funder),
+      ),
+    );
+    if ( !@empty($info['fundingstream']['stream']) || !@empty($info['fundername']['name']) ) {
+      $funders[] = $info;
+    }
+  }
+  return $funders;
+}
+
+/**
  * Determine the form to use to edit the given object.
  *
  * @param AbstractObject $object
