@@ -22,7 +22,7 @@ define('LIB4RIDORA_JOURNAL_FORM', 'Lib4RI Journal MODS Form');
 define('LIB4RIDORA_FACTOR_DSID', 'IMPACT-FACTORS');
 
 const LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD = 'lib4ridora_mods_pseudo_field';  // see inside: admin/islandora/search/islandora_solr_metadata
-const LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDER_PSEUDO_FIELD = 'mods_extension_fundingReferences_fundingReference_fundingStream_ms';
+const LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD = 'lib4ridora_mods_pseudo_field_funding';
 
 /**
  * Implements hook_islandora_required_objects().
@@ -1613,8 +1613,8 @@ function lib4ridora_preprocess_islandora_solr_metadata_display(&$variables) {
     $pseudo_field['value'] = array_map($value_map, $author_info);
   }
 
-  if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDER_PSEUDO_FIELD])) {
-    $funder_field =& $variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDER_PSEUDO_FIELD];
+  if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD])) {
+    $funder_field =& $variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD];
     if ( @!empty($funder_field) ) {
       $funder_info = lib4ridora_get_funder_info($variables['islandora_object']);
       if ( isset($funder_info['fundingstream']) ) {
@@ -1649,8 +1649,8 @@ function lib4ridora_process_islandora_solr_metadata_display(&$variables) {
     // Need to render each individually, since Solr metadata expects separate values separately.
     $pseudo_field['value'] = array_map('drupal_render', $pseudo_field['lib4ridora_renderable_author']);
   }
-  if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDER_PSEUDO_FIELD]['lib4ridora_renderable_funder'])) {
-    $funder_field =& $variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDER_PSEUDO_FIELD];
+  if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD]['lib4ridora_renderable_funder'])) {
+    $funder_field =& $variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD];
     // Need to render each individually, since Solr metadata expects separate values separately.
     $funder_field['value'] = array_map('drupal_render', $funder_field['lib4ridora_renderable_funder']);
   }
@@ -1678,7 +1678,7 @@ function lib4ridora_form_islandora_solr_metadata_config_form_validate(&$form, &$
     $luke_fields = array_keys($solr_luke['fields']);
     $field = $form_state['values']['islandora_solr_metadata_fields']['table_wrapper']['add_fieldset']['available_solr_fields'];
     // XXX: Field check here is divergence.
-    if ($field != LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD && !in_array($field, $luke_fields)) {
+    if ($field != LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD && $field != LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD && !in_array($field, $luke_fields)) {
       form_set_error('islandora_solr_metadata_fields][table_wrapper][add_fieldset][available_solr_fields', t('The field @field is not a valid field within Solr!', array('@field' => $field)));
     }
     else {
@@ -1730,7 +1730,7 @@ function lib4ridora_form_islandora_solr_metadata_config_form_validate(&$form, &$
  */
 function lib4ridora_form_islandora_solr_metadata_config_field_form_alter(&$form, &$form_state) {
   list($config_id, $field_name) = $form_state['build_info']['args'];
-  if ($field_name == LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD) {
+  if ($field_name == LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD || $field_name == LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD) {
     $form['wrapper']['hyperlink']['#access'] = $form['wrapper']['truncation']['#access'] = FALSE;
   }
 }

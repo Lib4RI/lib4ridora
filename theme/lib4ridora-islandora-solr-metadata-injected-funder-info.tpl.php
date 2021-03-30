@@ -29,5 +29,7 @@ $htmlTmp = '<'.$tagFN.' '.drupal_attributes($fundername_attributes).'>'.$info['f
 $htmlTmp .= '<'.$tagAT.' '.drupal_attributes($awardtitle_attributes).'>'.$info['awardtitle']['title'].'</'.$tagAT.'>&nbsp;(';
 $htmlTmp .= '<'.$tagAN.' '.drupal_attributes($awardnumber_attributes).'>'.$info['awardnumber']['number'].'</'.$tagAN.'>)';
 
+$tagAry = explode('|',variable_get('lib4ridora_metadata_funding_html','<b class="lib4ri_space_nowrap_unbold">|</b>')); // auxiliary markup tuning
+$htmlTmp = @trim($tagAry[0]) . $htmlTmp . @trim($tagAry[1]);
 ?>
-<span class="<?php print $classes;?>"><b class="lib4ri_space_nowrap_unbold"><?php print $htmlTmp;?></b></span>
+<span class="<?php print $classes;?>"><?php print $htmlTmp;?></span>
