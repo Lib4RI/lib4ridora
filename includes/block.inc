@@ -102,7 +102,7 @@ function lib4ridora_organizational_block_configuration_form() {
     'results_to_omit' => array(
       '#type' => 'textarea',
       '#title' => t('Omitted Organizations'),
-      '#description' => t('A list of organization to omit from facet results, separated by new lines.'),
+      '#description' => t("A list with IDs of organizational units (example: lib4ri-unit:123) to omit from facet results, separated by new lines.<br> After the ID a comment may be appended, separated by a leading '/' or '#'."),
       '#default_value' => variable_get('lib4ridora_organization_block_results_to_omit', ''),
     ),
   );
@@ -139,7 +139,8 @@ function lib4ridora_get_organization_facets() {
   $myrecords = islandora_solr_get_fields("facet_fields", FALSE, FALSE); // get all facet fields...
   $org_fields = array_map("trim", explode(',', variable_get('lib4ridora_organization_block_organization_field', 'mods_name_personal_affiliation_ms, mods_name_corporate_affiliation_ms')));
   $facets = array();
-  $omitted_facets = array_map('trim', explode(PHP_EOL, variable_get('lib4ridora_organization_block_results_to_omit', '')));
+  $omitted_facets = explode(PHP_EOL, variable_get('lib4ridora_organization_block_results_to_omit', '') );
+  $omitted_facets = array_map( function($uTmp) { return trim(strtok(strtr($uTmp,'|#','//').'/','/')); }, $omitted_facets );  // to allow appending '//' comments/unit-name onto each line/unit-id 
   $qp = new IslandoraSolrQueryProcessor();
   $qp->buildQuery('*:*');
   $qp->solrParams['fl'] = "PID, " . implode(', ', $org_fields);
