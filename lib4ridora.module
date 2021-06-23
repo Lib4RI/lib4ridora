@@ -1471,16 +1471,19 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#suffix' => '</div>',
   );
 
-  $form['org_unit'] = array(
-    '#type' => 'select',
-    '#options' => lib4ridora_get_all_organizational_units(),
-    '#title' => t('Organizational Unit'),
-    // XXX: Wrapping element desired to counteract core CSS at this level, and
-    // #theme_wrappers do not quite cut it.
-    '#prefix' => '<div id="lib4ri-advanced-search-org-unit">',
-    '#suffix' => '</div>',
-  );
-
+  global $base_path;  // sub-sites handling: will be only "/" for main site - temporarily added, May 2021
+  if ( strpos('=/'.variable_get('lib4ri_advanced_search_org_unit','eawag/empa/psi/wsl').'/=',$base_path) ) {
+    $form['org_unit'] = array(
+      '#type' => 'select',
+      '#options' => lib4ridora_get_all_organizational_units(),
+      '#title' => t('Organizational Unit'),
+      // XXX: Wrapping element desired to counteract core CSS at this level, and
+      // #theme_wrappers do not quite cut it.
+      '#prefix' => '<div id="lib4ri-advanced-search-org-unit">',
+      '#suffix' => '</div>',
+    );
+  }
+  
   $form['peer_review'] = array(
     '#type' => 'checkboxes',
     '#options' => array(
