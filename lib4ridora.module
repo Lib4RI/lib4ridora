@@ -1472,7 +1472,16 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
   );
 
   global $base_path;  // sub-sites handling: will be only "/" for main site - temporarily added, May 2021
-  if ( strpos('=/'.variable_get('lib4ri_advanced_search_org_unit','eawag/empa/psi/wsl').'/=',$base_path) ) {
+  if ( strpos('=/'.variable_get('lib4ri_advanced_search_org_unit','eawag/empa/psi/wsl').'/=',$base_path) ) { // hide *default* unit selection area:
+    $form['org_unit'] = array(
+      '#title' => 'Org. Unit (obsolete)',
+      '#type' => 'hidden',
+      '#default_value' => '*',
+      '#disabled' => TRUE,
+      '#required' => FALSE,
+      '#attributes' => array( 'style' => 'display:none;' ),
+    );
+  } else {			// show former *default* area where to select one unit:
     $form['org_unit'] = array(
       '#type' => 'select',
       '#options' => lib4ridora_get_all_organizational_units(),
