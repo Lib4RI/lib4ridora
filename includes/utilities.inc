@@ -6,7 +6,7 @@
  */
 
 /**
- * Retrieve the journal identified via an ISSN or EISSN.
+ * Retrieve the *first* journal found, identified via an ISSN or EISSN.
  *
  * @param string $identifier
  *   An ISSN or EISSN.
@@ -18,7 +18,7 @@ function lib4ridora_get_journal($identifier) {
   $issn_field = variable_get('lib4ridora_issn_solr_field', 'mods_identifier_issn_s');
   $e_issn_field = variable_get('lib4ridora_e_issn_solr_field', 'mods_identifier_e-issn_s');
   $solr = new IslandoraSolrQueryProcessor();
-  $solr->buildQuery("$issn_field:\"$identifier\" OR $e_issn_field:\"$identifier\"");
+  $solr->buildQuery("PID:journals%5c%3a* AND ({$issn_field}:\"$identifier\" OR {$e_issn_field}:\"$identifier\")");
   $solr->solrLimit = 1;
   $solr->solrParams['fl'] = implode(
     ',',
@@ -34,6 +34,40 @@ function lib4ridora_get_journal($identifier) {
 	return islandora_object_load($journal);
   }
   return FALSE;
+}
+
+/**
+ * Returns an array with PIDs of journals identified via an ISSN or EISSN.
+ *
+ * @param string $identifier
+ *   An ISSN or EISSN.
+ *
+ * @return array
+ *   Array of Journal PIDs, optionally as object.
+ */
+function lib4ridora_get_journals($identifier, $asObject = FALSE) {
+  $issn_field = variable_get('lib4ridora_issn_solr_field', 'mods_identifier_issn_s');
+  $e_issn_field = variable_get('lib4ridora_e_issn_solr_field', 'mods_identifier_e-issn_s');
+  $solr = new IslandoraSolrQueryProcessor();
+  $solr->buildQuery("PID:journals%5c%3a* AND ({$issn_field}:\"$identifier\" OR {$e_issn_field}:\"$identifier\")");
+  $solr->solrLimit = 987654321;
+  $solr->solrParams['fl'] = implode(
+    ',',
+    array(
+      'PID',
+      $issn_field,
+      $e_issn_field,
+    )
+  );
+  $solr->executeQuery(FALSE);
+  $journalAry = array();
+  if ( isset($solr->islandoraSolrResult['response']['objects']) ) {
+    foreach( $solr->islandoraSolrResult['response']['objects'] as $solrItem ) {
+      $journal = $solrItem['solr_doc']['PID'];
+      $journalAry[] = ( !$asObject ? $journal : islandora_object_load($journal) );
+    }
+  }
+  return $journalAry;
 }
 
 /**

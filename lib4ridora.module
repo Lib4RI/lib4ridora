@@ -1471,8 +1471,9 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#suffix' => '</div>',
   );
 
-  global $base_path;  // sub-sites handling: will be only "/" for main site - temporarily added, May 2021
-  if ( strpos('=/'.variable_get('lib4ri_advanced_search_org_unit','eawag/empa/psi/wsl').'/=',$base_path) ) { // hide *default* unit selection area:
+  global $base_path;  // sub-sites handling: pase-path will be "/" for main site - May 2021
+  $usHideAt = variable_get('lib4ri_advanced_search_org_unit_hide',''); // expects a comma delimited list like "eawag, wsl" there NOT to show the old/default unit search
+  if ( $base_path != '/' && stripos($usHideAt,trim($base_path,'/')) !== false ) {	// never hidden on main site
     $form['org_unit'] = array(
       '#title' => 'Org. Unit (obsolete)',
       '#type' => 'hidden',
@@ -1481,7 +1482,7 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
       '#required' => FALSE,
       '#attributes' => array( 'style' => 'display:none;' ),
     );
-  } else {			// show former *default* area where to select one unit:
+  } else {		// show former old/default search area where to select one unit (always shown on main site):
     $form['org_unit'] = array(
       '#type' => 'select',
       '#options' => lib4ridora_get_all_organizational_units(),
