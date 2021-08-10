@@ -17,7 +17,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
   $form['lib4ridora_advanced_conf_options'] = array(
       '#type' => 'checkbox',
       '#default_value' => FALSE,
-      '#title' => t('Show advanced condiguration options'),
+      '#title' => t('Show advanced configuration options'),
   );
   $form['lib4ridora_multi_pdf_defaults_property_availability'] = array(
     '#type' => 'select',
