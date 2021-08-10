@@ -14,6 +14,11 @@ function lib4ridora_admin(array $form, array &$form_state) {
   $lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options();
   unset($lib4ridora_multi_pdf_options['availability']['date']);
   $default = variable_get('lib4ridora_multi_pdf_defaults_property_availability', 'intranet');
+  $form['lib4ridora_advanced_conf_options'] = array(
+      '#type' => 'checkbox',
+      '#default_value' => FALSE,
+      '#title' => t('Show advanced condiguration options'),
+  );
   $form['lib4ridora_multi_pdf_defaults_property_availability'] = array(
     '#type' => 'select',
     '#title' => t('Default PDF availability at ingest'),
@@ -31,7 +36,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => FALSE,
     '#size' => $textfield_size,
   );
-  if ( @isset($_GET['all']) || @isset($_GET['add']) ) {
+  
 	  $form['lib4ridora_recent_additions_amount'] = array(
 		'#type' => 'textfield',
 		'#title' => t('Amount of Recent Additions'),
@@ -39,9 +44,14 @@ function lib4ridora_admin(array $form, array &$form_state) {
 		'#description' => t("Number to define how many of the recently added publications will be listed when you click on the 'Browse' link."),
 		'#required' => FALSE,
 	    '#size' => 160,
+        '#states' => array(
+          'visible' => array(
+              ':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
+          ),
+        ),
 	  );
-  }
-  if ( @isset($_GET['all']) || @isset($_GET['dl']) ) {			// related to Redmine issue #67 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/67
+  
+  // related to Redmine issue #67 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/67
 	  $form['lib4ridora_pdf_download_name_tuning'] = array(
 		'#type' => 'textfield',
 		'#title' => t('Option list for PDF download name'),
@@ -49,8 +59,13 @@ function lib4ridora_admin(array $form, array &$form_state) {
 		'#description' => t("Comma-separated list: [1] how many words of the title to use ('+' for cropping dots), [2] optional string to separate the filename parts, [3] optional space replacement. Quotes are OK for easier space/comma/empty-string handling."),
 		'#required' => FALSE,
 	    '#size' => 160,
+        '#states' => array(
+          'visible' => array(
+              ':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
+          ),
+        ),
 	  );
-  }
+  
   $form['lib4ridora_restricted_datastreams'] = array(
     '#type' => 'textfield',
     '#title' => t('Restricted DSIDs'),
@@ -138,7 +153,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => TRUE,
     '#size' => $textfield_size,
   );
-  if ( @isset($_GET['all']) || @isset($_GET['impact']) ) {			// Even if we skip this configuration, the variable defaults will do what we need - until reconfiguring it here.
+  	// Even if we skip this configuration, the variable defaults will do what we need - until reconfiguring it here.
 	  $form['lib4ridora_pseudo_solr_field_factor_failed'] = array(
 	    '#type' => 'textfield',
 	    '#title' => t('Journal Impact Factor failure term for export'),
@@ -146,6 +161,11 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	    '#default_value' => variable_get('lib4ridora_pseudo_solr_field_factor_failed', ''),
 	    '#required' => FALSE,
 	    '#size' => 160,
+	      '#states' => array(
+	          'visible' => array(
+	              ':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
+	          ),
+	      ),
 	  );
 	  $form['lib4ridora_pseudo_solr_field_factor_none_yet'] = array(
 	    '#type' => 'textfield',
@@ -154,15 +174,21 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	    '#default_value' => variable_get('lib4ridora_pseudo_solr_field_factor_none_yet', 'Not available = not available'),
 	    '#required' => FALSE,
 	    '#size' => 160,
+	      '#states' => array(
+	          'visible' => array(
+	              ':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
+	          ),
+	      ),
 	  );
-  }
+  
   $form['lib4ri_citation_export_form_placeholder'] = array(		/*  for citations in Excel/CSV exports */
     '#type' => 'textfield',
     '#title' => t("Citation Pseudo-Solr Field"),
     '#description' => t("Placeholder where to put citations into CSV/Ecxel exports. To be added as 'display field' at: /admin/islandora/search/islandora_solr/settings"),
     '#default_value' => variable_get('lib4ri_citation_export_form_placeholder','mods_citation_export_placeholder_lib4ri'),
     '#required' => FALSE,
-    '#size' => ( ( @isset($_GET['all']) || @isset($_GET['cit']) ) ? 128 : $textfield_size ),
+//    '#size' => ( ( @isset($_GET['all']) || @isset($_GET['cit']) ) ? 128 : $textfield_size ),
+    '#size' => $textfield_size,
   );
   $form['lib4ridora_solr_field_publication_year'] = array(
     '#type' => 'textfield',
@@ -236,7 +262,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#required' => TRUE,
     '#size' => $textfield_size,
   );
-  if ( @isset($_GET['all']) || @isset($_GET['search']) ) {
+  
     $form['lib4ridora_solr_search_extension_field_data'] = array(
       '#type' => 'textfield',
       '#title' => t('Expanded search: Solr Field Data'),
@@ -245,9 +271,15 @@ function lib4ridora_admin(array $form, array &$form_state) {
       '#default_value' => variable_get('lib4ridora_solr_search_extension_field_data','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'),
       '#required' => FALSE,
       '#size' => 160,
+        '#states' => array(
+            'visible' => array(
+                ':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
+            ),
+        ),
+        
     );
-  }
-  if ( @isset($_GET['all']) || @isset($_GET['prepo']) ) {			// 'prepo' ~= label prepositions, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/57
+  
+  // 'prepo' ~= label prepositions, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/57
     $form['lib4ridora_solr_field_org_terms_1on1'] = array(
       '#type' => 'textfield',
       '#title' => t('Organizational unit name parts untouched'),
@@ -255,9 +287,14 @@ function lib4ridora_admin(array $form, array &$form_state) {
       '#default_value' => variable_get('lib4ridora_solr_field_org_terms_1on1', 'or, and, for, of, in, at'),
       '#required' => FALSE,
       '#size' => 160,
+        '#states' => array(
+            'visible' => array(
+                ':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
+            ),
+        ),
     );
-  }
-  if ( @isset($_GET['all']) || @isset($_GET['css']) ) {			// 'prepo' ~= label prepositions, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/57
+  
+  // 'prepo' ~= label prepositions, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/57
     $form['lib4ridora_css_block_inert_iconless'] = array(
       '#type' => 'textfield',
       '#title' => t('CSS class for block text'),
@@ -265,8 +302,13 @@ function lib4ridora_admin(array $form, array &$form_state) {
       '#default_value' => variable_get('lib4ridora_css_block_inert_iconless', 'availability-text'),
       '#required' => FALSE,
       '#size' => 160,
+        '#states' => array(
+            'visible' => array(
+                ':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
+            ),
+        ),
     );
-  }
+  
   // related to Redmine issue #189 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/189 (about HTML tags in page title)
   $form['lib4ridora_page_title_tag_fix'] = array(
     '#type' => 'checkbox',
