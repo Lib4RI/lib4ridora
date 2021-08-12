@@ -14,11 +14,16 @@ function lib4ridora_admin(array $form, array &$form_state) {
   $lib4ridora_multi_pdf_options = lib4ridora_multi_pdf_get_options();
   unset($lib4ridora_multi_pdf_options['availability']['date']);
   $default = variable_get('lib4ridora_multi_pdf_defaults_property_availability', 'intranet');
-  $form['lib4ridora_advanced_conf_options'] = array(
-      '#type' => 'checkbox',
-      '#default_value' => FALSE,
-      '#title' => t('Show advanced configuration options'),
-  );
+  global $user;
+  $roles = $user->roles;
+  
+  if (in_array('administrator', $roles)){
+      $form['lib4ridora_advanced_conf_options'] = array(
+          '#type' => 'checkbox',
+          '#default_value' => FALSE,
+          '#title' => t('Show developer\'s configuration options'),
+      );
+  }
   $form['lib4ridora_multi_pdf_defaults_property_availability'] = array(
     '#type' => 'select',
     '#title' => t('Default PDF availability at ingest'),
