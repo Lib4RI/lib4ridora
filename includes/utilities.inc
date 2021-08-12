@@ -17,6 +17,9 @@
 function lib4ridora_get_journal($identifier) {
   $issn_field = variable_get('lib4ridora_issn_solr_field', 'mods_identifier_issn_s');
   $e_issn_field = variable_get('lib4ridora_e_issn_solr_field', 'mods_identifier_e-issn_s');
+  if ( !strpos($identifier,'-') ) {
+    $identifier = substr(ltrim($identifier),0,4) . '-' . substr(rtrim($identifier),-4);  // long-dash work-around (possibly in CSV, DORA-value assumed to be OK)
+  }
   $solr = new IslandoraSolrQueryProcessor();
   $solr->buildQuery("PID:journals%5c%3a* AND ({$issn_field}:\"$identifier\" OR {$e_issn_field}:\"$identifier\")");
   $solr->solrLimit = 1;
@@ -48,6 +51,9 @@ function lib4ridora_get_journal($identifier) {
 function lib4ridora_get_journals($identifier, $asObject = FALSE) {
   $issn_field = variable_get('lib4ridora_issn_solr_field', 'mods_identifier_issn_s');
   $e_issn_field = variable_get('lib4ridora_e_issn_solr_field', 'mods_identifier_e-issn_s');
+  if ( !strpos($identifier,'-') ) {
+    $identifier = substr(ltrim($identifier),0,4) . '-' . substr(rtrim($identifier),-4);  // long-dash work-around (possibly in CSV, DORA-value assumed to be OK)
+  }
   $solr = new IslandoraSolrQueryProcessor();
   $solr->buildQuery("PID:journals%5c%3a* AND ({$issn_field}:\"$identifier\" OR {$e_issn_field}:\"$identifier\")");
   $solr->solrLimit = 987654321;
