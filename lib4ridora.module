@@ -2213,7 +2213,7 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 	}
 
 	$fieldSearch = trim( strtr( variable_get('lib4ridora_solr_search_extension_field_data','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'), "&", "+" ) );
-	if ( substr(ltrim($fieldSearch),0,1) == "#" || !strpos($fieldSearch,"+") ) {
+	if ( substr($fieldSearch,0,1) == "#" || !strpos($fieldSearch,"+") ) {
 		return;		// inteded to be ignored, or no extra Solr field separated/added/readable.
 	}
 
@@ -2232,49 +2232,54 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 		return;		// no extra Solr field(s) specified to use!
 	}
 
-	$regExp = '/\s+\w*\.{0,1}\w+\%3a|\s+\w*\.{0,1}\w+\:/i';		// regular expression to find Solr fields - CANNOT deal with Solr fields with a space inside!
+	$regAry = array();
+	$regAry = array();
+	foreach( array('OR','AND','NOT') as $queryOp ) {	/* note: \w also finds under-scores */
+		$regAry[] = '\s{1}' . $queryOp . '\s+\w+\.\w+\%3a';
+		$regAry[] = '\s{1}' . $queryOp . '\s+\w+\.\w+\:';
+		$regAry[] = '\s{1}' . $queryOp . '\s+\w+\_\w+\%3a';
+		$regAry[] = '\s{1}' . $queryOp . '\s+\w+\_\w+\:';
+	}
+	$regExp = '/' . implode('|',$regAry) . '/i';	// regular expression to find Solr fields - CANNOT deal with Solr fields with a space inside!
 	$queryAry = array();
 	$queryTmp = $query;
 	$outerBracketNum = 0;
 	while( substr($queryTmp,0,1) == '(' ) {
 		$outerBracketNum++;
-		$queryTmp = trim(substr($queryTmp,1,-1));		// assumed there is a corresponding one at the end
+		$queryTmp = trim(substr($queryTmp,1,-1));		// assumed there is also corresponding one at the end
 	}
-	$queryTmp = ' ' . $queryTmp; // leading space, see regular expression above!
-	$queryLen = 1 + strlen($queryTmp); // +1 space
+	$queryTmp = ' AND ' . $queryTmp; // any of the possible opperators, leading space, see regular expression above!
+	$queryLen = 5 + strlen($queryTmp);  // +5 for ' AND '
 	$matchAry = array();
 	preg_match_all( $regExp, $queryTmp, $matchAry, PREG_OFFSET_CAPTURE );
-	
-	foreach( $matchAry[0] as $mIdx => $mAry ) {		// with $mAry[0] as search operator found, and $mAry[1] is its position in the query string
-		$posA = $mAry[1];
-		$solrField = ltrim( substr($queryTmp, $posA, strlen($mAry[0]) ) );		// incl. ':' or '%3a'
-		$posZ = max( @intval($matchAry[0][$mIdx+1][1]), $queryLen );	// where SolrField + user's term end
-		$posA += strlen($mAry[0]);
-		$searchTerm = trim( substr($queryTmp, $posA, $posZ-$posA ) );
-		if ( $tmpAry = preg_split( $regExp, $searchTerm ) ) {	// search term may have all the rest, cut it!
-			$searchTerm = $tmpAry[0];
-		}
-		// if there is an operator in/after the $searchTerm (usually OR) then separate it:
-		$boolOp = '';
-		foreach( array('OR','AND','NOT') as $op ) {
-			if ( strtoupper(substr($searchTerm,-strlen($op)-1)) == ' '.$op ) {
-				$searchTerm = rtrim(substr($searchTerm,0,-strlen($op)-1));
-				$boolOp = $op;
-				break; // there only should be one operator!(?)
+
+	// processing matches from behind (easier!?):
+	foreach( @array_reverse($matchAry[0]) as $mIdx => $mAry ) {		// with $mAry[0] as search operator found, and $mAry[1] is its position in the query string
+		$posCut = $mAry[1];
+		$solrField = substr($queryTmp, $posCut, strlen($mAry[0]) );		// incl. ':' or '%3a'
+		$posCut += strlen($solrField);
+		foreach( array('OR','AND','NOT') as $queryOp ) {
+			if ( substr($solrField,0,strlen($queryOp)+2) == ' ' . $queryOp . ' ' ) {
+				$solrField = ltrim(substr($solrField,strlen($queryOp)+2));
+				break;
 			}
 		}
+		$searchTerm = trim( substr($queryTmp, $posCut, $queryLen-$posCut ) );
 		$queryAry[] = array(
 			'solr_field' => $solrField,
 			'search_term' => $searchTerm,
-			'bool_op_next' => $boolOp,
+			'linked_by_op' => ( $mAry[1] ? $queryOp : /* skip/remove auxiliarly added operator at the beginning of query term */ '' ),
 		);
+		$queryLen = $mAry[1];
 	}
+	$queryAry = array_reverse($queryAry);
 
 	$queryNew = '';
 	foreach( $queryAry as $qAry ) {
 		$qNewTerm = '';
 		foreach($extendAry as $mustExist => $fieldExtra) {
 			if ( stripos(strtr($qAry['solr_field'],'%',':'),$mustExist.':') === 0 ) {
+				// connect the additional Solr field to check with 'OR':
 				$qNewTerm .= ' OR ' . $fieldExtra . ( strpos($qAry['solr_field'],':') ? ':' : '%3A' ) . $qAry['search_term'];
 			}
 		}
@@ -2283,7 +2288,7 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 		} else {
 			$qNewTerm = '(' . $qAry['solr_field'] . $qAry['search_term'] . $qNewTerm . ')';
 		}
-		$queryNew .= $qNewTerm . ( empty($qAry['bool_op_next']) ? '' : ' '.$qAry['bool_op_next'].' ' );
+		$queryNew .= ( empty($qAry['linked_by_op']) ? '' : ' '.$qAry['linked_by_op'].' ' ) . $qNewTerm;
 	}
 
 	for( $b=0;$b<$outerBracketNum;$b++) {
