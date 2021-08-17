@@ -18,11 +18,12 @@ function lib4ridora_admin(array $form, array &$form_state) {
   $roles = $user->roles;
   
   if (in_array('administrator', $roles)){
-      $form['lib4ridora_advanced_conf_options'] = array(
-          '#type' => 'checkbox',
-          '#default_value' => FALSE,
-          '#title' => t('Show developer\'s configuration options'),
-      );
+    $sessionName = 'lib4ridora_advanced_conf_options' . '_' . strval($user->name);
+    $form['lib4ridora_advanced_conf_options'] = array(
+        '#type' => 'checkbox',
+        '#default_value' => @boolval( $_SESSION[$sessionName] ),
+        '#title' => t('Show developer\'s configuration options'),
+    );
   }
   $form['lib4ridora_multi_pdf_defaults_property_availability'] = array(
     '#type' => 'select',
@@ -271,8 +272,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
     $form['lib4ridora_solr_search_extension_field_data'] = array(
       '#type' => 'textfield',
       '#title' => t('Expanded search: Solr Field Data'),
-  //  '#description' => t("Accepts a special list, example: 'field1|field2 + fieldA' means that the search in 'field1' or in 'field2' both will be expanded by searching in 'fieldA' too."),
-      '#description' => t("Intension/Example: There is SolrField1 and SolrField2, and for both of them also the values in SolrFieldX should be checked. <br>Resulting syntax: SolrField1|SolrField2 + SolrFieldX"),
+      '#description' => t("Intension/Example: There is SolrField1 and SolrField2, and for both of them also the values in SolrFieldX should be checked. <br>Resulting syntax: SolrField1|SolrField2 + SolrFieldX <br>Hint: A leading '#' will make this setting to be ignored."),
       '#default_value' => variable_get('lib4ridora_solr_search_extension_field_data','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'),
       '#required' => FALSE,
       '#size' => 160,
@@ -330,5 +330,36 @@ function lib4ridora_admin(array $form, array &$form_state) {
     '#options' => array(),
     '#required' => FALSE,
   );
-  return system_settings_form($form);
+
+  return system_settings_form(lib4ridora_admin_form_link_wiki($form));
+}
+
+/*
+ * Function to attach onto the description text of the form field a link to the Lib4RI-Wiki (if available).
+ * Keep/call this at the end of the form setup right before system_settings_form() !
+ * 
+ * It's intended that the form-field/variable name is expanded by '_wiki' to store the link alias of the Wiki.
+ * For example if the wiki-link is https://www.wiki.lib4ri.ch/x/kAH6Ag it could be assinged then with Drush:
+ * sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_solr_field_org_terms_1on1_wiki","kAH6Ag")'
+*/
+function lib4ridora_admin_form_link_wiki($form) {
+  foreach( $form as $formField => $fromData ) {
+    if ( $wikiAlias = @trim(variable_get($formField.'_wiki','')) ) {
+      $wikiLink = ( stripos($wikiAlias,'http') === 0 ) ? $wikiAlias : 'https://www.wiki.lib4ri.ch/x/'.$wikiAlias;
+      $form[$formField]['#description'] .= ' <br>Please see <a href="' . $wikiLink . '" target="_blank">further details</a>.';
+    }
+  }
+  return $form;
+}
+
+/*
+ * Function on submit to to the reset adv. dev options, it will however put it into a session variable/cookie at the user.
+ */
+function lib4ridora_admin_form_value_check($form, &$form_state) {
+  global $user;
+  if ( $form['lib4ridora_advanced_conf_options']['#value'] ) {
+	$sessionName = 'lib4ridora_advanced_conf_options' . '_' . strval($user->name);
+    $_SESSION[$sessionName] = TRUE;
+    $form['lib4ridora_advanced_conf_options']['#value'] = FALSE;
+  }
 }

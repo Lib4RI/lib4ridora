@@ -1271,6 +1271,10 @@ function lib4ridora_page_title_tagless($title, $extra_safe = FALSE ) {
 }
 function lib4ridora_form_alter(&$form, $form_state, $form_id) {
 	// dpm($form_id);
+	if ( $form_id == 'lib4ridora_admin' ) {
+		module_load_include('inc', 'lib4ridora', 'includes/admin.form');
+		$form['#validate'][] = 'lib4ridora_admin_form_value_check';
+    }
 	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) && user_is_logged_in() ) { 
 		if ( in_array($form_id,array("islandora_object_properties_form","islandora_object_properties_form_delete")) ) {
 			// related to HTML-editor issues: Changing the value of this submit button by jQuery/JavaScript may be tricky,
