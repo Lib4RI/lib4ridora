@@ -1497,7 +1497,7 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
       '#suffix' => '</div>',
     );
   }
-  
+
   $form['peer_review'] = array(
     '#type' => 'checkboxes',
     '#options' => array(
@@ -1526,9 +1526,80 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#prefix' => '<div id="lib4ri-advanced-search-full-text">',
     '#suffix' => '</div>',
   );
+
+
+  module_load_include('inc', 'lib4ridora', 'includes/advanced_search');
+
+  $optAry = lib4ridora_get_funding_options( 'mods_extension_fundingReferences_fundingReference_funderName_ms' );
+  $auxAry = array( "Funder_Name_1" => "Funder Name 1", "Funder_Name_2" => "Funder Name 2" );
+  $form['funder_name_test'] = array(
+    '#type' => 'select',
+    '#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
+    '#title' => t('Funder Names'),
+    '#prefix' => '<div id="lib4ri-advanced-search-funding" style="background-color:#def; padding-left:1em;">',
+  );
+
+  $optAry = lib4ridora_get_funding_options( 'mods_extension_fundingReferences_fundingReference_fundingStream_ms' );
+  $auxAry = array( "Funding_Stream_1" => "Funding Stream 1", "Funding_Stream_2" => "Funding Stream 2" );
+  $form['funding_stream_test'] = array(
+    '#type' => 'select',
+    '#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
+    '#title' => t('Funding Streams'),
+  );
+
+  $optAry = lib4ridora_get_funding_options( 'mods_extension_fundingReferences_fundingReference_awardTitle_ms' );
+  $auxAry = array( "Award_Title_1" => "Award Title 1", "Award_Title_2" => "Award Title 2" );
+  $form['award_title_test'] = array(
+    '#type' => 'select',
+    '#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
+    '#title' => t('Award Titles'),
+  );
+
+  $optAry = lib4ridora_get_funding_options( 'mods_extension_fundingReferences_fundingReference_awardNumber_ms' );
+  $auxAry = array( "Award_Number_1" => "Award Number 1", "Award_Number_2" => "Award Number 2" );
+  $form['award_number_test'] = array(
+    '#type' => 'select',
+    '#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
+    '#title' => t('Award Numbers'),
+    '#suffix' => '</div>',
+  );
+
+
+  if ( module_exists('lib4ri_funding') ) {
+    module_load_include('module', 'lib4ri_funding', 'lib4ri_funding' );
+    module_load_include('inc', 'lib4ri_funding', 'includes/theme' );
+
+    $elements = lib4ri_funding_element_info();
+    $elements['lib4ri_funding_funders']['#prefix'] = '<div id="lib4ri-advanced-search-funding" style="background-color:#dec; padding-left:1em;">';
+    $elements['lib4ri_funding_award_number']['#suffix'] = '</div>';
+    $form = array_merge( $form, $elements );
+  }
+
+
   $form['controls']['#weight'] = 100;
   $form['#validate'][] = 'lib4ridora_solr_advanced_search_form_validate';
   $form['#submit'][] = 'lib4ridora_solr_advanced_search_form_submit';
+}
+
+function lib4ridora_get_funding_options( $solr_field ) {
+  $facets = lib4ridora_facet_query(array($solr_field));
+
+  // If there's results, construct an array where the keys are affiliations as in Solr, and the values are formatted to be labels.
+  $fundAry = array();
+  foreach ($facets as $facet) {
+    if ( !empty($facet) ) {
+      $fundAry = array_merge($fundAry, array_combine( array_keys($facet), array_keys($facet) ) );
+    }
+  }
+
+  // Sort the array alphanumerically (ignoring lower/upper case):
+  $sortAryTmp = array_map( 'strtolower', $fundAry );
+  if ( stripos($solr_field,'number') ) {
+    $sortAryTmp = array_map( function($val) { return str_pad($val,10,'0',STR_PAD_LEFT); }, $sortAryTmp );
+  }
+  array_multisort( $sortAryTmp, SORT_ASC, SORT_STRING, $fundAry );
+
+  return $fundAry;
 }
 
 /**
@@ -2302,4 +2373,28 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 	if ( $queryNew != $query ) {
 		$islandora_solr_query->solrQuery = $queryNew;
 	}
+}
+
+/**
+ * Implements hook_init
+ *
+ * Used here for auxiliary firewall tasks that cannot be performed right now elsewhere 2021-08-27/fh
+ * Should be removed again as soon we have a better/external possibilty to filter out unwanted visitors.
+ * 
+ * sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_omit_user_agent","seekport")'
+ * sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_omit_user_agent",array("Aeekport","SEOcrawl","sciSearch"))'
+ */
+function lib4ridora_init() {
+  if ( $uaList = variable_get('lib4ridora_omit_user_agent',NULL) ) {  // expected to have a browser's user agent string, or an array with multiple of them.
+    global $base_path;
+    foreach( ( is_array($uaList) ? $uaList : array($uaList) ) as $uaString ) {
+      if ( stripos($_SERVER['HTTP_USER_AGENT'],strval($uaString)) !== false ) {
+        $tmpPath = '/tmp/browser-user-agent.denied' . strtr($base_path,'/','.') . 'txt';
+        $ipAry = array( date("Y-m-d.H-i-s"), $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_X_REAL_IP'], $_SERVER['HTTP_X_FORWARDED_FOR'], $_SERVER['REQUEST_URI'], $_SERVER['HTTP_USER_AGENT'] );
+        file_put_contents( $tmpPath, @strval(file_get_contents($tmpPath)) . implode(' | ',$ipAry) . "\r\n" );
+        header("HTTP/1.0 503 Service Unavailable");
+        exit;
+      }
+    }
+  }
 }
