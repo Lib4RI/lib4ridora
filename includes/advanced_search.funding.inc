@@ -5,9 +5,14 @@
  * Utiilty functions for Lib4Ri's altered advanced search form for FUNDING.
  */
 
-module_load_include('inc', 'lib4ridora', 'includes/advanced_search');
+module_load_include('inc', 'lib4ridora', 'includes/advanced_search');	// for safety, perhaps later to merge.
 
-function lib4ridora_get_solr_field_funding($funding_element = '') {  // see lib4ridora_parse_affiliation_fields() - vairables would be nice!?
+/**
+ * Look-up function to find the right solr field for the form fields related to funding.
+ * 
+ * see lib4ridora_parse_affiliation_fields() - So, vairables would be nice!?
+ */
+function lib4ridora_get_solr_field_funding($funding_element = '') {
 	if ( stripos($funding_element,'funder_name') === 0 ) {
 		return array('mods_extension_fundingReferences_fundingReference_funderName_ms');
 	}
@@ -23,7 +28,12 @@ function lib4ridora_get_solr_field_funding($funding_element = '') {  // see lib4
 	return '';
 }
 
-function lib4ridora_get_funding_options( $funding_element, $add_wildcard = FALSE ) {	// similar to lib4ridora_get_all_organizational_units() , without  */All
+/**
+ * Will create an funding related array to use with 'select' form field
+ * 
+ * See also lib4ridora_get_all_organizational_units()
+ */
+function lib4ridora_get_funding_options( $funding_element, $add_wildcard = FALSE ) {
 	
   $facet_fields = lib4ridora_get_solr_field_funding($funding_element);
   $facets = lib4ridora_facet_query($facet_fields);
@@ -38,7 +48,7 @@ function lib4ridora_get_funding_options( $funding_element, $add_wildcard = FALSE
 
   // Sort the array alphanumerically (ignoring lower/upper case):
   $sortAryTmp = array_map( 'strtolower', $fundAry );
-  if ( stripos($solr_field,'number') ) {
+  if ( stripos($funding_element,'number') ) {
     $sortAryTmp = array_map( function($val) { return str_pad($val,10,'0',STR_PAD_LEFT); }, $sortAryTmp );
   }
   array_multisort( $sortAryTmp, SORT_ASC, SORT_STRING, $fundAry );
@@ -70,4 +80,18 @@ function lib4ridora_construct_funding_element_filter(&$form_state, $funding_elem
   $filters = array_map("lib4ridora_construct_solr_statement", $facet_fields, $values);
 
   return lib4ridora_construct_filter_string_from_array($filters);
+}
+
+/**
+ * Callback function to find funding data for auto-complete fieled in adv. search.
+ * 
+ * Called via hook_menu()
+ */
+function lib4ridora_funding_autocomplete( $search_string ) {
+  $output = NULL;
+  if ( module_exists('lib4ri_funding') ) {
+    module_load_include('inc', 'lib4ri_funding', 'includes/autocomplete' );
+    $output = lib4ri_funding_atitle_autocomplete( 0 /* known funding stream */, $search_string );
+  }
+  drupal_json_output($output);
 }

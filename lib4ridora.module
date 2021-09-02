@@ -503,7 +503,26 @@ function lib4ridora_menu() {
     'type' => MENU_CALLBACK,
     'access callback' => TRUE,
   );
+  
+
+  // 'Themeless' apporach, see https://www.webomelette.com/how-create-autocomplete-form-element-drupal-7
+  if ( module_exists('lib4ri_funding') ) {
+    $items['islandora/fundersearch/autocomplete'] = array(
+      'module' => 'lib4ridora',
+      'file' => 'includes/advanced_search.funding.inc',
+      'page callback' => 'lib4ridora_funding_autocomplete',
+      'page arguments' => array(1),
+      'type' => MENU_CALLBACK,
+   /* 'access callback' => TRUE, */
+      'access callback' => 'lib4ridora_funding_access_callback',
+     );
+  }
+
   return $items;
+}
+
+function lib4ridora_funding_access_callback() {
+    return true;
 }
 
 /**
@@ -1567,12 +1586,22 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
 
   if ( module_exists('lib4ri_funding') ) {
     module_load_include('module', 'lib4ri_funding', 'lib4ri_funding' );
+/*
     module_load_include('inc', 'lib4ri_funding', 'includes/theme' );
-
     $elements = lib4ri_funding_element_info();
-    $elements['lib4ri_funding_funders']['#prefix'] = '<div id="lib4ri-advanced-search-funding" style="background-color:#dec; padding-left:1em;">';
+    $elements['lib4ri_funding_funders']['#prefix'] = '<div id="lib4ri-advanced-search-funding" style="background-color:#fde; padding-left:1em;">';
     $elements['lib4ri_funding_award_number']['#suffix'] = '</div>';
     $form = array_merge( $form, $elements );
+*/
+    $form['fundersearch'] = array(
+      '#id' => 'fundersearch', /* needed!? */
+      '#title' => t('Enter known Funding Data (Test)'),
+      '#type' => 'textfield',
+      '#maxlength' => 128,
+      '#autocomplete_path' => 'islandora/fundersearch/autocomplete',
+      '#prefix' => '<div id="lib4ri-advanced-search-funding" style="background-color:#dec; padding-left:1em;">',
+      '#suffix' => '</div>',
+    );
   }
 
 
