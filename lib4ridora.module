@@ -1528,9 +1528,9 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
   );
 
 
-  module_load_include('inc', 'lib4ridora', 'includes/advanced_search');
+  module_load_include('inc', 'lib4ridora', 'includes/advanced_search.funding');
 
-  $optAry = lib4ridora_get_funding_options( 'mods_extension_fundingReferences_fundingReference_funderName_ms' );
+  $optAry = lib4ridora_get_funding_options( 'funder_name_test' );
   $auxAry = array( "Funder_Name_1" => "Funder Name 1", "Funder_Name_2" => "Funder Name 2" );
   $form['funder_name_test'] = array(
     '#type' => 'select',
@@ -1539,7 +1539,7 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#prefix' => '<div id="lib4ri-advanced-search-funding" style="background-color:#def; padding-left:1em;">',
   );
 
-  $optAry = lib4ridora_get_funding_options( 'mods_extension_fundingReferences_fundingReference_fundingStream_ms' );
+  $optAry = lib4ridora_get_funding_options( 'funding_stream_test' );
   $auxAry = array( "Funding_Stream_1" => "Funding Stream 1", "Funding_Stream_2" => "Funding Stream 2" );
   $form['funding_stream_test'] = array(
     '#type' => 'select',
@@ -1547,7 +1547,7 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#title' => t('Funding Streams'),
   );
 
-  $optAry = lib4ridora_get_funding_options( 'mods_extension_fundingReferences_fundingReference_awardTitle_ms' );
+  $optAry = lib4ridora_get_funding_options( 'award_title_test' );
   $auxAry = array( "Award_Title_1" => "Award Title 1", "Award_Title_2" => "Award Title 2" );
   $form['award_title_test'] = array(
     '#type' => 'select',
@@ -1555,7 +1555,7 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#title' => t('Award Titles'),
   );
 
-  $optAry = lib4ridora_get_funding_options( 'mods_extension_fundingReferences_fundingReference_awardNumber_ms' );
+  $optAry = lib4ridora_get_funding_options( 'award_number_test' );
   $auxAry = array( "Award_Number_1" => "Award Number 1", "Award_Number_2" => "Award Number 2" );
   $form['award_number_test'] = array(
     '#type' => 'select',
@@ -1579,27 +1579,6 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
   $form['controls']['#weight'] = 100;
   $form['#validate'][] = 'lib4ridora_solr_advanced_search_form_validate';
   $form['#submit'][] = 'lib4ridora_solr_advanced_search_form_submit';
-}
-
-function lib4ridora_get_funding_options( $solr_field ) {
-  $facets = lib4ridora_facet_query(array($solr_field));
-
-  // If there's results, construct an array where the keys are affiliations as in Solr, and the values are formatted to be labels.
-  $fundAry = array();
-  foreach ($facets as $facet) {
-    if ( !empty($facet) ) {
-      $fundAry = array_merge($fundAry, array_combine( array_keys($facet), array_keys($facet) ) );
-    }
-  }
-
-  // Sort the array alphanumerically (ignoring lower/upper case):
-  $sortAryTmp = array_map( 'strtolower', $fundAry );
-  if ( stripos($solr_field,'number') ) {
-    $sortAryTmp = array_map( function($val) { return str_pad($val,10,'0',STR_PAD_LEFT); }, $sortAryTmp );
-  }
-  array_multisort( $sortAryTmp, SORT_ASC, SORT_STRING, $fundAry );
-
-  return $fundAry;
 }
 
 /**
@@ -1647,13 +1626,17 @@ function lib4ridora_solr_advanced_search_form_validate($form, &$form_state) {
  * @see islandora_solr_advanced_search_form()
  */
 function lib4ridora_solr_advanced_search_form_submit($form, &$form_state) {
-  module_load_include('inc', 'lib4ridora', 'includes/advanced_search');
+  module_load_include('inc', 'lib4ridora', 'includes/advanced_search.funding');
   $filters = array(
     lib4ridora_construct_year_filter($form_state),
     lib4ridora_construct_publication_type_filter($form_state),
     lib4ridora_construct_organization_unit_filter($form_state),
     lib4ridora_construct_peer_reviewed_filter($form_state),
     lib4ridora_construct_full_text_filter($form_state),
+    lib4ridora_construct_funding_element_filter($form_state, 'funder_name_test' ),
+    lib4ridora_construct_funding_element_filter($form_state, 'funding_stream_test' ),
+    lib4ridora_construct_funding_element_filter($form_state, 'award_title_test' ),
+    lib4ridora_construct_funding_element_filter($form_state, 'award_number_test' ),
   );
   $filters = array_filter($filters);
   if ($filters) {
