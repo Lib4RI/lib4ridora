@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * @file
@@ -80,6 +80,21 @@ function lib4ridora_construct_funding_element_filter(&$form_state, $funding_elem
   $filters = array_map("lib4ridora_construct_solr_statement", $facet_fields, $values);
 
   return lib4ridora_construct_filter_string_from_array($filters);
+}
+
+/**
+ * Test callback function to check cooperation/inclusion with/of 'lib4ri_funding' module
+ *
+ * Test link: https://www.dora-dev.lib4ri.ch/psi/adv-search/funding/Calipso
+ */
+function lib4ridora_adv_search_funding_callback( $search_string /* should be passed in automatically, otherwise use $_GET['q'] minus length of AC-path */ ) {
+  $dataAry = array();
+  if ( module_exists('lib4ri_funding') ) {
+    module_load_include('inc', 'lib4ri_funding', 'includes/autocomplete' );
+    $dataAry = lib4ri_funding_atitle_autocomplete( 0 /* known funding stream */, $search_string );
+    $dataAry = array_combine( array_values($dataAry), array_values($dataAry) );
+  }
+  drupal_json_output($dataAry);
 }
 
 /**

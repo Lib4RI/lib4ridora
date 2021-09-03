@@ -513,10 +513,19 @@ function lib4ridora_menu() {
       'page callback' => 'lib4ridora_funding_autocomplete',
       'page arguments' => array(1),
       'type' => MENU_CALLBACK,
-   /* 'access callback' => TRUE, */
       'access callback' => 'lib4ridora_funding_access_callback',
-     );
+    );
+
+	$items['adv-search/funding'] = array(		/* for test reasons */
+      'module' => 'lib4ridora',
+      'file' => 'includes/advanced_search.funding.inc',
+      'page callback' => 'lib4ridora_adv_search_funding_callback',
+	  'type' => MENU_CALLBACK,
+      'access callback' => 'lib4ridora_funding_access_callback',
+	);
+
   }
+
 
   return $items;
 }
@@ -1597,8 +1606,9 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
       '#id' => 'fundersearch', /* needed!? */
       '#title' => t('Enter known Funding Data (Test)'),
       '#type' => 'textfield',
-      '#maxlength' => 128,
-      '#autocomplete_path' => 'islandora/fundersearch/autocomplete',
+      '#maxlength' => 1024,
+      '#size' => 144,
+      '#autocomplete_path' => /* 'islandora/funding/autocomplete/atitle/0' */ variable_get('lib4ridora_fundersearch','adv-search/funding') ,
       '#prefix' => '<div id="lib4ri-advanced-search-funding" style="background-color:#dec; padding-left:1em;">',
       '#suffix' => '</div>',
     );
