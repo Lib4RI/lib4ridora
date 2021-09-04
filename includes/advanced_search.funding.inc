@@ -83,30 +83,41 @@ function lib4ridora_construct_funding_element_filter(&$form_state, $funding_elem
 }
 
 /**
- * Test callback function to check cooperation/inclusion with/of 'lib4ri_funding' module
- *
- * Test link: https://www.dora-dev.lib4ri.ch/psi/adv-search/funding/Calipso
- */
-function lib4ridora_adv_search_funding_callback( $search_string /* should be passed in automatically, otherwise use $_GET['q'] minus length of AC-path */ ) {
-  $dataAry = array();
-  if ( module_exists('lib4ri_funding') ) {
-    module_load_include('inc', 'lib4ri_funding', 'includes/autocomplete' );
-    $dataAry = lib4ri_funding_atitle_autocomplete( 0 /* known funding stream */, $search_string );
-    $dataAry = array_combine( array_values($dataAry), array_values($dataAry) );
-  }
-  drupal_json_output($dataAry);
-}
-
-/**
  * Callback function to find funding data for auto-complete fieled in adv. search.
  * 
  * Called via hook_menu()
  */
-function lib4ridora_funding_autocomplete( $search_string ) {
+function lib4ridora_fundersearch_autocomplete( $search_string ) {
   $output = NULL;
   if ( module_exists('lib4ri_funding') ) {
     module_load_include('inc', 'lib4ri_funding', 'includes/autocomplete' );
     $output = lib4ri_funding_atitle_autocomplete( 0 /* known funding stream */, $search_string );
   }
   drupal_json_output($output);
+}
+
+/**
+ * Customized callback function to check cooperation/inclusion with/of 'lib4ri_funding' module
+ *
+ * Called via hook_menu()
+ *
+ * Test link: https://www.dora-dev.lib4ri.ch/psi/lib4ridora/fundersearch/autocomplete/Calipso
+ */
+function lib4ridora_adv_search_funding_callback( $search_string ) {
+  $search_string = trim(substr(strchr(strip_tags($_GET['q']),'/autocomplete/'),14));  // work-around, due to experienced differences between sub-sites
+  $dataAry = array();
+  if ( !module_exists('lib4ri_funding') ) {
+    $dataAry['*'] = '--- search suggestions are not available currently';
+  } elseif ( strlen($search_string) < 3 ) {
+    $dataAry['*'] = ( strlen($search_string) < 2 ? '--- please type at least 3 letters' : '--- please type another letter' );
+  } else {
+    module_load_include('inc', 'lib4ri_funding', 'includes/autocomplete' );
+    $dataAry = lib4ri_funding_atitle_autocomplete( 0 /* known funding stream */, $search_string );
+    if ( !sizeof($dataAry) ) {
+      $dataAry['*'] = '--- sorry, nothing alike available';
+    } else { /* if the user is selection an auto-complete-suggestions, then the array key is actually copied into the form field!(?) */
+      $dataAry = array_combine( array_values($dataAry), array_values($dataAry) );
+    }
+  }
+  drupal_json_output($dataAry);
 }
