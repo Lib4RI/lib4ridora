@@ -503,37 +503,7 @@ function lib4ridora_menu() {
     'type' => MENU_CALLBACK,
     'access callback' => TRUE,
   );
-  
-  // 'Theme-less' apporach, see https://www.webomelette.com/how-create-autocomplete-form-element-drupal-7
-  if ( module_exists('lib4ri_funding') ) {
-    $items['islandora/fundersearch/autocomplete'] = array(
-      'module' => 'lib4ridora',
-      'file' => 'includes/advanced_search.funding.inc',
-      'page callback' => 'lib4ridora_fundersearch_autocomplete',
-      'page arguments' => array(1),
-      'type' => MENU_CALLBACK,
-      'access callback' => 'lib4ridora_fundersearch_access_callback',
-    );
-
-	$items['lib4ridora/fundersearch/autocomplete'] = array(
-      'module' => 'lib4ridora',
-      'file' => 'includes/advanced_search.funding.inc',
-      'page callback' => 'lib4ridora_adv_search_funding_callback',
-  //  'page arguments' => array(1),	/* https://www.drupal.org/forum/support/module-development-and-code-questions/2009-05-08/passing-arguments-to-form-functions */
-	  'type' => MENU_CALLBACK,
-      'access callback' => 'lib4ridora_fundersearch_access_callback',
-	);
-  }
-
   return $items;
-}
-
-function lib4ridora_fundersearch_access_callback() {
-  if ( !user_is_logged_in() ) {
-    module_load_include('inc', 'lib4ridora', 'includes/utilities');
-    return ( !lib4ridora_user_is_bot() );
-  }
-  return true;
 }
 
 /**
@@ -1527,7 +1497,7 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
       '#suffix' => '</div>',
     );
   }
-
+  
   $form['peer_review'] = array(
     '#type' => 'checkboxes',
     '#options' => array(
@@ -1556,63 +1526,6 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#prefix' => '<div id="lib4ri-advanced-search-full-text">',
     '#suffix' => '</div>',
   );
-
-
-  module_load_include('inc', 'lib4ridora', 'includes/advanced_search.funding');
-
-  $optAry = lib4ridora_get_funding_options( 'funder_name_test' );
-  $auxAry = array( "Funder_Name_1" => "Funder Name 1", "Funder_Name_2" => "Funder Name 2" );
-  $form['funder_name_test'] = array(
-    '#type' => 'select',
-    '#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
-    '#title' => t('Funder Names (Test)'),
-    '#prefix' => '<div id="lib4ri-advanced-search-funding" style="background-color:#def; padding-left:1em;">',
-  );
-
-  $optAry = lib4ridora_get_funding_options( 'funding_stream_test' );
-  $auxAry = array( "Funding_Stream_1" => "Funding Stream 1", "Funding_Stream_2" => "Funding Stream 2" );
-  $form['funding_stream_test'] = array(
-    '#type' => 'select',
-    '#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
-    '#title' => t('Funding Streams (Test)'),
-  );
-
-  $optAry = lib4ridora_get_funding_options( 'award_number_test' );
-  $auxAry = array( "Award_Number_1" => "Award Number 1", "Award_Number_2" => "Award Number 2" );
-  $form['award_number_test'] = array(
-    '#type' => 'select',
-    '#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
-    '#title' => t('Award Numbers (Test)'),
-    '#attributes' => array( 'style' => 'width:15em;' ),
-  );
-
-  $optAry = lib4ridora_get_funding_options( 'award_title_test' );
-  $auxAry = array( "Award_Title_1" => "Award Title 1", "Award_Title_2" => "Award Title 2" );
-  $form['award_title_test'] = array(
-    '#type' => 'select',
-    '#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
-    '#title' => t('Award Titles (Test)'),
-    '#attributes' => array( 'style' => 'width:75em;' ),
-    '#suffix' => '</div>',
-  );
-
-
-
-  if ( module_exists('lib4ri_funding') ) {
-    module_load_include('module', 'lib4ri_funding', 'lib4ri_funding' );
-    $form['fundersearch'] = array(
-      '#id' => 'fundersearch',
-      '#title' => t('Funding Data'),
-      '#type' => 'textfield',
-      '#maxlength' => 1024,
-      '#size' => 144,
-      '#autocomplete_path' => /* 'islandora/funding/autocomplete/atitle/0' */ variable_get('lib4ridora_fundersearch','lib4ridora/fundersearch/autocomplete') ,
-      '#prefix' => '<div id="lib4ri-advanced-search-funding" style="background-color:#dec; padding-left:1em;">',
-      '#suffix' => '</div>',
-    );
-  }
-
-
   $form['controls']['#weight'] = 100;
   $form['#validate'][] = 'lib4ridora_solr_advanced_search_form_validate';
   $form['#submit'][] = 'lib4ridora_solr_advanced_search_form_submit';
@@ -1663,19 +1576,15 @@ function lib4ridora_solr_advanced_search_form_validate($form, &$form_state) {
  * @see islandora_solr_advanced_search_form()
  */
 function lib4ridora_solr_advanced_search_form_submit($form, &$form_state) {
-  module_load_include('inc', 'lib4ridora', 'includes/advanced_search.funding');
+  module_load_include('inc', 'lib4ridora', 'includes/advanced_search');
   $filters = array(
     lib4ridora_construct_year_filter($form_state),
     lib4ridora_construct_publication_type_filter($form_state),
     lib4ridora_construct_organization_unit_filter($form_state),
     lib4ridora_construct_peer_reviewed_filter($form_state),
     lib4ridora_construct_full_text_filter($form_state),
-    lib4ridora_construct_funding_element_filter($form_state, 'funder_name_test' ),
-    lib4ridora_construct_funding_element_filter($form_state, 'funding_stream_test' ),
-    lib4ridora_construct_funding_element_filter($form_state, 'award_title_test' ),
-    lib4ridora_construct_funding_element_filter($form_state, 'award_number_test' ),
   );
-  $filters = array_filter( array_merge( $filters, lib4ridora_construct_funding_element_filters($form_state) ) );
+  $filters = array_filter($filters);
   if ($filters) {
     // Jam our filters into the redirect.
     $form_state['redirect'][1] = array_merge_recursive($form_state['redirect'][1], array(
@@ -2299,6 +2208,15 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 	$batch = batch_get();		// right now this is not intended for/when exporting results.
 	if ( !empty($batch) ) { return; }
 
+	if ( @isset($_GET['extension']) ) {
+		$extReq = @trim(strtolower(strip_tags($_GET['extension'])));
+		if ( intval($extReq) < 1 || in_array($extReq,array('false','off','no')) ) {
+			// coming from simple search, so skip because extended author element in MODS also can be respected here:
+			// https://www.dora-dev.lib4ri.ch/admin/islandora/search/islandora_solr/settings ==> Query Defaults
+			return;
+		}
+	}
+	
 	$query = trim( $islandora_solr_query->solrQuery );		// expecting something like: lib4ri_all_authors_mt:(aaa) NOT lib4ri_all_authors_mt:(bbb)
 	if ( !strchr($query,":") || strlen($query) < 4 ) {
 		// This seems ti be a simple search!(?) However let's exclude searches with '*:*' only.s
@@ -2308,91 +2226,39 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 	}
 
 	$fieldSearch = trim( strtr( variable_get('lib4ridora_solr_search_extension_field_data','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'), "&", "+" ) );
-	if ( substr($fieldSearch,0,1) == "#" || !strpos($fieldSearch,"+") ) {
-		return;		// inteded to be ignored, or no extra Solr field separated/added/readable.
-	}
+	if ( substr($fieldSearch,0,1) == "#" || !strchr($fieldSearch,"+") ) { return; }
 
-	$extendAry = array();
+	$queryNew = $query . " OR " ;		// aux.
+	$matchAry = array();
+	preg_match_all( "/\sNOT\s|\sAND\s|\sOR\s/", $queryNew, $matchAry, PREG_OFFSET_CAPTURE ); // looking for positions of the operators NOT, AND, OR (embraced by a space).
+	$qPartAry = array();
+	$qOffset = 0;
+	foreach( $matchAry[0] as $mAry ) {		// with $mAry[0] as search operator found, and $mAry[1] is its position in the query string
+		$qPartAry[] = array( substr($queryNew,$qOffset,$mAry[1]-$qOffset), trim($mAry[0]) );
+		$qOffset = strlen($mAry[0]) + $mAry[1];
+	}
+	$qPartAry[sizeof($qPartAry)-1][1] = "";		// to clear the aux. ' OR '
+
+	$queryNew = "";
 	$fieldData = explode( ",", strtr( $fieldSearch, "/;", "|," ) );
 	foreach( $fieldData as $fieldSearch ) {
 		$fieldAry = explode("+",trim($fieldSearch),2);
-		if ( $fieldExtra = @trim($fieldAry[1]) ) {
-			$fieldAry = array_map('trim',explode("|",$fieldAry[0]));
-			foreach( $fieldAry as $mustExist ) {
-				$extendAry[$mustExist] = $fieldExtra;
+		$fieldExtra = trim($fieldAry[1]);
+		$fieldAry = explode("|",$fieldAry[0]);
+		foreach( $qPartAry as $qIdx => $qAry ) {
+			$ary = explode(":",$qAry[0],2);
+			foreach( $fieldAry as $fieldOld ) {
+				if ( trim($ary[0]) == trim($fieldOld) ) {
+					$qAry[0] = $ary[0] . ":" . $ary[1] . " OR  " . $fieldExtra . ":" . $ary[1];
+					$qOffset = -1;	// just to state we have found/expanded something.
+				}
 			}
+			$qPartAry[$qIdx] = array( $qAry[0], $qAry[1] );
 		}
-	}
-	if ( !sizeof($extendAry) ) {
-		return;		// no extra Solr field(s) specified to use!
+		foreach( $qPartAry as $ary ) { $queryNew .= "(" . trim($ary[0]) . ") " . trim($ary[1]) . " "; }
 	}
 
-	$regAry = array();
-	$regAry = array();
-	foreach( array('OR','AND','NOT') as $queryOp ) {	/* note: \w also finds under-scores */
-		$regAry[] = '\s{1}' . $queryOp . '\s+\w+\.\w+\%3a';
-		$regAry[] = '\s{1}' . $queryOp . '\s+\w+\.\w+\:';
-		$regAry[] = '\s{1}' . $queryOp . '\s+\w+\_\w+\%3a';
-		$regAry[] = '\s{1}' . $queryOp . '\s+\w+\_\w+\:';
-	}
-	$regExp = '/' . implode('|',$regAry) . '/i';	// regular expression to find Solr fields - CANNOT deal with Solr fields with a space inside!
-	$queryAry = array();
-	$queryTmp = $query;
-	$outerBracketNum = 0;
-	while( substr($queryTmp,0,1) == '(' ) {
-		$outerBracketNum++;
-		$queryTmp = trim(substr($queryTmp,1,-1));		// assumed there is also corresponding one at the end
-	}
-	$queryTmp = ' AND ' . $queryTmp; // any of the possible opperators, leading space, see regular expression above!
-	$queryLen = 5 + strlen($queryTmp);  // +5 for ' AND '
-	$matchAry = array();
-	preg_match_all( $regExp, $queryTmp, $matchAry, PREG_OFFSET_CAPTURE );
-
-	// processing matches from behind (easier!?):
-	foreach( @array_reverse($matchAry[0]) as $mIdx => $mAry ) {		// with $mAry[0] as search operator found, and $mAry[1] is its position in the query string
-		$posCut = $mAry[1];
-		$solrField = substr($queryTmp, $posCut, strlen($mAry[0]) );		// incl. ':' or '%3a'
-		$posCut += strlen($solrField);
-		foreach( array('OR','AND','NOT') as $queryOp ) {
-			if ( substr($solrField,0,strlen($queryOp)+2) == ' ' . $queryOp . ' ' ) {
-				$solrField = ltrim(substr($solrField,strlen($queryOp)+2));
-				break;
-			}
-		}
-		$searchTerm = trim( substr($queryTmp, $posCut, $queryLen-$posCut ) );
-		$queryAry[] = array(
-			'solr_field' => $solrField,
-			'search_term' => $searchTerm,
-			'linked_by_op' => ( $mAry[1] ? $queryOp : /* skip/remove auxiliarly added operator at the beginning of query term */ '' ),
-		);
-		$queryLen = $mAry[1];
-	}
-	$queryAry = array_reverse($queryAry);
-
-	$queryNew = '';
-	foreach( $queryAry as $qAry ) {
-		$qNewTerm = '';
-		foreach($extendAry as $mustExist => $fieldExtra) {
-			if ( stripos(strtr($qAry['solr_field'],'%',':'),$mustExist.':') === 0 ) {
-				// connect the additional Solr field to check with 'OR':
-				$qNewTerm .= ' OR ' . $fieldExtra . ( strpos($qAry['solr_field'],':') ? ':' : '%3A' ) . $qAry['search_term'];
-			}
-		}
-		if ( empty($qNewTerm) ) {
-			$qNewTerm = $qAry['solr_field'] . $qAry['search_term'];
-		} else {
-			$qNewTerm = '(' . $qAry['solr_field'] . $qAry['search_term'] . $qNewTerm . ')';
-		}
-		$queryNew .= ( empty($qAry['linked_by_op']) ? '' : ' '.$qAry['linked_by_op'].' ' ) . $qNewTerm;
-	}
-
-	for( $b=0;$b<$outerBracketNum;$b++) {
-		$queryNew = '(' . $queryNew . ')';
-	}
-
-	if ( $queryNew != $query ) {
-		$islandora_solr_query->solrQuery = $queryNew;
-	}
+	if ( $qOffset < 0 ) { $islandora_solr_query->solrQuery = trim($queryNew); }
 }
 
 /**
