@@ -248,31 +248,49 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
         // The following differs from the default
         // islandora_query block currentQuery().
         $updated_filter = FALSE;
-        foreach ($records as $key => $value) {
-          // Re-write certain PIDs to name strings.
-          if (strpos(preg_replace('/\\\\ /', ' ', $filter), $value['solr_field']) !== FALSE) {
-            $updated_filter = TRUE;
-            if (isset($value['solr_field_settings']['pid_object_label']) && $value['solr_field_settings']['pid_object_label']) {
-              $myqp = new IslandoraSolrQueryProcessor();
-              $mylbl = NULL;
-              $mypid = str_replace('info:fedora/', '', $filter_string);
-              $mypid = $filter_string;
-              if (islandora_is_valid_pid($mypid)) {
-                $myqp->buildQuery("PID:\"$mypid\"");
-                $myqp->solrParams['fl'] = 'PID, ' . variable_get( 'islandora_solr_object_label_field', 'fgs_label_s' );
-                $myqp->executeQuery();
-                if (!empty($myqp->islandoraSolrResult) && !empty($myqp->islandoraSolrResult['response']['objects'])) {
-                  $mylbl = (!empty($myqp->islandoraSolrResult['response']['objects'][0]['object_label']) ? $myqp->islandoraSolrResult['response']['objects'][0]['object_label'] : "...");
+		// spacial case: if there is an explit given search string then just use this:
+        if ( $str = @trim(strip_tags($_GET['search_string'])) ) {  //html tags are stripped again to prevent html injection
+          $filter_string = htmlentities($str);
+        } else {
+          foreach ($records as $key => $value) {
+            // Re-write certain PIDs to name strings.
+            if (strpos(preg_replace('/\\\\ /', ' ', $filter), $value['solr_field']) !== FALSE) {
+              $updated_filter = TRUE;
+              if (isset($value['solr_field_settings']['pid_object_label']) && $value['solr_field_settings']['pid_object_label']) {
+                $pidAry = array();
+                foreach( array('eawag','empa','psi','wsl') as $inst ) {
+                  foreach( array('units','authors') as $objType ) {
+                    $regEx = '/' . $inst . '\-' . $objType . ':\d+/';
+                    $matchAry = array();
+                    if ( preg_match_all( $regEx, $filter_string, $matchAry ) ) {
+                      foreach( $matchAry as $mAry ) {
+                        foreach( $mAry as $pid ) { $pidAry[$pid] = ''; }
+                      }
+                    }
+                  }
                 }
-                else {
-                  if ($myobj = islandora_object_load($mypid)) {
-                    $mylbl = $myobj->label;
+                if ( empty($pidAry) ) {
+                  $pidAry[$filter_string] = '';  // assumed $filter_string could be any type of PID we don't know
+                }
+                foreach( $pidAry as $mypid => $myany ) {
+                  if ( @!islandora_is_valid_pid($mypid) ) { continue; }
+                  $myqp = new IslandoraSolrQueryProcessor();
+                  $mylbl = '';
+                  $myqp->buildQuery("PID:\"$mypid\"");
+                  $myqp->solrParams['fl'] = 'PID, ' . variable_get( 'islandora_solr_object_label_field', 'fgs_label_s' );
+                  $myqp->executeQuery();
+                  if ( !empty($myqp->islandoraSolrResult) && !empty($myqp->islandoraSolrResult['response']['objects']) ) {
+                    if ( !( $mylbl = @trim( $myqp->islandoraSolrResult['response']['objects'][0]['object_label'] ) ) ) { $mylbl = "..."; }
+                  } else {
+                    if ( $myobj = islandora_object_load($mypid) ) { $mylbl = strval($myobj->label); }
+                  }
+                  if ( !empty($mylbl) ) {
+                    $filter_string = str_replace( $mypid, $mylbl, $filter_string );
                   }
                 }
               }
-              $filter_string = ($mylbl ? $mylbl : $filter_string);
+              $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a>' . " {$value['solr_field_settings']['label']} " . $symbol . " " . check_plain($filter_string);
             }
-            $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a>' . " {$value['solr_field_settings']['label']} " . $symbol . " " . check_plain($filter_string);
           }
         }
         // Default to old behavior.
