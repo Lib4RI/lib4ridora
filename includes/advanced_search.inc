@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * @file
@@ -101,7 +101,7 @@ function lib4ridora_parse_affiliation_fields() {
  */
 function lib4ridora_trim_and_solr_escape($str) {
   module_load_include("inc", "islandora_solr", "includes/utilities");
-  return islandora_solr_lesser_escape(trim($str));
+  return islandora_solr_lesser_escape(trim($str,"'\" \n\r\t\v\0"));
 }
 
 /**
@@ -113,18 +113,16 @@ function lib4ridora_trim_and_solr_escape($str) {
  * @return array
  *   Associative array where key is the facet field and the value is the count.
  */
-function lib4ridora_facet_query(array $facet_fields) {
+function lib4ridora_facet_query(array $facet_fields, $query = '') {
   $qp = new IslandoraSolrQueryProcessor();
-  $query = '*:*';
-  $qp->buildQuery($query);
+  $qp->buildQuery( ( empty($query) ? '*:*' : $query ) );
   $qp->solrParams['fl'] = "PID";
   $qp->solrParams['facet.mincount'] = 1;
   $qp->solrParams['facet.field'] = $facet_fields;
   $qp->solrParams['facet'] = 'true';
-  $qp->solrParams['facet.limit'] = 1000000;
+  $qp->solrParams['facet.limit'] = 98765431;
   $qp->solrLimit = 0;
   $qp->executeQuery();
-
   return $qp->islandoraSolrResult['facet_counts']['facet_fields'];
 }
 

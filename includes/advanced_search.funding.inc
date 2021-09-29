@@ -13,17 +13,20 @@ module_load_include('inc', 'lib4ridora', 'includes/advanced_search');	// for saf
  * see lib4ridora_parse_affiliation_fields() - So, vairables would be nice!?
  */
 function lib4ridora_get_solr_field_funding($funding_element = '') {
+	if ( strtolower($funding_element) == 'funderselect' ) {
+		return array_map('trim',explode(',', variable_get('lib4ridora_funding_solr_field_funder','mods_extension_fundingReferences_fundingReference_fundingStream_mt')));
+	}
 	if ( stripos($funding_element,'funder_name') === 0 ) {
-		return array('mods_extension_fundingReferences_fundingReference_funderName_ms');
+		return array('mods_extension_fundingReferences_fundingReference_funderName_mt');
 	}
 	if ( stripos($funding_element,'funding_stream') === 0 ) {
-		return array('mods_extension_fundingReferences_fundingReference_fundingStream_ms');
+		return array('mods_extension_fundingReferences_fundingReference_fundingStream_mt');
 	}
 	if ( stripos($funding_element,'award_title') === 0 ) {
-		return array('mods_extension_fundingReferences_fundingReference_awardTitle_ms');
+		return array('mods_extension_fundingReferences_fundingReference_awardTitle_mt');
 	}
 	if ( stripos($funding_element,'award_number') === 0 ) {
-		return array('mods_extension_fundingReferences_fundingReference_awardNumber_ms');
+		return array('mods_extension_fundingReferences_fundingReference_awardNumber_mt');
 	}
 	return '';
 }
@@ -161,6 +164,39 @@ function lib4ridora_fundersearch_autocomplete( $search_string ) {
   drupal_json_output($output);
 }
 
+/*
+ * Function to search+find award titles in publications existing in DORA
+ *
+ * Currently the Solr's web API is used, also https://github.com/Lib4RI/lib4ridora/blob/7.x/includes/utilities.inc#L22 may work.
+ */
+function lib4ridora_funding_award_title_autocomplete( $search_string ) {
+	module_load_include('inc', 'lib4ridora', 'includes/advanced_search.funding');
+
+	$solr_field = array_shift( lib4ridora_get_solr_field_funding('award_title') );	// = Solr field to use, currently support for 1 field only.
+
+	$solr_sep = '|';
+	$solr_url = 'http://' . trim(exec('hostname')) .  '.emp-eaw.ch:8080/solr/collection1/select';
+	$solr_url .= '?wt=json&csv.separator=' . $solr_sep . '&indent=true&rows=987654321&sort=PID%20asc';
+	$solr_url .= '&fl=PID%2c+' . $solr_field;
+	$solr_url .= '&q=PID:*%5c%3a*+AND+' . $solr_field . ':*' . lib4ridora_trim_and_solr_escape( substr($search_string,0,-1) /* work-round */ )  . '*';
+
+	$resultAry = array();
+	if ( $jsonAry = @json_decode(file_get_contents($solr_url)) ) {
+		if ( @isset($jsonAry->response->docs) ) {
+			foreach( $jsonAry->response->docs as $obj ) {
+				foreach( $obj->$solr_field as $term ) {
+					if ( stripos($term,$search_string) === false /* work-round */ ) { continue; }
+					$idx = strtolower($term);
+					if ( @isset($resultAry[$idx]) ) { continue; }
+					$resultAry[$idx] = $term;
+				}
+			}
+			ksort($resultAry);
+		}
+	}
+	return $resultAry;
+}
+
 /**
  * Customized callback function to check cooperation/inclusion with/of 'lib4ri_funding' module
  *
@@ -184,12 +220,13 @@ function lib4ridora_adv_search_funding_callback( $search_string ) {
       $award_number = @intval(ltrim($tmpAry[0]));
     }
     if ( !$award_number ) {
-      $dataAry = lib4ri_funding_atitle_autocomplete( 0 /* known funding stream */, $search_string );
+//    $dataAry = lib4ri_funding_atitle_autocomplete( 0 /* known funding stream */, $search_string );
+      $dataAry = lib4ridora_funding_award_title_autocomplete( $search_string );
     } else { // if a (award) number is found then search for both:
       $nAry = lib4ri_funding_atitle_autocomplete(0,strval($award_number));
       $search_string = str_replace(strval($award_number),'',$search_string);  // remove the number, so we just have text
       $search_string = trim( preg_replace('/\s*\(\s*\)\s*/',' ',strtr($search_string,'[{}]','(())')), "[({-})] \n\r\t\v\0" );
-      $tAry = lib4ri_funding_atitle_autocomplete(0,$search_string);
+      $tAry = lib4ridora_funding_award_title_autocomplete( $search_string );
       if ( sizeof($tAry) && sizeof($nAry) && implode('|',$tAry) != implode('|',$nAry) ) {
 		$dataAry = array_merge( $tAry, /* array(' '.strval($award_number)), */ $nAry );
 	  } else {

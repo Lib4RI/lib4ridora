@@ -764,3 +764,50 @@ function lib4ridora_get_open_access_pdf(AbstractObject $object, $keyDsIdPdf = 'd
 	}
 	return $pdfOA;
 }
+
+/*
+ * Try to detect if the user is a bot. Partially uses functions from from other modules if availalbe.
+ * 
+ * Hard-code list is based on CitCount_IsWebRobot() + lib4ri_publication_feedback_form_is_bot
+ */
+function lib4ridora_user_is_bot($user_agent = '', $demand_language = FALSE, $use_session = FALSE) {
+	
+	if ( $use_session && !empty($_SESSION['lib4ridora_user_is_bot']) ) {
+		return ( intval($_SESSION['lib4ridora_user_is_bot']) > 0 );			// +1 for bot, -1 if not
+	}
+	if ( $demand_language && @empty(trim($_SERVER['HTTP_ACCEPT_LANGUAGE'])) ) {
+		if ( $use_session ) { $_SESSION['lib4ridora_user_is_bot'] = 1; }
+		return TRUE;	// considered to be a bot
+	}
+	if ( empty($user_agent) ) {
+		if ( !( $user_agent = @trim($_SERVER['HTTP_USER_AGENT']) ) ) {
+			if ( $use_session ) { $_SESSION['lib4ridora_user_is_bot'] = 1; }
+			return TRUE;	// with an empty user agent string we will consider the user as a bot
+		}
+	}
+	// If available use the check in islandora_usage_stats, see islandora_usage_stats/includes/utilities.inc, 
+	$bot_regex = trim(variable_get('islandora_usage_stats_exclude_bots_regex', '/bot|rambler|spider|crawl|slurp|curl|^$/i'));
+	if ( !module_exists('islandora_usage_stats') || strlen($bot_regex) < 40 ) {
+		// let's use a hard-coded list then, patially however expandable
+		$botAry = array(
+			'Bot,Search,Crawl,Spider,Scan,Scout,Archiv,Index,Ads,Job,SEO', 			/* generic */
+			variable_get('lib4ridora_bot_list_addon',''),
+			'curl,wget,typo3,java,python,rambler,zoom', 		/* generic/tools */
+			'Google',		/* assumed it's a fake. Note that Google's Chrome Browser doesn't have 'Google' inside its user-agent string */
+			'Semrush,BingPreview',
+		/*	'BingBot,MSNBot',	*/
+		/*	'Gigabot,VoilaBot',	*/
+		/*	'AdIdxBot',		*/
+			'Baidu,Yahoo,Slurp,Yandex,YaDirect',
+			'DuckDuck,AOLbuild,Teoma,Jeeves',		/* misc custom commercial bots/search-engines */
+			'HTTrack',			/* kwnow archivers */
+		);
+		$bot_regex = '/' . implode('|',array_map('trim',explode(',',implode(',',$botAry)))) . '|^$/i';
+	}
+	if ( preg_match($bot_regex,	$user_agent) === 1 ) {
+		if ( $use_session ) { $_SESSION['lib4ridora_user_is_bot'] = 1; }
+		return TRUE;
+	}
+	if ( $use_session ) { $_SESSION['lib4ridora_user_is_bot'] = -1; }
+	return FALSE;
+}
