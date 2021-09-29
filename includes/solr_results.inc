@@ -145,13 +145,19 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
     $params = $islandora_solr_query->internalSolrParams;
     // Get query values.
     if (!in_array($islandora_solr_query->solrQuery, $islandora_solr_query->differentKindsOfNothing)) {
-      // Get query value.
-      $query_value = $islandora_solr_query->solrQuery;
-      $query_value_human = $query_value;
-      $search_fields = islandora_solr_get_fields("search_fields", FALSE, FALSE);
-      foreach ($search_fields as $key => $value){
-        $query_value_human = preg_replace("/" . $value['solr_field'] . "/", $value['solr_field_settings']['label'], $query_value_human);
+
+      $query_value = '';
+      // spacial case: if there is an explit given search string then just use this:
+      if ( !( $query_value_human = @trim(strip_tags($_GET['search_string'])) ) ) { // possible html tags need to be stripped to prevent html injection
+        // Get query value.
+        $query_value = $islandora_solr_query->solrQuery;
+        $query_value_human = $query_value;
+        $search_fields = islandora_solr_get_fields("search_fields", FALSE, FALSE);
+        foreach ($search_fields as $key => $value){
+          $query_value_human = preg_replace("/" . $value['solr_field'] . "/", $value['solr_field_settings']['label'], $query_value_human);
+        }
       }
+
       $query_list = array();
 
       // Remove link keeps all parameters (query gets removed instead).
@@ -169,7 +175,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
         ),
       );
       $attr_minus =& $attributes['minus']['attr'];
-      $attr_minus['title'] = t('Remove') . ' ' . $query_value;
+      $attr_minus['title'] = t('Remove') . ( empty($query_value) ? '' : ' '.strip_tags($query_value) );
       $attr_minus['class'] = array('remove-query');
       $attr_minus['rel'] = 'nofollow';
       $attr_minus['href'] = url($path_minus, array('query' => $query_minus));
@@ -180,7 +186,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
       // XXX: We are not using l() because of active classes:
       // @see http://drupal.org/node/41595
       // Create link.
-      $query_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a> ' . check_plain($query_value_human);
+      $query_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a> ' . htmlentities($query_value_human);
 
       // Add wrap and list.
       $output .= '<div class="islandora-solr-query-wrap">';
@@ -232,8 +238,12 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
             'query' => $query_minus,
           ),
         );
+        $filterAry = explode(':',$filter,2);
+        if ( @!empty($filterAry[1]) ) {		// this is just for display reasons, so remove query-auxiliary backslashes
+			$filterAry[1] = ' ' . trim(str_replace("\\",'',$filterAry[1]));
+		}
         $attr_minus =& $attributes['minus']['attr'];
-        $attr_minus['title'] = t('Remove') . ' ' . $filter;
+        $attr_minus['title'] = t('Remove') . ' ' . strip_tags(implode(':',$filterAry));
         $attr_minus['class'] = array('remove-filter');
         $attr_minus['rel'] = 'nofollow';
         $attr_minus['href'] = url($path, array('query' => $query_minus));
@@ -248,49 +258,44 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
         // The following differs from the default
         // islandora_query block currentQuery().
         $updated_filter = FALSE;
-		// spacial case: if there is an explit given search string then just use this:
-        if ( $str = @trim(strip_tags($_GET['search_string'])) ) {  //html tags are stripped again to prevent html injection
-          $filter_string = htmlentities($str);
-        } else {
-          foreach ($records as $key => $value) {
-            // Re-write certain PIDs to name strings.
-            if (strpos(preg_replace('/\\\\ /', ' ', $filter), $value['solr_field']) !== FALSE) {
-              $updated_filter = TRUE;
-              if (isset($value['solr_field_settings']['pid_object_label']) && $value['solr_field_settings']['pid_object_label']) {
-                $pidAry = array();
-                foreach( array('eawag','empa','psi','wsl') as $inst ) {
-                  foreach( array('units','authors') as $objType ) {
-                    $regEx = '/' . $inst . '\-' . $objType . ':\d+/';
-                    $matchAry = array();
-                    if ( preg_match_all( $regEx, $filter_string, $matchAry ) ) {
-                      foreach( $matchAry as $mAry ) {
-                        foreach( $mAry as $pid ) { $pidAry[$pid] = ''; }
-                      }
+        foreach ($records as $key => $value) {
+          // Re-write certain PIDs to name strings.
+          if (strpos(preg_replace('/\\\\ /', ' ', $filter), $value['solr_field']) !== FALSE) {
+            $updated_filter = TRUE;
+            if (isset($value['solr_field_settings']['pid_object_label']) && $value['solr_field_settings']['pid_object_label']) {
+              $pidAry = array();
+              foreach( array('eawag','empa','psi','wsl') as $inst ) {
+                foreach( array('units','authors') as $objType ) {
+                  $regEx = '/' . $inst . '\-' . $objType . ':\d+/';
+                  $matchAry = array();
+                  if ( preg_match_all( $regEx, $filter_string, $matchAry ) ) {
+                    foreach( $matchAry as $mAry ) {
+                      foreach( $mAry as $pid ) { $pidAry[$pid] = ''; }
                     }
                   }
                 }
-                if ( empty($pidAry) ) {
-                  $pidAry[$filter_string] = '';  // assumed $filter_string could be any type of PID we don't know
+              }
+              if ( empty($pidAry) ) {
+                $pidAry[$filter_string] = '';  // assumed $filter_string could be any type of PID we don't know
+              }
+              foreach( $pidAry as $mypid => $myany ) {
+                if ( @!islandora_is_valid_pid($mypid) ) { continue; }
+                $myqp = new IslandoraSolrQueryProcessor();
+                $mylbl = '';
+                $myqp->buildQuery("PID:\"$mypid\"");
+                $myqp->solrParams['fl'] = 'PID, ' . variable_get( 'islandora_solr_object_label_field', 'fgs_label_s' );
+                $myqp->executeQuery();
+                if ( !empty($myqp->islandoraSolrResult) && !empty($myqp->islandoraSolrResult['response']['objects']) ) {
+                  if ( !( $mylbl = @trim( $myqp->islandoraSolrResult['response']['objects'][0]['object_label'] ) ) ) { $mylbl = "..."; }
+                } else {
+                  if ( $myobj = islandora_object_load($mypid) ) { $mylbl = strval($myobj->label); }
                 }
-                foreach( $pidAry as $mypid => $myany ) {
-                  if ( @!islandora_is_valid_pid($mypid) ) { continue; }
-                  $myqp = new IslandoraSolrQueryProcessor();
-                  $mylbl = '';
-                  $myqp->buildQuery("PID:\"$mypid\"");
-                  $myqp->solrParams['fl'] = 'PID, ' . variable_get( 'islandora_solr_object_label_field', 'fgs_label_s' );
-                  $myqp->executeQuery();
-                  if ( !empty($myqp->islandoraSolrResult) && !empty($myqp->islandoraSolrResult['response']['objects']) ) {
-                    if ( !( $mylbl = @trim( $myqp->islandoraSolrResult['response']['objects'][0]['object_label'] ) ) ) { $mylbl = "..."; }
-                  } else {
-                    if ( $myobj = islandora_object_load($mypid) ) { $mylbl = strval($myobj->label); }
-                  }
-                  if ( !empty($mylbl) ) {
-                    $filter_string = str_replace( $mypid, $mylbl, $filter_string );
-                  }
+                if ( !empty($mylbl) ) {
+                  $filter_string = str_replace( $mypid, $mylbl, $filter_string );
                 }
               }
-              $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a>' . " {$value['solr_field_settings']['label']} " . $symbol . " " . check_plain($filter_string);
             }
+            $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a>' . " {$value['solr_field_settings']['label']} " . $symbol . " " . check_plain($filter_string);
           }
         }
         // Default to old behavior.
