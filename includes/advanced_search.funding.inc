@@ -38,6 +38,27 @@ function lib4ridora_get_solr_field_funding($funding_element = '',$field_type = '
 	return '';
 }
 
+/*
+ * proprietary look.up table ofSNSF labels depending on the languages.
+ * Source: https://www.snf.ch/it
+ * 
+ * Assigned via
+ * sudo drush -r /var/www/html -y @sites php-eval "variable_set('lib4ridora_snsf_labels', array('en' => array('SNSF','Swiss National Science Fondation'),'de' => array('SNF', 'Schweizerischer Nationalfonds'),'fr' => array('FNS', 'Fonds national suisse'),'it' => array('FNS', 'Fondo nazionale svizzero')))"
+ */
+function lib4ridora_funding_get_data_snsf() {
+	$snsfAry = variable_get('lib4ridora_snsf_labels',NULL);
+	if ( $snsfAry === NULL ) {		// so we can assign an empty array for now treatment
+		$snsfAry = array(
+			'en' => array('SNSF','Swiss National Science Fondation'),
+			'de' => array('SNF', 'Schweizerischer Nationalfonds'),
+			'fr' => array('FNS', 'Fonds national suisse'),
+			'it' => array('FNS', 'Fondo nazionale svizzero'),
+		);
+		// having the sub-array as associative would be nice too, making however the drush command much longer.
+	}
+	return $snsfAry;
+} 
+
 /**
  * Will create an funding related array to use with 'select' form field
  * 
@@ -246,12 +267,29 @@ if ( $user->name == "Frank" ) {
 
     $solr_field = $solr_field_funder;
     $filters = array();
-    $resultAry = lib4ridora_funding_data_solr_autocomplete( $search_string, $solr_field_funder );
+    
+
+    $sStr = $search_string;
+    if ( $pos = stripos($sStr,'(=Funder') ) {		// 'safety removal'
+      $sStr = rtrim(substr($sStr,0,$sStr));
+    }
+    $snsfAry = lib4ridora_funding_get_data_snsf();
+    $labelAry = array();
+    foreach( $snsfAry as $languAry ) {  // 2 indices, 0:Abbreviation, 1:Label
+      if ( stripos($languAry[0],$sStr) !== false || stripos($languAry[1],$sStr) !== false ) {
+        $sStr = $snsfAry['en']['0'];		// = SNSF usually
+        $labelAry = array( strtoupper($snsfAry['en']['0']) => $languAry[1]);
+        break;
+      }
+    }
+
+    $resultAry = lib4ridora_funding_data_solr_autocomplete( $sStr, $solr_field_funder );
     foreach( $resultAry as $value ) {
-      if ( stripos($value,$search_string) !== false ) {		// re-check needed!?
+      if ( stripos($value,$sStr) !== false ) {		// re-check needed!?
         $filters[] = lib4ridora_construct_solr_statement($solr_field, $value);				// to get: mods_example_mt:"Book"
-	  }
-	}
+      }
+    }
+
 	if ( sizeof($filters) ) {
 	  // lib4ridora_construct_filter_string_from_array( $filters) to get: mods_example_mt:"Book" OR mods_example_mt:"Journal" */ ;
       $searchAry[] = array( 'find' => lib4ridora_construct_filter_string_from_array( $filters), 'op' => @strval($fieldAry['boolean']) );
@@ -491,10 +529,30 @@ function lib4ridora_adv_search_funding_callback( $search_string ) {
   // order of string-examination: award number, funding stream, award title.
   // generally, let's see if this could be a funding stream (or an award title):
   $solr_field = array_shift( lib4ridora_get_solr_field_funding('funding_stream','mt') );	// = Solr field to use, currently support for 1 field only.
+
   $fundAry = lib4ridora_funding_data_solr_autocomplete( $search_string, $solr_field );
   if ( @!empty(reset($fundAry)) ) {
     $fundAry = array_combine( array_values($fundAry), array_values($fundAry) );
     $fundAry = array_map( function($val) { return($val.' (=Funder)'); }, $fundAry );
+  }
+
+  $snsfAry = lib4ridora_funding_get_data_snsf();
+  $labelAry = array();
+  foreach( $snsfAry as $languAry ) {  // 2 indices, 0:Abbreviation, 1:Label
+	if ( stripos($languAry[0],$search_string) !== false || stripos($languAry[1],$search_string) !== false ) {
+      $search_string = $snsfAry['en']['0'];		// = SNSF usually
+      $labelAry = array( strtoupper($snsfAry['en']['0']) => $languAry[1]);
+      break;
+    }
+  }
+
+  $fundAry = lib4ridora_funding_data_solr_autocomplete( $search_string, $solr_field );
+  if ( @!empty(reset($fundAry)) ) {
+    $fundAry = array_combine( array_values($fundAry), array_values($fundAry) );
+//  $fundAry = array_map( function($val) { return($val.' (=Funder)'); }, $fundAry );
+    foreach( $fundAry as $fIdx => $fVal ) {
+      $fundAry[$fIdx] = $fVal . ' (=Funder' . ( @isset($labelAry[strtoupper($fVal)]) ?  ': '.$labelAry[strtoupper($fVal)] : '' ) . ')';
+    }
   }
 
   $dataAry = array();
