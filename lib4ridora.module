@@ -1686,9 +1686,9 @@ function lib4ridora_solr_advanced_search_form_submit($form, &$form_state) {
     lib4ridora_construct_funding_element_filter($form_state, 'funding_stream_test' ),
     lib4ridora_construct_funding_element_filter($form_state, 'award_title_test' ),
     lib4ridora_construct_funding_element_filter($form_state, 'award_number_test' ),
-    lib4ridora_construct_funding_autocomplete_filters($form_state),
   );
-  $filters = array_filter( array_merge( $filters, lib4ridora_construct_funding_element_filters($form_state) ) );
+  $fundAry = explode(' AND ',lib4ridora_construct_funding_combined_filters($form_state));
+  $filters = array_filter( array_merge( $filters, lib4ridora_construct_funding_element_filters($form_state), $fundAry ) );
   if ($filters) {
     // Jam our filters into the redirect.
     $form_state['redirect'][1] = array_merge_recursive($form_state['redirect'][1], array(
@@ -2367,13 +2367,24 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 /**
  * Implements hook_init
  *
- * Used here for auxiliary firewall tasks that cannot be performed right now elsewhere 2021-08-27/fh
+ * Used here (see Task 2) for auxiliary firewall tasks that cannot be performed right now elsewhere 2021-08-27/fh
  * Should be removed again as soon we have a better/external possibilty to filter out unwanted visitors.
  * 
  * sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_omit_user_agent","seekport")'
  * sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_omit_user_agent",array("Aeekport","SEOcrawl","sciSearch"))'
  */
 function lib4ridora_init() {
+  // Task 1: if requested (via variable) do not allow (known) bots to run batches (specially CSV/Excel exports):
+  if ( variable_get('lib4ridora_no_batch_for_bot',false) && !empty( batch_get() ) ) {
+    module_load_include('inc', 'lib4ridora', 'includes/utilities');
+    if ( lib4ridora_user_is_bot('',true,true) ) {
+      header("HTTP/1.0 503 Service Unavailable"); // header("HTTP/1.0 404 Not Found");
+      echo("503 Service Unavailable");
+      exit;
+    }
+  }
+
+  // Task 2: if requested by a user-agent string/list then stop	it/tem from browsing DORA:
   if ( $uaList = variable_get('lib4ridora_omit_user_agent',NULL) ) {  // expected to have a browser's user agent string, or an array with multiple of them.
     global $base_path;
     foreach( ( is_array($uaList) ? $uaList : array($uaList) ) as $uaString ) {
@@ -2382,6 +2393,7 @@ function lib4ridora_init() {
         $ipAry = array( date("Y-m-d.H-i-s"), $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_X_REAL_IP'], $_SERVER['HTTP_X_FORWARDED_FOR'], $_SERVER['REQUEST_URI'], $_SERVER['HTTP_USER_AGENT'] );
         file_put_contents( $tmpPath, @strval(file_get_contents($tmpPath)) . implode(' | ',$ipAry) . "\r\n" );
         header("HTTP/1.0 503 Service Unavailable");
+        echo("503 Service Unavailable");
         exit;
       }
     }

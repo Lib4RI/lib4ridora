@@ -141,9 +141,7 @@ function lib4ridora_construct_funding_element_filter(&$form_state, $funding_elem
     return lib4ridora_construct_filter_string_from_array($filters);
   }
 
-// MI-STEP 2
   // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-global $user;
 
   $facet_fields = lib4ridora_get_solr_field_funding('fundersearch','mt');		// default, if we cannot find something better
   $solr_field_default = reset($facet_fields);
@@ -152,11 +150,6 @@ global $user;
   $solr_field_atitle = array_shift( lib4ridora_get_solr_field_funding('award_title','mt') );	// = Solr field to use, currently support for 1 field only.
 
   $valueAry = ( @is_array($form_state['values'][$funding_element]) ? $form_state['values'][$funding_element] : array( $form_state['values'][$funding_element] ) );
-
-
-	if ( $user->name == "Frank" ) {
-			dpm( "ValueAry: " . print_r( $valueAry , 1 ) );
-	}
 
   $searchAry = array();
   foreach( $valueAry as /* $element_value */ $fieldAry ) {
@@ -222,14 +215,12 @@ global $user;
   return rtrim($searchAll);
 }
 
-function lib4ridora_construct_funding_autocomplete_filters(&$form_state, $funding_type = 'award_title', $funding_element = 'fund2' ) {		// see lib4ridora_construct_organization_unit_filter();
+function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_type = 'award_title', $funding_element = 'fund2' ) {		// see lib4ridora_construct_organization_unit_filter();
 
   if ( @empty($funding_element) || @empty($funding_type) || @!isset($form_state['values'][$funding_element]) ) { return array(); }
 
-global $user;
-
   $facet_fields = lib4ridora_get_solr_field_funding('fundersearch','mt');		// default, if we cannot find something better
-  $solr_field = reset($facet_fields);
+  $solr_field = '';
   $solr_field_funder = array_shift( lib4ridora_get_solr_field_funding('funding_stream','mt') );	// = Solr field to use, currently support for 1 field only.
   $solr_field_anumber = array_shift( lib4ridora_get_solr_field_funding('award_number','mt') );	// = Solr field to use, currently support for 1 field only.
   $solr_field_atitle = array_shift( lib4ridora_get_solr_field_funding('award_title','mt') );	// = Solr field to use, currently support for 1 field only.
@@ -237,12 +228,7 @@ global $user;
 
   $valueAry = ( @is_array($form_state['values'][$funding_element]) ? $form_state['values'][$funding_element] : array( $form_state['values'][$funding_element] ) );
 
-if ( $user->name == "Frank" ) {
-	dpm( $funding_type . " / ValueAry/AC: " . print_r( $valueAry , 1 ) );
-}
-
-  $searchAry = array();
-  $searchAll = '';
+  $filterAry = array();
   foreach( $valueAry as /* $element_value */ $fieldAry ) {
 	/* $valueAry : Array ( 
 		[0] => Array ( 
@@ -265,69 +251,65 @@ if ( $user->name == "Frank" ) {
 	*/
     if ( !( $search_string = trim($fieldAry['search']) ) ) { continue; }
 
-    $solr_field = $solr_field_funder;
-    $filters = array();
-    
-
-    $sStr = $search_string;
-    if ( $pos = stripos($sStr,'(=Funder') ) {		// 'safety removal'
-      $sStr = rtrim(substr($sStr,0,$sStr));
-    }
-    $snsfAry = lib4ridora_funding_get_data_snsf();
-    $labelAry = array();
-    foreach( $snsfAry as $languAry ) {  // 2 indices, 0:Abbreviation, 1:Label
-      if ( stripos($languAry[0],$sStr) !== false || stripos($languAry[1],$sStr) !== false ) {
-        $sStr = $snsfAry['en']['0'];		// = SNSF usually
-        $labelAry = array( strtoupper($snsfAry['en']['0']) => $languAry[1]);
-        break;
-      }
-    }
-
-    $resultAry = lib4ridora_funding_data_solr_autocomplete( $sStr, $solr_field_funder );
-    foreach( $resultAry as $value ) {
-      if ( stripos($value,$sStr) !== false ) {		// re-check needed!?
-        $filters[] = lib4ridora_construct_solr_statement($solr_field, $value);				// to get: mods_example_mt:"Book"
-      }
-    }
-
-	if ( sizeof($filters) ) {
-	  // lib4ridora_construct_filter_string_from_array( $filters) to get: mods_example_mt:"Book" OR mods_example_mt:"Journal" */ ;
-      $searchAry[] = array( 'find' => lib4ridora_construct_filter_string_from_array( $filters), 'op' => @strval($fieldAry['boolean']) );
-    } 
-    else {
+	// First let's check if this is a funder name resp. a funding stream.
+	// Parially (for SNSF) we will check if the input is matching the content of a tiny translation table/array to take this then as search string.
+	$sStr = $search_string;
+	if ( $pos = stripos($sStr,'(=Funder') ) {		// 'safety removal'
+	  $sStr = rtrim(substr($sStr,0,$sStr));
+	}
+	$snsfAry = lib4ridora_funding_get_data_snsf();
+	$labelAry = array();
+	foreach( $snsfAry as $languAry ) {  // 2 indices, 0:Abbreviation, 1:Label
+	  if ( stripos($languAry[0],$sStr) !== false || stripos($languAry[1],$sStr) !== false ) {
+		$sStr = $snsfAry['en']['0'];		// = SNSF usually
+		$labelAry = array( strtoupper($snsfAry['en']['0']) => $languAry[1]);
+		break;
+	  }
+	}
+    $resultAry = lib4ridora_funding_data_solr_autocomplete($sStr,$solr_field_funder);
+	foreach( $resultAry as $value ) {
+  //  if ( stripos($value,$sStr) !== false ) {		// re-check needed!?
+		$sTmp = lib4ridora_construct_solr_statement($solr_field_funder, $value);		// to get: mods_example_mt:"Book
+		$filterAry[strtolower($sTmp)] = array( 'filter' =>  $sTmp, 'op' => @strval($fieldAry['boolean']) );
+		$solr_field = $solr_field_funder;
+  //  }
+	}
+	
+	if ( empty($solr_field) ) {		// check if award number/title
       if ( !( $award_number = intval(ltrim($search_string,"[({-})] \n\r\t\v\0")) ) ) {
         // no number found at the beginning, so let's see if there is a number at the end (as eg. on Detailed Record Page):
         $tmpAry = array(); 
         preg_match('/\s+\d+$/',rtrim(strtr($search_string,'[({-})]','       ')),$tmpAry);
         $award_number = @intval(ltrim($tmpAry[0]));
       }
-      if ( !$award_number ) {
-        $solr_field = $solr_field_atitle;
-        $resultAry = lib4ridora_funding_data_solr_autocomplete( $search_string, $solr_field_atitle );		// we can/need/can re-use this function here
-      } else {
-        $solr_field = $solr_field_anumber;
-        $resultAry = lib4ridora_funding_data_solr_autocomplete( $search_string, $solr_field_anumber );
-      }
+      $solr_field = ( $award_number ? $solr_field_anumber : $solr_field_atitle );
+      $resultAry = lib4ridora_funding_data_solr_autocomplete($search_string,$solr_field);
       foreach( $resultAry as $value ) {
-        if ( stripos($value,$search_string) !== false ) {		// re-check needed!?
-          $filters[] = lib4ridora_construct_solr_statement($solr_field, $value);		// to get: mods_pubtype_mt:"Book"
-        }
-      }
-      if ( sizeof($filters) ) {
-        $searchAry[] = array( 'find' => lib4ridora_construct_filter_string_from_array($filters), 'op' => @strval($fieldAry['boolean']) );
+    //  if ( stripos($value,$search_string) !== false ) {		// re-check needed!?
+          $sTmp = lib4ridora_construct_solr_statement($solr_field, $value);		// to get: mods_example_mt:"Book
+          $filterAry[strtolower($sTmp)] = array( 'filter' => $sTmp, 'op' => @strval($fieldAry['boolean']) );
+    //  }
       }
     }
   }
 
-  if ( sizeof($searchAry) < 2 ) {
-	return @strval($searchAry[0]['find']);
+  $searchAll = '';
+  foreach( $filterAry as $sIdx => $sAry ) {
+    $searchAll = trim( $searchAll . ' ' . $sAry['filter'] . ( empty($sAry['op']) ? ' ' : ' '.$sAry['op'].' ' ) );
   }
-  foreach( $searchAry as $sIdx => $sAry ) {
-	$op = ( @isset($searchAry[$sIdx+1]) ? ( empty($sAry['op']) ? ' ' : ' '.$sAry['op'].' ' ) : '' );
-    $searchAll .= ( strpos($sAry['find'],' OR ') ? '(' . $sAry['find'] . ')' : $sAry['find'] ) . $op;
-  }
-  return rtrim($searchAll);
+  return $searchAll;
 }
+
+// $solr_field
+// $solr_field
+// $solr_field
+// $solr_field
+// $solr_field
+// $solr_field
+// $solr_field
+// $solr_field
+// $solr_field
+// $solr_field
 
 /*
  * Work in progress
@@ -490,9 +472,8 @@ function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $fiel
  * Currently the Solr's web API is used, also https://github.com/Lib4RI/lib4ridora/blob/7.x/includes/utilities.inc#L22 may work.
  */
 function lib4ridora_funding_award_title_autocomplete( $search_string ) {
-	if ( empty($search_string) ) {
-		return FALSE;
-	}
+	if ( empty($search_string) ) { return array(); }
+
 	$search_string = preg_replace('/\s+/',' ',urldecode($search_string));
 	$solr_field = array_shift( lib4ridora_get_solr_field_funding('award_title','mt') );	// = Solr field to use, currently support for 1 field only.
 
@@ -500,9 +481,8 @@ function lib4ridora_funding_award_title_autocomplete( $search_string ) {
 }
 
 function lib4ridora_funding_data_solr_autocomplete( $search_string, $solr_field = '' ) {
-	if ( empty($search_string) || empty($solr_field) ) {
- 		return FALSE;
-	}
+	if ( empty($search_string) || empty($solr_field) ) { return array(); }
+
 	$search_string = preg_replace('/\s+/',' ',urldecode($search_string));
 
 	return lib4ridora_solr_search_words( explode(' ',$search_string), $solr_field );
