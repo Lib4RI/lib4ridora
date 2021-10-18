@@ -129,7 +129,9 @@ function lib4ridora_construct_funding_element_filter(&$form_state, $funding_elem
 
   if ( in_array($funding_element,array('fund1')) ) { return ""; }
 
-  if ( !in_array($funding_element,array('fund1','fund2','fund3')) ) {
+  if ( in_array($funding_element,array('fund1','fund2','fund3')) ) { return ""; /* for these we have extra handling */ }
+  
+  if ( @isset($form_state['values'][$funding_element]) ) {
 
     $element_value = $form_state['values'][$funding_element];
     if ( empty($element_value) || $element_value == "*" ) { return ""; }
@@ -217,6 +219,10 @@ function lib4ridora_construct_funding_element_filter(&$form_state, $funding_elem
 
 function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_type = 'award_title', $funding_element = 'fund2' ) {		// see lib4ridora_construct_organization_unit_filter();
 
+  // Dev-Note related:
+  global $user;
+
+
   if ( @empty($funding_element) || @empty($funding_type) || @!isset($form_state['values'][$funding_element]) ) { return array(); }
 
   $facet_fields = lib4ridora_get_solr_field_funding('fundersearch','mt');		// default, if we cannot find something better
@@ -227,6 +233,11 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_ty
   if ( empty($solr_field_atitle) ) { return ''; }
 
   $valueAry = ( @is_array($form_state['values'][$funding_element]) ? $form_state['values'][$funding_element] : array( $form_state['values'][$funding_element] ) );
+
+
+  // Dev-Note:
+  if ( stripos('/DoraDev/Frank/',strval($user->name)) ) { dpm( "Input/ValueArray: " . print_r($valueAry,1) ); }
+
 
   $filterAry = array();
   foreach( $valueAry as /* $element_value */ $fieldAry ) {
@@ -267,36 +278,55 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_ty
 	  }
 	}
     $resultAry = lib4ridora_funding_data_solr_autocomplete($sStr,$solr_field_funder);
+    $tmpAry = array();
 	foreach( $resultAry as $value ) {
-  //  if ( stripos($value,$sStr) !== false ) {		// re-check needed!?
-		$sTmp = lib4ridora_construct_solr_statement($solr_field_funder, $value);		// to get: mods_example_mt:"Book
-		$filterAry[strtolower($sTmp)] = array( 'filter' =>  $sTmp, 'op' => @strval($fieldAry['boolean']) );
+      if ( stripos($value,$sStr) !== false ) {		// re-check needed!
+		$tmpAry[] = $value;		// to get: mods_example_mt:"Book
 		$solr_field = $solr_field_funder;
-  //  }
+      }
 	}
-	
-	if ( empty($solr_field) ) {		// check if award number/title
-      if ( !( $award_number = intval(ltrim($search_string,"[({-})] \n\r\t\v\0")) ) ) {
-        // no number found at the beginning, so let's see if there is a number at the end (as eg. on Detailed Record Page):
-        $tmpAry = array(); 
-        preg_match('/\s+\d+$/',rtrim(strtr($search_string,'[({-})]','       ')),$tmpAry);
-        $award_number = @intval(ltrim($tmpAry[0]));
-      }
-      $solr_field = ( $award_number ? $solr_field_anumber : $solr_field_atitle );
-      $resultAry = lib4ridora_funding_data_solr_autocomplete($search_string,$solr_field);
-      foreach( $resultAry as $value ) {
-    //  if ( stripos($value,$search_string) !== false ) {		// re-check needed!?
-          $sTmp = lib4ridora_construct_solr_statement($solr_field, $value);		// to get: mods_example_mt:"Book
-          $filterAry[strtolower($sTmp)] = array( 'filter' => $sTmp, 'op' => @strval($fieldAry['boolean']) );
-    //  }
-      }
+	if ( sizeof($tmpAry) ){
+      $sTmp = '"' . implode('" OR "',$tmpAry) . '"';		// similar to lib4ridora_construct_filter_string_from_array()
+      $sTmp = $solr_field_funder . ':' . ( empty(trim($sTmp,'" ')) ? '*' : ( sizeof($tmpAry) > 1 ? '('.$sTmp.')' : $sTmp ) );		// similar to lib4ridora_construct_solr_statement()
+      $filterAry[$solr_field.'__'.strtolower($sStr)] = array( 'filter' => $sTmp, 'op' => @strval($fieldAry['boolean']) );
+    }
+    
+    // check if award number/title
+    if ( !( $award_number = intval(ltrim($search_string,"[({-})] \n\r\t\v\0")) ) ) {
+      // no number found at the beginning, so let's see if there is a number at the end (as eg. on Detailed Record Page):
+      $tmpAry = array(); 
+      preg_match('/\s+\d+$/',rtrim(strtr($search_string,'[({-})]','       ')),$tmpAry);
+      $award_number = @intval(ltrim($tmpAry[0]));
+    }
+    $solr_field = ( $award_number ? $solr_field_anumber : $solr_field_atitle );
+    $resultAry = lib4ridora_funding_data_solr_autocomplete($search_string,$solr_field);
+    $tmpAry = array();
+    foreach( $resultAry as $value ) {
+      if ( stripos($value,$search_string) !== false ) { $tmpAry[] = $value; }
+    }
+    if ( sizeof($tmpAry) ) {
+      $sTmp = '"' . implode('" OR "', $tmpAry) . '"';				// similar to lib4ridora_construct_filter_string_from_array()
+      $sTmp = $solr_field . ':' . ( empty(trim($sTmp,'" ')) ? '*' : ( sizeof($tmpAry) > 1 ? '('.$sTmp.')' : $sTmp ) );
+      $filterAry[$solr_field.'__'.strtolower($search_string)] = array( 'filter' => $sTmp, 'op' => @strval($fieldAry['boolean']) );
     }
   }
 
-  $searchAll = '';
-  foreach( $filterAry as $sIdx => $sAry ) {
-    $searchAll = trim( $searchAll . ' ' . $sAry['filter'] . ( empty($sAry['op']) ? ' ' : ' '.$sAry['op'].' ' ) );
+  // the last boolean operator must be empty, all other must have at least 'OR':
+  $tmpAry = array();
+  foreach( array_reverse($filterAry) as $sTmp => $sAry ) {
+    $sAry['op'] = ( sizeof($tmpAry) ? ( empty($sAry['op']) ? 'OR' : $sAry['op'] ) : '' );
+    $tmpAry[$sTmp] = $sAry;
   }
+  $searchAll = '';
+  foreach( array_reverse($tmpAry) as $sAry ) {
+    $searchAll = trim( ' ' . $searchAll . ' ' . $sAry['filter'] . ' ' . $sAry['op'] . ' ' );
+  }
+  
+
+  // Dev-Note:
+  if ( stripos('/DoraDev/Frank/',strval($user->name)) ) { dpm( "SearchString: " . print_r($searchAll,1) ); }
+
+
   return $searchAll;
 }
 
