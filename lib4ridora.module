@@ -1629,6 +1629,9 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
 	  }
 
   }
+  elseif ( @isset($form['fund1']) ) {
+    unset($form['fund1']);
+  }
 /*	^^^ TEST ^^^ */
 
 

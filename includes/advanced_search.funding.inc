@@ -13,29 +13,77 @@ module_load_include('inc', 'lib4ridora', 'includes/advanced_search');	// for saf
  * see lib4ridora_parse_affiliation_fields() - So, vairables would be nice!?
  */
 function lib4ridora_get_solr_field_funding($funding_element = '',$field_type = 'ms') {
+	if( !empty($field_type) && substr(0,1) != '_' ) {
+		$field_type = '_' . $field_type;
+	}
 	if ( strtolower($funding_element) == 'fundersearch' ) {
 		$ary = explode(',', variable_get('lib4ridora_funding_solr_field_default','mods_extension_fundingReferences_fundingReference_awardTitle_mt'));
-		foreach( $ary as $idx => $val ) { $ary[$idx] = ( empty($field_type) ? trim($val) : preg_replace('/_m\w{1,3}$/','_'.$field_type,trim($val)) ); }
+		foreach( $ary as $idx => $val ) { $ary[$idx] = ( empty($field_type) ? trim($val) : preg_replace('/_m\w{1,3}$/',$field_type,trim($val)) ); }
 		return $ary;
 	}
 	if ( strtolower($funding_element) == 'funderselect' ) {
 		$ary = explode(',', variable_get('lib4ridora_funding_solr_field_funder','mods_extension_fundingReferences_fundingReference_fundingStream_mt'));
-		foreach( $ary as $idx => $val ) { $ary[$idx] = ( empty($field_type) ? trim($val) : preg_replace('/_m\w{1,3}$/','_'.$field_type,trim($val)) ); }
+		foreach( $ary as $idx => $val ) { $ary[$idx] = ( empty($field_type) ? trim($val) : preg_replace('/_m\w{1,3}$/',$field_type,trim($val)) ); }
 		return $ary;
 	}
 	if ( stripos($funding_element,'funder_name') === 0 ) {
-		return array('mods_extension_fundingReferences_fundingReference_funderName_'.$field_type);
+		return array('mods_extension_fundingReferences_fundingReference_funderName'.$field_type);
 	}
 	if ( stripos($funding_element,'funding_stream') === 0 ) {
-		return array('mods_extension_fundingReferences_fundingReference_fundingStream_'.$field_type);
+		return array('mods_extension_fundingReferences_fundingReference_fundingStream'.$field_type);
 	}
 	if ( stripos($funding_element,'award_title') === 0 ) {
-		return array('mods_extension_fundingReferences_fundingReference_awardTitle_'.$field_type);
+		return array('mods_extension_fundingReferences_fundingReference_awardTitle'.$field_type);
 	}
 	if ( stripos($funding_element,'award_number') === 0 ) {
-		return array('mods_extension_fundingReferences_fundingReference_awardNumber_'.$field_type);
+		return array('mods_extension_fundingReferences_fundingReference_awardNumber'.$field_type);
 	}
 	return '';
+}
+
+/*
+ * proprietary helper function to clean words
+ * 
+ * Remind that a leading '-' or '!' also could have a meaning
+ */
+function lib4ridora_word_clean( $word ) {
+	$word = str_replace('.','',strtr($word,
+		';:,><()"[]?{}&',	/* will be removed */
+		'..............')
+	);
+	return ltrim( rtrim($word, "*!- \n\r\t\v\0"), "* \n\r\t\v\0");
+}
+
+/*
+ * proprietary HELPER function to stem/tokenize words by user input
+ * 
+ * Background: Auto-complete is all about finding (partial) words, but sometimes we seem to need to know the stemmed/tokinzied variant.
+ * For exampe, if the user types "cogniti" for cognitive/cognition then
+ * https://www.dora-dev.lib4ri.ch/psi/islandora/search/*%3A*?f[9]=mods_extension_fundingReferences_fundingReference_awardTitle_mt:cogniti*
+ * ...will not return any result!(?)
+ * 
+ * ToDo: find out if there is a real Solr-related function/class to do this.
+ */
+function lib4ridora_word_solr( $word ) {			// TO BE TUNED/REPLACED !
+	if ( strlen($word) > 3 && substr($word,-1) == 's' ) {
+		$word = substr($word,0,-1);		// no plural s
+	}
+	$endAry = array( /* for ending to replace */
+		'ing'  => '',
+		'ive'  => 'i',
+		'ial'  => 'i',
+		'sion' => 's',
+		'tion' => 't',
+		'ic'  => '',
+		'ment' => '',
+	);
+	foreach( $endAry as $eRep => $eNew ) {
+		$len = strlen($eRep);
+		if ( strlen($word) < ($len + 3) ) { continue; }
+		if ( substr($word,-$len) != $eRep ) { continue; }
+		return ( substr($word,0,-$len) . $eNew );
+	}
+	return $word;
 }
 
 /*
@@ -230,6 +278,7 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_ty
 	$solr_field_funder = array_shift( lib4ridora_get_solr_field_funding('funding_stream','mt') );	// = Solr field to use, currently support for 1 field only.
 	$solr_field_anumber = array_shift( lib4ridora_get_solr_field_funding('award_number','mt') );	// = Solr field to use, currently support for 1 field only.
 	$solr_field_atitle = array_shift( lib4ridora_get_solr_field_funding('award_title','mt') );	// = Solr field to use, currently support for 1 field only.
+	$solr_field_ms_atitle = array_shift( lib4ridora_get_solr_field_funding('award_title','ms') );	// = Solr field to use, currently support for 1 field only.
 	if ( empty($solr_field_atitle) ) { return ''; }
 
 	$valueAry = ( @is_array($form_state['values'][$funding_element]) ? $form_state['values'][$funding_element] : array( $form_state['values'][$funding_element] ) );
@@ -312,14 +361,31 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_ty
 			}
 		}
 		if ( !$award_number_ok ) {
-			$solr_field = $solr_field_atitle;
-			$sTmp = str_replace(strval($award_number),'',$search_string);  // remove the number, so we just have text
-			if ( $sTmp = trim( preg_replace('/\s*\(\s*\)\s*/',' ',strtr($sTmp,'[{}]','(())')), "[({-})] \n\r\t\v\0" ) ) {	// clean up
-				$tmpAry = explode(' ',$sTmp);
-				$sTmp = '*' . implode('* OR *',$tmpAry) . '*';		// we are more flexible with brackets!
+			// Issue: Which Solr field (mt/ms) to use?
+			// Assumed the user really selected a (full) award title when we can use the ms field.
+			// however if there is only a partial string (typed of partially copied+pasted) we have to try a token search with 'mt'.
+			$filter_string = $solr_field_ms_atitle . ':"' . $search_string . '"';	// to be rechecked!
+			$solr = new IslandoraSolrQueryProcessor();
+			$solr->buildQuery( $filter_string );		// (better) use quotes for the '_ms' field!
+			$solr->solrLimit = 1;
+			$solr->executeQuery(FALSE);
+			if ( @intval( $solr->islandoraSolrResult['response']['numFound'] ) ) {
+				$solr_field = $solr_field_ms_atitle;
+			} else {
+				$solr_field = $solr_field_atitle;
+				$sTmp = str_replace(strval($award_number),'',$search_string);  // remove the number, so we just have text
+				if ( $sTmp = trim( preg_replace('/\s*\(\s*\)\s*/',' ',strtr($sTmp,'[{}]','(())')), "[({-})] \n\r\t\v\0" ) ) {	// clean up
+					$tmpAry = explode(' ',$sTmp);
+					$sTmp = '';
+					foreach( $tmpAry as $word ) {
+						$word = lib4ridora_word_clean( $word );
+						if ( strlen($word) < 2 ) { continue; }
+						$sTmp .= ( empty($sTmp) ? '' : ' AND ' ) . lib4ridora_word_solr($word);		// we are more flexible with brackets!
+					}
+				}
+				$filter_string = $solr_field . ':' . ( empty($sTmp) ? '*' : ( strpos($sTmp,' AND ') ? '('.$sTmp.')' : $sTmp ) );		// similar to lib4ridora_construct_solr_statement()
 			}
-			$sTmp = $solr_field . ':' . ( empty($sTmp) ? '*' : ( strpos($sTmp,'* OR *') ? '('.$sTmp.')' : $sTmp ) );		// similar to lib4ridora_construct_solr_statement()
-			$filterAry[$solr_field.'__'.strtolower($search_string)] = array( 'filter' => $sTmp, 'op' => @strval($fieldAry['boolean']) );
+			$filterAry[$solr_field.'__'.strtolower($search_string)] = array( 'filter' => $filter_string, 'op' => @strval($fieldAry['boolean']) );
 		}
 	}
 
@@ -433,7 +499,11 @@ function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $fiel
 			';:,><()"[]?{}&',
 			'..............')
 		);
-		$word = $opWord . ltrim( rtrim($word,"-! \n\r\t\v\0"), "* \n\r\t\v\0");
+		$word = ltrim( rtrim($word,"!.- \n\r\t\v\0"), "*.- \n\r\t\v\0");
+		if ( strlen($word) < 2 ) {
+			continue;
+		}
+		$word .= $opWord;
 		$opWord = '';
 		if ( $word == 'AND' || $word == 'OR' ) {
 			continue;
@@ -443,7 +513,7 @@ function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $fiel
 			continue;
 		}
 		if ( substr($word,0,1) == '!' || substr($word,0,1) == '-' ) {
-			if ( $word = ltrim($word,"-!* \n\r\t\v\0") ) {
+			if ( $word = ltrim($word,"!*.- \n\r\t\v\0") ) {
 				$valueList .= ( ( empty($valueList) ? 'NOT+' : '+NOT+' ) . '*' . rawurlencode($word) . '+NOT+' . rawurlencode($word) . '*' );
 			}
 		} elseif( ( $wLen = strlen($word) ) && $wLen > 1 ) {
