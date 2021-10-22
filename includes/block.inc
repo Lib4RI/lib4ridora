@@ -44,7 +44,7 @@ function lib4ridora_get_organizational_block_content() {
  * Custom sort function used in lib4ridora_get_organizational_block_content()
  */
 function lib4ridora_organizational_facet_sort($a, $b) {
-  return strcmp($a['label'], $b['label']);
+  return strcmp(strtolower($a['label']),strtolower($b['label']));
 }
 
 /**
