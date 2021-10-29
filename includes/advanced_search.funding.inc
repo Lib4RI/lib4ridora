@@ -71,10 +71,14 @@ function lib4ridora_word_solr( $word ) {			// TO BE TUNED/REPLACED !
 	$endAry = array( /* for ending to replace */
 		'ing'  => '',
 		'ive'  => 'i',
+		'tiv'  => 't',	/* assumed tying is not over/finished */
 		'ial'  => 'i',
 		'sion' => 's',
 		'tion' => 't',
-		'ic'  => '',
+		'sio'  => 's',	/* assumed tying is not over/finished */
+		'tio'  => 't',	/* assumed tying is not over/finished */
+		'ion'  => '',
+		'ic'   => '',
 		'ment' => '',
 	);
 	foreach( $endAry as $eRep => $eNew ) {
