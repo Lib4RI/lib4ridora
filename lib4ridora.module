@@ -1207,8 +1207,10 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
       }
     }
 
-    // Persistent URL:
-    $pUrlEnc = url("islandora/object/".$object->id, array('absolute' => TRUE));
+    // Persistent URL - ensure on the main-site to have institute/namespace in the middle on the link, e.g. https://www.dora.lib4ri.ch/empa/islandora/object/empa:18645
+    global $base_path;		// 'just '/' on the main site
+    $instAux = ( strlen($base_path) > 2 ? '' /* on a sub-site, nothing to add */ : strtok(strtr($object->id,'-',':').':',':').'/' /* on main-site: add inst. taken from PID */ );
+    $pUrlEnc = url($instAux.'islandora/object/'.$object->id, array('absolute' => TRUE));
     $pUrlDec = urldecode($pUrlEnc);	/* Decode for human readability */
     $rendered['citation.tab']['persistent_url'] = array(
       '#type' => 'item',
