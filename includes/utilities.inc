@@ -458,6 +458,44 @@ function lib4ridora_metadata_display_elements(&$elements) {
   }
 }
 
+/*
+ * function to get information of metadata fields as configured Solr
+ *
+ * based on islandora_solr_get_fields
+ */
+function lib4ridora_get_metadata_fields($field_as_key = true) {
+  // Fields query.
+  $query = db_select('islandora_solr_metadata_fields', 'ismf');
+  $query->fields('ismf');
+  $query->orderBy('ismf.weight', 'ASC');
+  try {
+    $result = $query->execute();
+    $records = $result->fetchAll(PDO::FETCH_ASSOC);
+  }
+  catch (Exception $e) {
+    if ($e->errorInfo[0] == '42S02') {
+      drupal_set_message(t('Islandora Solr metadata fields table not found. Try running <a href="@update_url">update.php</a>.', array('@update_url' => url('update.php'))), 'error');
+    }
+    else {
+      drupal_set_message($e->getMessage(), 'error');
+    }
+    return array();
+  }
+  // Unserialize Solr field settings blob.
+  foreach ($records as &$value) {
+    $value['data'] = unserialize($value['data']);
+  }
+  // Fields as keys.
+  if ( $field_as_key ) {
+    $original = $records;
+    $records = array();
+    foreach ($original as $field) {
+      $records[$field['solr_field']] = $field;
+    }
+  }
+  return $records;
+}
+
 /**
  * DOI-validation helper function
  *

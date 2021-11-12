@@ -11,6 +11,9 @@ module_load_include('inc', 'lib4ridora', 'includes/advanced_search');	// for saf
  * Look-up function to find the right solr field for the form fields related to funding.
  * 
  * see lib4ridora_parse_affiliation_fields() - So, vairables would be nice!?
+ * 
+ * Note: '_mlt' fields turned out to be most flexible (concerning lower-/uppercase, wildcards), unfortuately they only hold
+ * the first 'section' (e.g. tag-area for an author) from the MODS, and all further section are not available/indexed. :=(
  */
 function lib4ridora_get_solr_field_funding($funding_element = '',$field_type = 'ms') {
 	if( !empty($field_type) && substr(0,1) != '_' ) {
@@ -55,37 +58,63 @@ function lib4ridora_word_clean( $word ) {
 }
 
 /*
- * proprietary HELPER function to stem/tokenize words by user input
+ * proprietary HELPER function to stem/tokenize words by user input, assuming here that just english input is given.
  * 
  * Background: Auto-complete is all about finding (partial) words, but sometimes we seem to need to know the stemmed/tokinzied variant.
- * For exampe, if the user types "cogniti" for cognitive/cognition then
+ * For exampe, if the user types "cogniti" for cognitive/cognition then...:
  * https://www.dora-dev.lib4ri.ch/psi/islandora/search/*%3A*?f[9]=mods_extension_fundingReferences_fundingReference_awardTitle_mt:cogniti*
- * ...will not return any result!(?)
+ * ...will not return any result!(?) Another 'good' case is the word 'electrical', ...
  * 
- * ToDo: find out if there is a real Solr-related function/class to do this.
+ * ToDo: find out if there is a real Solr-related function/class to do this, or any xslt files to apply.
  */
-function lib4ridora_word_solr( $word ) {			// TO BE TUNED/REPLACED !
-	if ( strlen($word) > 3 && substr($word,-1) == 's' ) {
-		$word = substr($word,0,-1);		// no plural s
+function lib4ridora_word_solr( $word, $add = '' ) {	// expecting it to be trimmed already!
+	if ( strlen($word) < 5 ) {
+		return $word;		// so we also leave here  already with functional words like OR or NOT
+	}
+	$wordLC = strtolower($word);
+	if ( strlen($word) > 3 && substr($wordLC,-1) == 's' ) {		// no plural es/s
+		$len = ( strlen($word) > 4 && substr($wordLC,-2) == 'es' ) ? 2 : 1;
+		$word = substr($word,0,-$len);
+		$wordLC = substr($wordLC,0,-$len);
 	}
 	$endAry = array( /* for ending to replace */
 		'ing'  => '',
-		'ive'  => 'i',
-		'tiv'  => 't',	/* assumed tying is not over/finished */
-		'ial'  => 'i',
+		'ied'  => 'y',
+		'ed'   => '',
+		'tal'  => 't',
+		'tive' => 't',
+		'ive'  => '',
+		'ial'  => '',
+		'ish'  => '',
+		'ious' => '',
+		'ous'  => '',
+		'ica'  => '',
+		'ca'   => '',   /* after tests: better not 'c' */
+		'cal'  => 'c',
+		'ful'  => '',
 		'sion' => 's',
 		'tion' => 't',
-		'sio'  => 's',	/* assumed tying is not over/finished */
-		'tio'  => 't',	/* assumed tying is not over/finished */
 		'ion'  => '',
-		'ic'   => '',
+		'ity'  => '',
+		'ant'  => '',
 		'ment' => '',
+		'ness' => '',
+		'ship' => '',
+		'ism'  => '',
+		'sis'  => '',
+		'age'  => '',
+		'ery'  => '',
+		'our'  => 'o',
+		'or'   => 'o',
 	);
 	foreach( $endAry as $eRep => $eNew ) {
 		$len = strlen($eRep);
-		if ( strlen($word) < ($len + 3) ) { continue; }
-		if ( substr($word,-$len) != $eRep ) { continue; }
-		return ( substr($word,0,-$len) . $eNew );
+		if ( strlen($word) < ($len + 2) ) { continue; }
+		for($i=$len;$i>1;$i--) {
+			if ( substr($wordLC,-$i) == substr($eRep,0,$i) ) {
+				return ( substr($word,0,-$i) . $eNew . $add );
+			}
+		}
 	}
 	return $word;
 }
@@ -269,13 +298,13 @@ function lib4ridora_construct_funding_element_filter(&$form_state, $funding_elem
 	return rtrim($searchAll);
 }
 
-function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_type = 'award_title', $funding_element = 'fund2' ) {		// see lib4ridora_construct_organization_unit_filter();
+function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_element = 'fund2' ) {		// see lib4ridora_construct_organization_unit_filter();
 
 	// Dev-Note related:
 	global $user;
 
 
-	if ( @empty($funding_element) || @empty($funding_type) || @!isset($form_state['values'][$funding_element]) ) { return array(); }
+	if ( @empty($funding_element) || @!isset($form_state['values'][$funding_element]) ) { return array(); }
 
 	$facet_fields = lib4ridora_get_solr_field_funding('fundersearch','mt');		// default, if we cannot find something better
 	$solr_field = '';
@@ -383,8 +412,8 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_ty
 					$sTmp = '';
 					foreach( $tmpAry as $word ) {
 						$word = lib4ridora_word_clean( $word );
-						if ( strlen($word) < 2 ) { continue; }
-						$sTmp .= ( empty($sTmp) ? '' : ' AND ' ) . lib4ridora_word_solr($word);		// we are more flexible with brackets!
+						if ( strlen($word) < 3 ) { continue; }
+						$sTmp .= ( empty($sTmp) ? '' : ' AND ' ) . lib4ridora_word_solr($word,'*');		// we are more flexible with brackets!
 					}
 				}
 				$filter_string = $solr_field . ':' . ( empty($sTmp) ? '*' : ( strpos($sTmp,' AND ') ? '('.$sTmp.')' : $sTmp ) );		// similar to lib4ridora_construct_solr_statement()
@@ -517,16 +546,16 @@ function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $fiel
 			continue;
 		}
 		if ( substr($word,0,1) == '!' || substr($word,0,1) == '-' ) {
-			if ( $word = ltrim($word,"!*.- \n\r\t\v\0") ) {
+			if ( $word = lib4ridora_word_solr(ltrim($word,"!*.- \n\r\t\v\0")) ) {
 				$valueList .= ( ( empty($valueList) ? 'NOT+' : '+NOT+' ) . '*' . rawurlencode($word) . '+NOT+' . rawurlencode($word) . '*' );
 			}
-		} elseif( ( $wLen = strlen($word) ) && $wLen > 1 ) {
+		} elseif( ( $wLen = strlen($word) ) && $wLen > 1 && ( $wordSolr = lib4ridora_word_solr($word) ) && strlen($wordSolr) ) {
 			if ( $chk = rtrim( $word, "* \n\r\t\v\0" ) ) {
-				$mustHaveAry[] = $chk;		// so it cannot be empty of just a *
+				$mustHaveAry[] = $chk;		// so it cannot be empty or just a *
 			}
-			$varAry = array( rawurlencode($word) );
+			$varAry = array( rawurlencode($word) /* assumed this is a full word, which would be indexed then */ );
 			if ( $word_wild_card > 0 ) {
-				$varAry[] = '*'.rawurlencode($word).'*';
+				$varAry[] = '*'.rawurlencode($wordSolr).'*';
 				if ( $wLen > 2 ) { 
 					$varAry[] = '*'.rawurlencode(substr($word,1));
 					$varAry[] = rawurlencode(substr($word,0,-1)).'*';
