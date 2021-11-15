@@ -811,3 +811,75 @@ function lib4ridora_user_is_bot($user_agent = '', $demand_language = FALSE, $use
 	if ( $use_session ) { $_SESSION['lib4ridora_user_is_bot'] = -1; }
 	return FALSE;
 }
+
+/*
+ * function to prevent bots from running searches.
+ *
+ * Goal: Task1: Stop browsing DORA with a unwanted user-agent string (Eawag firewall cannot handle this - Jour Fixe 2021-08-27)
+ *       Task2: Do not allow (known) bots to run batches (specially CSV/Excel exports).
+ * 
+ * Caution: Take care that out own/Lib4RI's batch processes are not afffected!
+ *          Note too that within Drupal we have no $_SERVER are, global like $base_path or $user are there however.
+ * Partially based on: /var/www/html/includes/batch.inc
+ * Future: Should be removed again as soon we have a better/external possibilty to filter out unwanted visitors.
+ *
+ * This covers batch-triggering links like:
+ * https://www.dora.lib4ri.ch/empa/islandora/search/dc.title%3Acarbon?islandora_solr_search_navigation=1&solr_profile=lib4ri_csv
+ * https://www.dora.lib4ri.ch/eawag/batch?op=start&id=78228
+ *
+ * Variable assignments:
+ * sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_omit_user_agent","seekport")'
+ * sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_omit_user_agent",array("Aeekport","SEOcrawl","sciSearch"))'
+ *
+ * However (as tested/experienced):
+ * - For https://www.dora.lib4ri.ch/eawag/batch?op=start&id=78228 batch_alter is applyed to late!(?) Because in the returning
+ *   web page (as you may get it with Wget) it's full HTML, with recent additions, and the 'No active batch' error message
+ *   as issued by /var/www/html/includes/batch.inc file - lucky hook_init can interrupt it if needed.
+ * - For https://www.dora.lib4ri.ch/empa/islandora/search/dc.title%3Acarbon?islandora_solr_search_navigation=1&solr_profile=lib4ri_csv
+ *   as found 'underneath' the CSV/Ecxel icon the hook_init does not seem to be triggered (always) but hook_bach_alter() can interrupt it.
+ */
+function lib4ridora_access_rejection( $batch = NULL ) {
+  // Task 1: user-agent check:
+  if ( $uaList = variable_get('lib4ridora_omit_user_agent',NULL) ) {  // expected to have a browser's user agent string, or an array with multiple of them.
+    global $base_path;
+    if ( !drupal_is_cli() || @!empty($_SERVER['DOCUMENT_ROOT']) ) {	// see: https://api.drupal.org/api/drupal/includes%21bootstrap.inc/function/drupal_is_cli/7.x
+      foreach( ( is_array($uaList) ? $uaList : array($uaList) ) as $uaString ) {
+        if ( empty(trim($_SERVER['HTTP_USER_AGENT'])) || stripos($_SERVER['HTTP_USER_AGENT'],strval($uaString)) !== false ) {
+          $tmpPath = '/tmp/browser-user-agent.denied' . strtr($base_path,'/','.') . 'txt';
+          $ipAry = array( date("Y-m-d.H-i-s"), $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_X_REAL_IP'], $_SERVER['HTTP_X_FORWARDED_FOR'], $_SERVER['REQUEST_URI'], $_SERVER['HTTP_USER_AGENT'] );
+          file_put_contents( $tmpPath, @strval(file_get_contents($tmpPath)) . implode(' | ',$ipAry) . "\r\n" );
+          header("HTTP/1.0 503 Service Unavailable");
+          echo("503 Service Unavailable");
+          exit;
+        }
+      }
+    }
+  }
+  // Task 2: bot rejection:
+  if ( variable_get('lib4ridora_no_batch_for_bot',true) ) {	// TRUE by default - Jour Fixe 2021-10-21
+    // Special case, catch obsolete links like: https://www.dora.lib4ri.ch/eawag/batch?op=start&id=78228
+    if ( isset($_REQUEST['id']) && ( @empty($_SERVER['REQUEST_URI']) || strpos(strtok($_SERVER['REQUEST_URI'].'?','?'),'/batch') ) ) {
+      include_once('/var/www/html/includes/batch.inc');
+      $batch = &batch_get();
+      // Retrieve the current state of the batch.
+      if ( !$batch && function_exists('batch_load') ) {
+        if ( !( $batch = batch_load($_REQUEST['id']) ) ) {
+          if ( lib4ridora_user_is_bot('',true,true) ) {
+            header("HTTP/1.0 404 Not Found");		// 404 similar as in Drupal 9: https://www.drupal.org/project/drupal/issues/1986330
+            echo("404 Not Found");
+            exit;
+          }
+        }
+      }
+    }
+    // handle general case via name check of interface, for drush command and 'rather normal' usage links like:
+    // https://www.dora.lib4ri.ch/empa/islandora/search/dc.title%3Acarbon?islandora_solr_search_navigation=1&solr_profile=lib4ri_csv
+    if ( !drupal_is_cli() ) {		// see: https://api.drupal.org/api/drupal/includes%21bootstrap.inc/function/drupal_is_cli/7.x
+      if ( lib4ridora_user_is_bot('',true,true) ) {
+        header("HTTP/1.0 404 Not Found");		// 404 similar as in Drupal 9: https://www.drupal.org/project/drupal/issues/1986330
+        echo("404 Not Found");
+        exit;
+      }
+    }
+  }
+}

@@ -2265,36 +2265,20 @@ function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
 
 /**
  * Implements hook_init
- *
- * Used here (see Task 2) for auxiliary firewall tasks that cannot be performed right now elsewhere 2021-08-27/fh
- * Should be removed again as soon we have a better/external possibilty to filter out unwanted visitors.
- * 
- * sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_omit_user_agent","seekport")'
- * sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_omit_user_agent",array("Aeekport","SEOcrawl","sciSearch"))'
  */
 function lib4ridora_init() {
-  // Task 1: if requested (via variable) do not allow (known) bots to run batches (specially CSV/Excel exports):
-  if ( variable_get('lib4ridora_no_batch_for_bot',true) && !empty( batch_get() ) ) {	// according to Jour Fixe 2021-10-21
+  if ( !user_is_logged_in() ) {		// no check for registered users.
     module_load_include('inc', 'lib4ridora', 'includes/utilities');
-    if ( lib4ridora_user_is_bot('',true,true) ) {
-      header("HTTP/1.0 503 Service Unavailable"); // header("HTTP/1.0 404 Not Found");
-      echo("503 Service Unavailable");
-      exit;
-    }
+    lib4ridora_access_rejection();
   }
+}
 
-  // Task 2: if requested by a user-agent string/list then stop	it/tem from browsing DORA:
-  if ( $uaList = variable_get('lib4ridora_omit_user_agent',NULL) ) {  // expected to have a browser's user agent string, or an array with multiple of them.
-    global $base_path;
-    foreach( ( is_array($uaList) ? $uaList : array($uaList) ) as $uaString ) {
-      if ( stripos($_SERVER['HTTP_USER_AGENT'],strval($uaString)) !== false ) {
-        $tmpPath = '/tmp/browser-user-agent.denied' . strtr($base_path,'/','.') . 'txt';
-        $ipAry = array( date("Y-m-d.H-i-s"), $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_X_REAL_IP'], $_SERVER['HTTP_X_FORWARDED_FOR'], $_SERVER['REQUEST_URI'], $_SERVER['HTTP_USER_AGENT'] );
-        file_put_contents( $tmpPath, @strval(file_get_contents($tmpPath)) . implode(' | ',$ipAry) . "\r\n" );
-        header("HTTP/1.0 503 Service Unavailable");
-        echo("503 Service Unavailable");
-        exit;
-      }
-    }
+/**
+ * Implements hook_batch_alter
+ */
+function lib4ridora_batch_alter( $batch ) {
+  if ( !user_is_logged_in() ) {
+    module_load_include('inc', 'lib4ridora', 'includes/utilities');
+    lib4ridora_access_rejection( $batch );
   }
 }
