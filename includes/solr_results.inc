@@ -127,25 +127,33 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
   * 	- islandora_solr_get_fields("facet_fields", FALSE, FALSE);
   */
   public function lib4ridora_replace_field_with_label( $query_string = '', $solr_fields = array(), $remove_weight = false ) {
-	foreach ($solr_fields as $key => $value) {
-		$solr_field = $value['solr_field'];
-		// cut off '_mt', '_ms', ... - remind there are dc.title, dc.creator, ... or psuedo-solr-fields:
-		if ( !( $label = @strval($value['solr_field_settings']['label']) ) ) {	/* if table 'islandora_solr_fields' was used */
-			if ( !( $label = @strval($value['data']['display_label']) ) ) {		/* if table 'islandora_solr_metadata_fields' was used */
-				continue;		// eek! one of the key-path must exist!
-			}
-		}
-		if ( !strpos($solr_field,'.') && ( $pos = strrpos($solr_field,'_') ) ) {
-			$query_string = preg_replace('/'.substr($solr_field,0,$pos).'_\w+\s*:/', $label.':', $query_string);
-		} else {
-			$query_string = preg_replace('/'.$solr_field.'/', $label, $query_string);
-		}
-	}
-	if ( $remove_weight && strpos($query_string,'^') ) {	// try to remove search-weights:
-	  $query_string = preg_replace('/\)\^\d\s+/', ') ', $query_string.' ');		// for: (carbon)^5
-	  $query_string = preg_replace('/\"\^\d\s+/', '" ', $query_string.' ');		// for: "carbon"^5
-	}
-	return rtrim($query_string);
+    foreach ($solr_fields as $solr_field => $data) {		// $solr_field also can be just a digit depending on the data source used!
+      if ( empty($data) ) { continue; }
+      $label = '';
+      if ( !intval($solr_field) && is_string($data) ) {
+        $label = $data;	// no corresponding table available, rather for flexibility
+      } else {
+        $solr_field = $data['solr_field'];
+        if ( !( $label = @strval($data['solr_field_settings']['label']) ) ) {  /* if table 'islandora_solr_fields' was used */
+          if ( !( $label = @strval($data['data']['display_label']) ) ) {    /* if table 'islandora_solr_metadata_fields' was used */
+            if ( !( $label = @strval($data['display_label']) ) || !( $label = @strval($data['label']) ) ) {    /* just for convenience */
+              continue;    // eek! one of the key-path must exist!
+            }
+          }
+        }
+      }
+      // cut off '_mt', '_ms', ... - remind there are dc.title, dc.creator, ... or psuedo-solr-fields:
+      if ( !strpos($solr_field,'.') && ( $pos = strrpos($solr_field,'_') ) ) {
+        $query_string = preg_replace('/'.substr($solr_field,0,$pos).'_\w+/', $label, $query_string);
+      } else {
+        $query_string = preg_replace('/'.$solr_field.'/', $label, $query_string);
+      }
+    }
+    if ( $remove_weight && strpos($query_string,'^') ) {  // try to remove search-weights:
+      $query_string = preg_replace('/\)\^\d\s+/', ') ', $query_string.' ');    // for: (carbon)^5
+      $query_string = preg_replace('/\"\^\d\s+/', '" ', $query_string.' ');    // for: "carbon"^5
+    }
+    return rtrim($query_string);
   }
 
   /**
@@ -176,6 +184,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
 		islandora_solr_get_fields("result_fields", FALSE, FALSE, TRUE),
 		lib4ridora_get_metadata_fields() /* , */
 	);
+	$solr_all_fields = array_reverse(array_merge($solr_misc_fields,$solr_search_fields,$solr_facet_fields));
 
     // Get user provided filter parameters.
     $fq = isset($islandora_solr_query->internalSolrParams['f']) ? $islandora_solr_query->internalSolrParams['f'] : array();
@@ -189,7 +198,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
       if ( !( $query_value_human = @trim(strip_tags($_GET['search_string'])) ) ) { // possible html tags need to be stripped to prevent html injection
         // Get query value/string.
         $query_value = $islandora_solr_query->solrQuery;
-        $query_value_human = $this->lib4ridora_replace_field_with_label( $query_value, array_merge($solr_search_fields,$solr_misc_fields,$solr_facet_fields,$solr_search_fields), true );
+        $query_value_human = $this->lib4ridora_replace_field_with_label( $query_value, $solr_all_fields, true );
       }
 
       $query_list = array();
@@ -246,7 +255,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
     foreach ($fq as $key => $filter) {
       // Check for exclude filter.
       $symbol = ($filter[0] == '-') ? '&ne;' /* 'not equal' sign */ : '=';
-      $filter_string = $this->formatFilter($filter, $islandora_solr_query);
+      $filter_string = ( stripos($filter,'_dt:') ? $this->formatFilter($filter,$islandora_solr_query) : $this->formatFilterSimple($filter,$solr_all_fields) );
       // Pull out filter (for exclude link).
       $query_minus = array();
       $f_x['f'] = array_diff($params['f'], array($filter));
@@ -290,7 +299,6 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
       $filterPlain = preg_replace( '/\\\\ /', ' ', strtok($filter.':',':') );
       $keySolrField = -1;
 
-      $solr_all_fields = array_merge($solr_facet_fields, $solr_misc_fields, $solr_search_fields,/* facets once more to dominate existing assoc. keys */ $solr_facet_fields);
       foreach( $solr_all_fields as $key => $value) {
         $solr_field = $value['solr_field'];
         if ( stripos($filterPlain,$solr_field) !== FALSE ) {
@@ -339,10 +347,10 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
             }
           }
         }
-        $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a>' . " {$value['solr_field_settings']['label']} " . $symbol . " " . check_plain($filter_string);
+        $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a>' . " {$value['solr_field_settings']['label']} " . $symbol . " " . ltrim(check_plain($filter_string),'-!');
       }
       else { // Default to old behavior.
-        $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a> &hellip; ' . $symbol . ' ' . check_plain($filter_string);
+        $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a> &hellip; ' . $symbol . ' ' . ltrim(check_plain($filter_string),'-!');
       }
     }
 
@@ -359,12 +367,41 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
   }
 
   /**
+   * Formats the passed in filter into a human readable form. Based on formatFilter()
+   *
+   * Cannot (yet) handle Date-Solr-fields currenty, so check $filter about such a field
+   * e.g. with stripos($filter,'_dt:') and prefer formatFilter() then.
+   * 
+   */
+  public function formatFilterSimple($filter, $solr_fields = array() ) {
+	if ( empty($solr_all_fields) ) {
+		module_load_include('inc', 'islandora', 'includes/utilities');
+		module_load_include('inc', 'lib4ridora', 'includes/utilities');
+		module_load_include('inc', 'lib4ridora', 'includes/advanced_search.funding.inc');
+		// get all Solr fields incl. labels:
+		$solr_facet_fields = islandora_solr_get_fields("facet_fields", FALSE, FALSE, TRUE);
+		$solr_search_fields = islandora_solr_get_fields("search_fields", FALSE, FALSE, TRUE);
+		$solr_misc_fields = array_merge(
+			islandora_solr_get_fields("sort_fields", FALSE, FALSE, TRUE),
+			islandora_solr_get_fields("result_fields", FALSE, FALSE, TRUE),
+			lib4ridora_get_metadata_fields() /* , */
+		);
+		$solr_fields = array_reverse(array_merge($solr_misc_fields,$solr_search_fields,$solr_facet_fields));
+	}
+	$filter = $this->lib4ridora_replace_field_with_label( $filter, $solr_fields );
+	// Enprettyments:
+	$filter = html_entity_decode($filter,ENT_HTML401,'UTF-8'); // there may be special characters as HTML-encoding inside that may become double-encoded.
+	return preg_replace('/\s+/',' ',str_replace(':',': ',$filter));		// should not harm, just looks better with 1 space after semicolon
+  }
+
+  /**
    * Formats the passed in filter into a human readable form.
    *
    * @param string $filter
-   *   The passed in filter.
+   *   The passed in filter like:
+   *    mods_extension_fundingReferences_fundingReference_fundingStream_mt:"Horizon 2020 Framework Programme" OR mods_extension_fundingReferences_fundingReference_awardTitle_mt:(Horizon AND Framework AND Prog...
    * @param object $islandora_solr_query
-   *   The current Solr Query
+   *   The current Solr Query as big array with all the results inside and other query/facet related data
    *
    * @return string
    *   The formatted filter string for breadcrumbs and active query.

@@ -588,11 +588,16 @@ function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $fiel
 	$solr_url .= '?wt=json&csv.separator=' . $solr_sep . '&indent=true&rows=987654321&sort=PID%20asc';
 	$solr_url .= '&fl=PID%2c+' . /* implode('%2c+',$fieldAry) */ $solr_field;
 	$solr_url .= '&q=PID:*%5c%3a*+AND+' . $solr_field . ':(' . $valueList . ')';
-/*
-	// Dev-Note:
+/*	*/
 	global $user;
-	if ( stripos('/DoraDev/Frank/',strval($user->name)) ) { dpm( "Solr-Url: " . print_r($solr_url,1) ); }
-*/
+	if ( stripos('/DoraDev/Frank/',strval($user->name)) ) {
+		dpm( date("Y-m-d H:i:s")."\r\n"."Solr-URL:\r\n".$solr_url );
+		file_put_contents('/tmp/adv-s.solr-url.test.txt',date("Y-m-d H:i:s")."\r\n".$solr_url);
+		dpm( "mustHaveAry: " . print_r($mustHaveAry,1) . "\r\n" );
+	}
+/*	*/
+
+
 	$resultAry = array();
 	$numFound = -1;
 	if ( $jsonAry = @json_decode(file_get_contents($solr_url)) ) {
@@ -602,13 +607,11 @@ function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $fiel
 		if ( $numFound && @isset($jsonAry->response->docs) ) {
 			foreach( $jsonAry->response->docs as $obj ) {
 				foreach( $obj->$solr_field as $term ) {
-					$found = ( sizeof($mustHaveAry) ? false : true );
+					$toFind = sizeof($mustHaveAry);
 					foreach( $mustHaveAry as $chk ) {
-						if ( stripos($term,$chk) === false ) { continue; }
-						$found = true;
-						break;
+						if ( stripos($term,$chk) !== false ) { $toFind--; }
 					}
-					if ( $found ) {		
+					if ( $toFind == 0 ) {		
 						$idx = strtolower($term);
 						if ( @isset($resultAry[$idx]) ) { continue; }
 						$resultAry[$idx] = $term;
@@ -657,33 +660,32 @@ function lib4ridora_adv_search_funding_callback( $search_string ) {
 	$search_string = trim(substr(strchr(strip_tags($_GET['q']),'/autocomplete/'),14));  // work-around, due to experienced differences between sub-sites
 	
 	// trim quotes and asteriks since internally handled:
-	$tmpAry = str_getcsv($search_string,' ');
-	$tmpAry = array_map(function($word) { return trim($word,"* \n\r\t\v\0"); },$tmpAry);
-	$search_string = implode(' ',$tmpAry);
-	
-	if ( strlen($search_string) < 2 ) {
+	$ssAry = array();
+	$sLenMax = 0;
+	foreach( str_getcsv($search_string,' ') as $fVal ) {
+		if ( $fVal = trim($fVal,"* \n\r\t\v\0") ) {
+			$ssAry[] = $fVal;
+			$sLenMax = max(strlen($fVal), $sLenMax);
+		}
+	}
+	if ( $sLenMax < 2 ) {
 		drupal_json_output( array('*' => '--- please type at least 3 characters') );
 		return;
 	}
-	if ( strlen($search_string) < 3 ) {
+	if ( $sLenMax < 3 ) {
 		drupal_json_output( array('*' => '--- please type one more') );
 		return;
 	}
+	$search_string = implode(' ',$ssAry);
 
 	// order of string-examination: award number, funding stream, award title.
 	// generally, let's see if this could be a funding stream (or an award title):
 	$solr_field = array_shift( lib4ridora_get_solr_field_funding('funding_stream','mt') );	// = Solr field to use, currently support for 1 field only.
 
-	$fundAry = lib4ridora_funding_data_solr_autocomplete( $search_string, $solr_field );
-	if ( @!empty(reset($fundAry)) ) {
-		$fundAry = array_combine( array_values($fundAry), array_values($fundAry) );
-		$fundAry = array_map( function($val) { return($val.' (=Funder)'); }, $fundAry );
-	}
-
 	$snsfAry = lib4ridora_funding_get_data_snsf();
 	$labelAry = array();
 	foreach( $snsfAry as $languAry ) {  // 2 indices, 0:Abbreviation, 1:Label
-	if ( stripos($languAry[0],$search_string) !== false || stripos($languAry[1],$search_string) !== false ) {
+		if ( stripos($languAry[0],$search_string) !== false || stripos($languAry[1],$search_string) !== false ) {
 			$search_string = $snsfAry['en']['0'];		// = SNSF usually
 			$labelAry = array( strtoupper($snsfAry['en']['0']) => $languAry[1]);
 			break;
@@ -693,7 +695,7 @@ function lib4ridora_adv_search_funding_callback( $search_string ) {
 	$fundAry = lib4ridora_funding_data_solr_autocomplete( $search_string, $solr_field );
 	if ( @!empty(reset($fundAry)) ) {
 		$fundAry = array_combine( array_values($fundAry), array_values($fundAry) );
-//  $fundAry = array_map( function($val) { return($val.' (=Funder)'); }, $fundAry );
+	//  $fundAry = array_map( function($val) { return($val.' (=Funder)'); }, $fundAry );
 		foreach( $fundAry as $fIdx => $fVal ) {
 			$fundAry[$fIdx] = $fVal . ' (=Funder' . ( @isset($labelAry[strtoupper($fVal)]) ?  ': '.$labelAry[strtoupper($fVal)] : '' ) . ')';
 		}
@@ -754,7 +756,7 @@ function lib4ridora_adv_search_funding_callback( $search_string ) {
 			$fundAry['*'] = '--- award titles where ' . $sTmp;
 			$dataAry = array_merge( $fundAry, $dataAry );
 		}
-	} else {
+	} else { // we only have funder names/streams, or nothing:
 		$dataAry = ( @empty(reset($fundAry)) ? array('*' => '--- sorry, nothing alike available') : $fundAry );
 	}
 
