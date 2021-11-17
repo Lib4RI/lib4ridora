@@ -67,11 +67,14 @@ function lib4ridora_word_clean( $word ) {
  * 
  * ToDo: find out if there is a real Solr-related function/class to do this, or any xslt files to apply.
  */
-function lib4ridora_word_solr( $word, $add = '' ) {	// expecting it to be trimmed already!
-	if ( strlen($word) < 5 ) {
-		return $word;		// so we also leave here  already with functional words like OR or NOT
+function lib4ridora_word_solr( $word, $word_suffix = '', $ignore_case = true ) {	// expecting it to be TRIMmed already!
+	if ( strlen($word) < 5 || preg_match('/\d+/',substr($word,0,1).substr($word,-1)) ) {
+		return $word;		// too short (so we also leave here already with functional words like OR or NOT), or ending or starting with a number
 	}
-	$wordLC = strtolower($word);
+	if ( !$ignore_case && strtolower(substr($word,-1)) != substr($word,-1) ) {
+		return $word;		// last case is uppercase which is not supported here (intentionally) if we need to respect lower-/uppercase.
+	}
+	$wordLC = ( $ignore_case ? strtolower($word) : $word );
 	if ( strlen($word) > 3 && substr($wordLC,-1) == 's' ) {		// no plural es/s
 		$len = ( strlen($word) > 4 && substr($wordLC,-2) == 'es' ) ? 2 : 1;
 		$word = substr($word,0,-$len);
@@ -112,7 +115,7 @@ function lib4ridora_word_solr( $word, $add = '' ) {	// expecting it to be trimme
 		if ( strlen($word) < ($len + 2) ) { continue; }
 		for($i=$len;$i>1;$i--) {
 			if ( substr($wordLC,-$i) == substr($eRep,0,$i) ) {
-				return ( substr($word,0,-$i) . $eNew . $add );
+				return ( substr($word,0,-$i) . $eNew . $word_suffix );
 			}
 		}
 	}
@@ -261,9 +264,9 @@ function lib4ridora_construct_funding_element_filter(&$form_state, $funding_elem
 		$solr_field = $solr_field_funder;
 		$fundAry = lib4ridora_funding_data_solr_autocomplete( $search_string, $solr_field );
 		foreach( $fundAry as $value ) {
-		if ( stripos($value,$search_string) !== false ) {		// re-check needed!?
-		$filters[] = lib4ridora_construct_solr_statement($solr_field, $value);
-		}
+			if ( stripos($value,$search_string) !== false ) {		// re-check needed!?
+				$filters[] = lib4ridora_construct_solr_statement($solr_field, $value);
+			}
 		}
 		$dataAry = array();
 		if ( !( $award_number = intval(ltrim($search_string,"[({-})] \n\r\t\v\0")) ) ) {
@@ -346,7 +349,7 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_el
 
 		// First let's check if this is a funder name resp. a funding stream.
 		// Parially (for SNSF) we will check if the input is matching the content of a tiny translation table/array to take this then as search string.
-		$sStr = $search_string;
+		$sStr = lib4ridora_word_solr($search_string);
 		if ( $pos = stripos($sStr,'(=Funder') ) {		// 'safety removal'
 			$sStr = rtrim(substr($sStr,0,$sStr));
 		}
@@ -516,7 +519,7 @@ function lib4ridora_fundersearch_autocomplete( $search_string ) {
  * For debugging reasons via web API currently to see/test the Solr URL, later perhaps something
  * similar to lib4ridora_facet_query() should Islandora objects be all we need to find.
  */
-function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $field_type = 'mt', $word_wild_card = 1 ) {
+function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $field_type = 'mt', $word_wild_card = 1, $partial_ditgit = true ) {
 	if ( !sizeof($words) || empty($solr_field) ) {
 		return FALSE;
 	}
@@ -545,26 +548,31 @@ function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $fiel
 			$opWord = '-';
 			continue;
 		}
+		$wordRT = rtrim($word,"* \n\r\t\v\0");
 		if ( substr($word,0,1) == '!' || substr($word,0,1) == '-' ) {
-			if ( $word = lib4ridora_word_solr(ltrim($word,"!*.- \n\r\t\v\0")) ) {
+			if ( $word = lib4ridora_word_solr(ltrim($wordRT,"!*.- \n\r\t\v\0")) ) {
 				$valueList .= ( ( empty($valueList) ? 'NOT+' : '+NOT+' ) . '*' . rawurlencode($word) . '+NOT+' . rawurlencode($word) . '*' );
 			}
-		} elseif( ( $wLen = strlen($word) ) && $wLen > 1 && ( $wordSolr = lib4ridora_word_solr($word) ) && strlen($wordSolr) ) {
-			if ( $chk = rtrim( $word, "* \n\r\t\v\0" ) ) {
-				$mustHaveAry[] = $chk;		// so it cannot be empty or just a *
+		} elseif( ( $wLen = strlen($wordRT) ) && $wLen > 1 && ( $wordSolr = lib4ridora_word_solr($wordRT) ) && strlen($wordSolr) ) {
+			$varAry = array( $word /* assumed this is a full word, which would be indexed then */ );
+			if ( $wordSolr != $word ) {
+				$varAry[] = $wordSolr;
 			}
-			$varAry = array( rawurlencode($word) /* assumed this is a full word, which would be indexed then */ );
-			if ( $word_wild_card > 0 ) {
-				$varAry[] = '*'.rawurlencode($wordSolr).'*';
+			if ( $word_wild_card > 0 && strtoupper($word) != $word && ( $partial_ditgit || !preg_match('/^\d+$/',$word) ) ) {
+				$varAry[] = '*'.$wordSolr.'*';
 				if ( $wLen > 2 ) { 
-					$varAry[] = '*'.rawurlencode(substr($word,1));
-					$varAry[] = rawurlencode(substr($word,0,-1)).'*';
+					$varAry[] = substr($word,0,-1).'*';
 				}
-				if ( $wLen > 3 ) {
-					$varAry[] = '*'.rawurlencode(substr($word,1,-1)).'*';
+				if ( $wLen > 3 ) { 
+					$varAry[] = '*'.substr($word,1);
+				}
+				if ( $wLen > 4 ) {
+					$varAry[] = '*'.substr($word,1,-1).'*';
 				}
 			}
-			$valueList .= ( ( empty($valueList) ? '' : '+AND+' ) . '(' . implode('+OR+',$varAry) . ')' );
+			$mustHaveAry[] = $wordSolr;
+			$sTmp = implode('+OR+',array_map('rawurlencode',$varAry));
+			$valueList .= ( ( empty($valueList) ? '' : '+AND+' ) . '(' . str_ireplace('%2A','*',$sTmp) . ')' );
 		}
 	}
 	if ( empty($valueList) ) {
@@ -677,6 +685,7 @@ function lib4ridora_adv_search_funding_callback( $search_string ) {
 		return;
 	}
 	$search_string = implode(' ',$ssAry);
+	$search_str_f = $search_string;		// may vary, see array like snsfAry with alternate (translated) label of a funder name/stream
 
 	// order of string-examination: award number, funding stream, award title.
 	// generally, let's see if this could be a funding stream (or an award title):
@@ -686,16 +695,15 @@ function lib4ridora_adv_search_funding_callback( $search_string ) {
 	$labelAry = array();
 	foreach( $snsfAry as $languAry ) {  // 2 indices, 0:Abbreviation, 1:Label
 		if ( stripos($languAry[0],$search_string) !== false || stripos($languAry[1],$search_string) !== false ) {
-			$search_string = $snsfAry['en']['0'];		// = SNSF usually
+			$search_str_f = $snsfAry['en']['0'];		// = SNSF usually
 			$labelAry = array( strtoupper($snsfAry['en']['0']) => $languAry[1]);
 			break;
 		}
 	}
 
-	$fundAry = lib4ridora_funding_data_solr_autocomplete( $search_string, $solr_field );
+	$fundAry = lib4ridora_funding_data_solr_autocomplete( $search_str_f, $solr_field );
 	if ( @!empty(reset($fundAry)) ) {
 		$fundAry = array_combine( array_values($fundAry), array_values($fundAry) );
-	//  $fundAry = array_map( function($val) { return($val.' (=Funder)'); }, $fundAry );
 		foreach( $fundAry as $fIdx => $fVal ) {
 			$fundAry[$fIdx] = $fVal . ' (=Funder' . ( @isset($labelAry[strtoupper($fVal)]) ?  ': '.$labelAry[strtoupper($fVal)] : '' ) . ')';
 		}
@@ -751,7 +759,7 @@ function lib4ridora_adv_search_funding_callback( $search_string ) {
 	if ( @!empty(reset($dataAry)) ) {
 		$dataAry = array_combine( array_values($dataAry), array_values($dataAry) );
 		if ( @!empty(reset($fundAry)) ) {
-		$sTmp = ( strlen($search_string) > 20 ? 'the user input' : '"'.strval($search_string).'"' );
+		$sTmp = ( strlen($search_string) > 20 ? 'the user input' : '"'.lib4ridora_word_solr($search_string).'"' );
 		$sTmp .= ' appears in its title' . ( intval($search_string) ? ' or number:' : ':' );
 			$fundAry['*'] = '--- award titles where ' . $sTmp;
 			$dataAry = array_merge( $fundAry, $dataAry );

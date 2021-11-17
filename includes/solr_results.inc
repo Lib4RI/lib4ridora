@@ -240,7 +240,6 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
         'attributes' => array('class' => 'islandora-solr-query-list query-list'),
       ));
       $output .= '</div>';
-
     }
 
     // Get filter values.
@@ -255,7 +254,12 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
     foreach ($fq as $key => $filter) {
       // Check for exclude filter.
       $symbol = ($filter[0] == '-') ? '&ne;' /* 'not equal' sign */ : '=';
-      $filter_string = ( stripos($filter,'_dt:') ? $this->formatFilter($filter,$islandora_solr_query) : $this->formatFilterSimple($filter,$solr_all_fields) );
+      $filter_string = urldecode($filter);
+      if ( /* stripos($filter_string,'_dt:') || */ !preg_match('/\s+(AND|OR|NOT)\s+/',$filter_string) ) {
+        $filter_string = $this->formatFilter($filter,$islandora_solr_query);
+      } else {
+        $filter_string = $this->formatFilterSimple($filter,$solr_all_fields);
+      }
       // Pull out filter (for exclude link).
       $query_minus = array();
       $f_x['f'] = array_diff($params['f'], array($filter));
@@ -347,10 +351,24 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
             }
           }
         }
-        $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a>' . " {$value['solr_field_settings']['label']} " . $symbol . " " . ltrim(check_plain($filter_string),'-!');
+        if ( !( $label = @strval($value['solr_field_settings']['label']) ) ) {  /* if table 'islandora_solr_fields' was used */
+          if ( !( $label = @strval($value['data']['display_label']) ) ) {    /* if table 'islandora_solr_metadata_fields' was used */
+            if ( !( $label = @strval($$value['display_label']) ) || !( $label = @strval($value['label']) ) ) {    /* just for convenience */
+              $label = '&hellip;';
+            }
+          }
+        }
+        foreach( array($label,html_entity_decode($label)) as $sTmp ) {
+          // trying not to repeat/reshow the facet label inside the filter string, since (by former default) the facet label with be added in front.
+          while( ( $pos = strpos($filter_string,$sTmp) ) !== false ) {
+            $filter_string = substr($filter_string,0,$pos) . ltrim(substr($filter_string,strlen($sTmp)+$pos),'= :');
+          }
+          if ( $pos ) { break; }
+        }
+        $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a> ' . $label . ' ' . $symbol . ' ' . check_plain(ltrim($filter_string,'-!'));
       }
       else { // Default to old behavior.
-        $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a> &hellip; ' . $symbol . ' ' . ltrim(check_plain($filter_string),'-!');
+        $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a> &hellip; ' . $symbol . ' ' . check_plain(ltrim($filter_string,'-!'));
       }
     }
 
@@ -374,24 +392,41 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
    * 
    */
   public function formatFilterSimple($filter, $solr_fields = array() ) {
-	if ( empty($solr_all_fields) ) {
-		module_load_include('inc', 'islandora', 'includes/utilities');
-		module_load_include('inc', 'lib4ridora', 'includes/utilities');
-		module_load_include('inc', 'lib4ridora', 'includes/advanced_search.funding.inc');
-		// get all Solr fields incl. labels:
-		$solr_facet_fields = islandora_solr_get_fields("facet_fields", FALSE, FALSE, TRUE);
-		$solr_search_fields = islandora_solr_get_fields("search_fields", FALSE, FALSE, TRUE);
-		$solr_misc_fields = array_merge(
-			islandora_solr_get_fields("sort_fields", FALSE, FALSE, TRUE),
-			islandora_solr_get_fields("result_fields", FALSE, FALSE, TRUE),
-			lib4ridora_get_metadata_fields() /* , */
-		);
-		$solr_fields = array_reverse(array_merge($solr_misc_fields,$solr_search_fields,$solr_facet_fields));
-	}
-	$filter = $this->lib4ridora_replace_field_with_label( $filter, $solr_fields );
-	// Enprettyments:
-	$filter = html_entity_decode($filter,ENT_HTML401,'UTF-8'); // there may be special characters as HTML-encoding inside that may become double-encoded.
-	return preg_replace('/\s+/',' ',str_replace(':',': ',$filter));		// should not harm, just looks better with 1 space after semicolon
+    if ( empty($solr_all_fields) ) {
+      module_load_include('inc', 'islandora', 'includes/utilities');
+      module_load_include('inc', 'lib4ridora', 'includes/utilities');
+      module_load_include('inc', 'lib4ridora', 'includes/advanced_search.funding.inc');
+      // get all Solr fields incl. labels:
+      $solr_facet_fields = islandora_solr_get_fields("facet_fields", FALSE, FALSE, TRUE);
+      $solr_search_fields = islandora_solr_get_fields("search_fields", FALSE, FALSE, TRUE);
+      $solr_misc_fields = array_merge(
+          islandora_solr_get_fields("sort_fields", FALSE, FALSE, TRUE),
+          islandora_solr_get_fields("result_fields", FALSE, FALSE, TRUE),
+          lib4ridora_get_metadata_fields() /* , */
+      );
+      $solr_fields = array_reverse(array_merge($solr_misc_fields,$solr_search_fields,$solr_facet_fields));
+    }
+    // replace date-spans with year-spans, expect $filter to contain "...sued_dt:[2001-01-01T00:00:00Z TO 2021-12-31T23:59:59Z]&..." or even URL-encoded.
+    while( !isset($yearRange) || !empty($yearRange) ) {
+      $yearRange = array();
+      if ( ( $pos0 = stripos($filter,'_dt:',@intval($pos)) ) || ( $pos0 = stripos($filter,'_dt%3A',@intval($pos)) ) ) {
+        if ( ( ( $pos1 = strpos($filter,'[',$pos0) ) && ( $len1 = 1 ) ) || ( ( $pos1 = stripos($filter,'%5B',$pos0) ) && ( $len1 = 3 ) ) ) {
+          if ( ( ( $pos2 = stripos($filter,' TO ',$pos1) ) && ( $len2 = 4 ) ) || ( ( $pos2 = stripos($filter,'%20TO%20',$pos1) ) && ( $len2 = 8 ) ) ) {
+            if ( ( ( $pos3 = strpos($filter,']',$pos2) ) && ( $len3 = 1 ) ) || ( ( $pos3 = stripos($filter,'%5D',$pos2) ) && ( $len3 = 3 ) ) ) {
+              $yearRange[0] = intval(trim(substr($filter,$pos1+$len1,$pos2-$pos1-$len1)));
+              $yearRange[1] = intval(trim(substr($filter,$pos2+$len2,$pos3-$pos2-$len2)));
+              $filter = substr($filter,0,$pos1) . implode( ( stripos($filter,'%') ? '%20-%20' : ' - ' ), $yearRange ) . substr($filter,$pos3+$len3);
+			  $pos = $pos0 + 10;
+            }
+          }
+        }
+      }
+    }
+	// Try to teplace names of Solr fields with their (configured) labels:
+    $filter = $this->lib4ridora_replace_field_with_label( $filter, $solr_fields );
+    // Enprettyments:
+    $filter = html_entity_decode($filter,ENT_HTML401,'UTF-8'); // there may be special characters as HTML-encoding inside that may become double-encoded.
+    return preg_replace('/\s+/',' ',str_replace(':',': ',$filter));         // should not harm, just looks better with 1 space after semicolon
   }
 
   /**
