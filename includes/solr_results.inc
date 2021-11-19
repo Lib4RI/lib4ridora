@@ -391,7 +391,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
    * e.g. with stripos($filter,'_dt:') and prefer formatFilter() then.
    * 
    */
-  public function formatFilterSimple($filter, $solr_fields = array() ) {
+  public function formatFilterSimple($filter, $solr_fields = array(), $date_format = NULL /* see handing in formatFilter() */ ) {
     if ( empty($solr_all_fields) ) {
       module_load_include('inc', 'islandora', 'includes/utilities');
       module_load_include('inc', 'lib4ridora', 'includes/utilities');
@@ -406,15 +406,21 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
       );
       $solr_fields = array_reverse(array_merge($solr_misc_fields,$solr_search_fields,$solr_facet_fields));
     }
-    // replace date-spans with year-spans, expect $filter to contain "...sued_dt:[2001-01-01T00:00:00Z TO 2021-12-31T23:59:59Z]&..." or even URL-encoded.
-    while( !isset($yearRange) || !empty($yearRange) ) {
+    // replace date-spans with year-spans, expect $filter to contain "...sued_dt:[2014-01-01T00:00:00Z TO 2021-12-31T23:59:59Z]&..." or even URL-encoded.
+    while( !isset($yearRange) || !empty($yearRange) ) {			// loop, as support for multiple dates
       $yearRange = array();
       if ( ( $pos0 = stripos($filter,'_dt:',@intval($pos)) ) || ( $pos0 = stripos($filter,'_dt%3A',@intval($pos)) ) ) {
         if ( ( ( $pos1 = strpos($filter,'[',$pos0) ) && ( $len1 = 1 ) ) || ( ( $pos1 = stripos($filter,'%5B',$pos0) ) && ( $len1 = 3 ) ) ) {
           if ( ( ( $pos2 = stripos($filter,' TO ',$pos1) ) && ( $len2 = 4 ) ) || ( ( $pos2 = stripos($filter,'%20TO%20',$pos1) ) && ( $len2 = 8 ) ) ) {
             if ( ( ( $pos3 = strpos($filter,']',$pos2) ) && ( $len3 = 1 ) ) || ( ( $pos3 = stripos($filter,'%5D',$pos2) ) && ( $len3 = 3 ) ) ) {
-              $yearRange[0] = intval(trim(substr($filter,$pos1+$len1,$pos2-$pos1-$len1)));
-              $yearRange[1] = intval(trim(substr($filter,$pos2+$len2,$pos3-$pos2-$len2)));
+              $yearRange[0] = trim(substr($filter,$pos1+$len1,$pos2-$pos1-$len1));		// will be e.g. 2014-01-01T00:00:00Z
+              $yearRange[0] = ( $date_format == NULL ) ? strval(intval($yearRange[0])) : format_date(strtotime($yearRange[0]) + (60 * 60 * 24), 'custom', $date_format);
+              $yearRange[1] = trim(substr($filter,$pos2+$len2,$pos3-$pos2-$len2));		// will be e.g. 2021-12-31T23:59:59Z
+              if ( $date_format == NULL ) {
+                $yearRange[1] = ( intval($yearRange[1]) ? strval(intval($yearRange[1])) : ( ( strpos($yearRange[1],'*') === 0 ) ? 'NOW' : $yearRange[1] ) );
+              } else {
+                $yearRange[1] = format_date(strtotime(trim($yearRange[1])) - (60 * 60 * 24), 'custom', $date_format);
+              }
               $filter = substr($filter,0,$pos1) . implode( ( stripos($filter,'%') ? '%20-%20' : ' - ' ), $yearRange ) . substr($filter,$pos3+$len3);
 			  $pos = $pos0 + 10;
             }

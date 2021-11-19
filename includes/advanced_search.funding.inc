@@ -75,7 +75,11 @@ function lib4ridora_word_solr( $word, $word_suffix = '', $ignore_case = true ) {
 		return $word;		// last case is uppercase which is not supported here (intentionally) if we need to respect lower-/uppercase.
 	}
 	$wordLC = ( $ignore_case ? strtolower($word) : $word );
-	if ( strlen($word) > 3 && substr($wordLC,-1) == 's' ) {		// no plural es/s
+	// plural handling:
+	if ( strlen($word) > 5 && substr($wordLC,-3) == 'ves' ) {		// e.g: shelf/shelves
+		$word = substr($word,0,-3) . 'f';
+		$wordLC = substr($wordLC,0,-3) . 'f';
+	} elseif ( strlen($word) > 3 && substr($wordLC,-1) == 's' ) {		// no plural es/s
 		$len = ( strlen($word) > 4 && substr($wordLC,-2) == 'es' ) ? 2 : 1;
 		$word = substr($word,0,-$len);
 		$wordLC = substr($wordLC,0,-$len);
@@ -91,9 +95,7 @@ function lib4ridora_word_solr( $word, $word_suffix = '', $ignore_case = true ) {
 		'ish'  => '',
 		'ious' => '',
 		'ous'  => '',
-		'ica'  => '',
-		'ca'   => '',   /* after tests: better not 'c' */
-		'cal'  => 'c',
+		'ical' => '',
 		'ful'  => '',
 		'sion' => 's',
 		'tion' => 't',
@@ -115,11 +117,11 @@ function lib4ridora_word_solr( $word, $word_suffix = '', $ignore_case = true ) {
 		if ( strlen($word) < ($len + 2) ) { continue; }
 		for($i=$len;$i>1;$i--) {
 			if ( substr($wordLC,-$i) == substr($eRep,0,$i) ) {
-				return ( substr($word,0,-$i) . $eNew . $word_suffix );
+				return ( rtrim( substr($word,0,-$i) . $eNew, 'aeijouy') . $word_suffix );
 			}
 		}
 	}
-	return $word;
+	return rtrim($word,'aeijouy');
 }
 
 /*
@@ -319,11 +321,6 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_el
 
 	$valueAry = ( @is_array($form_state['values'][$funding_element]) ? $form_state['values'][$funding_element] : array( $form_state['values'][$funding_element] ) );
 
-
-	// Dev-Note:
-	if ( stripos('/DoraDev/Frank/',strval($user->name)) ) { dpm( "Input/Values: " . print_r($valueAry,1) ); }
-
-
 	$filterAry = array();
 	foreach( $valueAry as /* $element_value */ $fieldAry ) {
 	/* $valueAry : Array ( 
@@ -346,6 +343,7 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_el
 	Note: [field] => mods_extension_fundingReferences_fundingReference_awardTitle_mt is the default - this may not be appropriate resp. not fit to [search] !
 	*/
 		if ( !( $search_string = trim($fieldAry['search']) ) ) { continue; }
+		$search_string = preg_replace('/\s+/',' ',$search_string);
 
 		// First let's check if this is a funder name resp. a funding stream.
 		// Parially (for SNSF) we will check if the input is matching the content of a tiny translation table/array to take this then as search string.
@@ -363,6 +361,7 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_el
 			}
 		}
 		$resultAry = lib4ridora_funding_data_solr_autocomplete($sStr,$solr_field_funder);
+
 		$tmpAry = array();
 		foreach( $resultAry as $value ) {
 			if ( stripos($value,$sStr) !== false ) {		// re-check needed!
@@ -370,8 +369,8 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_el
 				$solr_field = $solr_field_funder;
 			}
 		}
-		if ( sizeof($tmpAry) ){
-			$sTmp = '"' . implode('" OR "',$tmpAry) . '"';		// similar to lib4ridora_construct_filter_string_from_array()
+		if ( sizeof($tmpAry) ) {
+			$sTmp =  ( ( sizeof($tmpAry) == 1 && !strpos(reset($tmpAry),' ') ) ? reset($tmpAry) : '('.implode(') OR (',$tmpAry).')' );
 			$sTmp = $solr_field_funder . ':' . ( empty(trim($sTmp,'" ')) ? '*' : ( sizeof($tmpAry) > 1 ? '('.$sTmp.')' : $sTmp ) );		// similar to lib4ridora_construct_solr_statement()
 			$filterAry[$solr_field.'__'.strtolower($sStr)] = array( 'filter' => $sTmp, 'op' => @strval($fieldAry['boolean']) );
 		}
@@ -400,30 +399,54 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_el
 			// Issue: Which Solr field (mt/ms) to use?
 			// Assumed the user really selected a (full) award title when we can use the ms field.
 			// however if there is only a partial string (typed of partially copied+pasted) we have to try a token search with 'mt'.
-			$filter_string = $solr_field_ms_atitle . ':"' . $search_string . '"';	// to be rechecked!
-			$solr = new IslandoraSolrQueryProcessor();
-			$solr->buildQuery( $filter_string );		// (better) use quotes for the '_ms' field!
-			$solr->solrLimit = 1;
-			$solr->executeQuery(FALSE);
-			if ( @intval( $solr->islandoraSolrResult['response']['numFound'] ) ) {
-				$solr_field = $solr_field_ms_atitle;
-			} else {
-				$solr_field = $solr_field_atitle;
-				$sTmp = str_replace(strval($award_number),'',$search_string);  // remove the number, so we just have text
-				if ( $sTmp = trim( preg_replace('/\s*\(\s*\)\s*/',' ',strtr($sTmp,'[{}]','(())')), "[({-})] \n\r\t\v\0" ) ) {	// clean up
-					$tmpAry = explode(' ',$sTmp);
-					$sTmp = '';
-					foreach( $tmpAry as $word ) {
-						$word = lib4ridora_word_clean( $word );
-						if ( strlen($word) < 3 ) { continue; }
-						$sTmp .= ( empty($sTmp) ? '' : ' AND ' ) . lib4ridora_word_solr($word,'*');		// we are more flexible with brackets!
-					}
+			$ssAry = array();
+			$sTmp = str_replace(strval($award_number),'',$search_string);  // remove the number, so we just have text
+			if ( $sTmp = trim( preg_replace('/\s*\(\s*\)\s*/',' ',strtr($sTmp,'[{-}]','(( ))')), "[({-})] \n\r\t\v\0" ) ) {	// clean up
+				$tmpAry = explode(' ',$sTmp);
+				foreach( $tmpAry as $word ) {
+					$word = lib4ridora_word_clean( $word );
+					if ( strlen($word) < 3 ) { continue; }
+					$ssAry[] = lib4ridora_word_solr($word);
 				}
-				$filter_string = $solr_field . ':' . ( empty($sTmp) ? '*' : ( strpos($sTmp,' AND ') ? '('.$sTmp.')' : $sTmp ) );		// similar to lib4ridora_construct_solr_statement()
+			}
+			if ( empty($ssAry) ) { $ssAry = array('*'); }
+			
+			$optAry = array( /* case sensitive with _ms ! */
+				$solr_field_ms_atitle . ':"' . $search_string . '"'	/* usually only full award title will be successful here */ ,
+				$solr_field_ms_atitle . ':*' . trim( str_replace(' ',"\\ ",$search_string), '*' ) . '*',
+				$solr_field_atitle . ':' . ( ( sizeof($ssAry) > 1 ) ? '('.implode(' AND ',$ssAry).')' : $search_string ),
+				$solr_field_atitle . ':' . preg_replace('/\*+/','*',( ( sizeof($ssAry) > 1 ) ? '(*'.implode('* AND *',$ssAry).'*)' : '*'.$search_string.'*' )),
+			);
+			$filter_string = '';
+			$numFound = 0;
+			foreach( $optAry as $optNum => $fs_ss ) {
+				$solr = new IslandoraSolrQueryProcessor();
+				$solr->buildQuery( $fs_ss );		// (better) use quotes for the '_ms' field!
+				$solr->solrLimit = 2;
+				$solr->executeQuery(FALSE);
+				if ( $numFound = @intval( $solr->islandoraSolrResult['response']['numFound'] ) ) {
+					$filter_string = $fs_ss;
+					$solr_field = strtok($fs_ss,':');
+					break;
+				}
+			}
+			if ( empty($filter_string) ) {
+				$filter_string = $optAry[sizeof($optAry)-1];
+				$solr_field = strtok($filter_string,':');
+				if ( $optNum > 1 && variable_get('lib4ridora_adv_search_user_hint',true) ) {
+					// since we did not find a direct hit, give a message with/when more than one search words:
+					if ( $numFound ) {
+						$sTmp .= '. However there ' . ( ( $numFound == 1 ) ? 'is a potential match' : 'are potential matches' ) . ' when splitting it up';
+					} else {
+						$sTmp .= ', even after splitting it up';
+					}
+					drupal_set_message( t($sTmp.'.'), 'warning' );
+				}
 			}
 			$filterAry[$solr_field.'__'.strtolower($search_string)] = array( 'filter' => $filter_string, 'op' => @strval($fieldAry['boolean']) );
 		}
 	}
+
 
 	// the last boolean operator must be empty, all other must have at least 'OR':
 	$tmpAry = array();
@@ -435,11 +458,6 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_el
 	foreach( array_reverse($tmpAry) as $sAry ) {
 		$searchAll = trim( ' ' . $searchAll . ' ' . $sAry['filter'] . ' ' . $sAry['op'] . ' ' );
 	}
-	
-
-	// Dev-Note:
-	if ( stripos('/DoraDev/Frank/',strval($user->name)) ) { dpm( "SearchString: " . print_r($searchAll,1) ); }
-
 
 	return $searchAll;
 }
@@ -526,6 +544,7 @@ function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $fiel
 	if ( !empty($field_type) ) {
 		$solr_field = preg_replace('/_m\w{1,3}$/','_'.ltrim($field_type,'_'),$solr_field);
 	}
+	global $base_path;
 
 	$valueList = '';	// for Solr query
 	$opWord = '';	// for possible boolean operator that may come as word
@@ -595,16 +614,15 @@ function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $fiel
 	$solr_url = 'http://' . trim(exec('hostname')) .  '.emp-eaw.ch:8080/solr/collection1/select';
 	$solr_url .= '?wt=json&csv.separator=' . $solr_sep . '&indent=true&rows=987654321&sort=PID%20asc';
 	$solr_url .= '&fl=PID%2c+' . /* implode('%2c+',$fieldAry) */ $solr_field;
-	$solr_url .= '&q=PID:*%5c%3a*+AND+' . $solr_field . ':(' . $valueList . ')';
-/*	*/
+	$solr_url .= '&q=PID:' . ( strlen($base_path) > 2 ? trim($base_path,'/') : '*' ) . '%5c%3a*+AND+' . $solr_field . ':(' . $valueList . ')';
+/*
 	global $user;
 	if ( stripos('/DoraDev/Frank/',strval($user->name)) ) {
 		dpm( date("Y-m-d H:i:s")."\r\n"."Solr-URL:\r\n".$solr_url );
 		file_put_contents('/tmp/adv-s.solr-url.test.txt',date("Y-m-d H:i:s")."\r\n".$solr_url);
 		dpm( "mustHaveAry: " . print_r($mustHaveAry,1) . "\r\n" );
 	}
-/*	*/
-
+*/
 
 	$resultAry = array();
 	$numFound = -1;
@@ -665,8 +683,12 @@ function lib4ridora_funding_data_solr_autocomplete( $search_string, $solr_field 
  * Test link: https://www.dora-dev.lib4ri.ch/psi/lib4ridora/fundersearch/autocomplete/Calipso
  */
 function lib4ridora_adv_search_funding_callback( $search_string ) {
-	$search_string = trim(substr(strchr(strip_tags($_GET['q']),'/autocomplete/'),14));  // work-around, due to experienced differences between sub-sites
-	
+	// work-around ahead (due to strange $search_string-differences between sub-sites):
+	if ( $sTmp = @trim(substr(strchr(strip_tags($_GET['q']),'/autocomplete/'),14)) ) {
+		$search_string = $sTmp; // over-ride, since $search_string can contain a suplus part/directory
+	} elseif ( empty($search_string) ) {	// may not be the most reliable, but better than nothing
+		return array();
+	}
 	// trim quotes and asteriks since internally handled:
 	$ssAry = array();
 	$sLenMax = 0;
