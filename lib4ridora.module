@@ -1698,16 +1698,13 @@ function lib4ridora_solr_advanced_search_form_submit($form, &$form_state) {
     lib4ridora_construct_funding_element_filter($form_state, 'funding_stream_test' ),
     lib4ridora_construct_funding_element_filter($form_state, 'award_title_test' ),
     lib4ridora_construct_funding_element_filter($form_state, 'award_number_test' ),
-    lib4ridora_construct_funding_combined_filters($form_state),
   );
-  $filters = array_filter( array_merge( $filters, lib4ridora_construct_funding_element_filters($form_state) ) );
-  if ($filters) {
-    // Jam our filters into the redirect.
-    $form_state['redirect'][1] = array_merge_recursive($form_state['redirect'][1], array(
-      'query' => array(
-        'f' => $filters,
-      ),
-    ));
+  $filters = array_filter( array_merge( $filters,
+    lib4ridora_construct_funding_element_filters($form_state),
+    lib4ridora_construct_funding_combined_filters($form_state) /* , */
+  ) );
+  if ($filters) { // Jam our filters into the redirect:
+    $form_state['redirect'][1] = array_merge_recursive($form_state['redirect'][1], array( 'query' => array( 'f' => $filters ) ) );
   }
 }
 
