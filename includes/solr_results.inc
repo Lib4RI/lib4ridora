@@ -407,28 +407,39 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
       $solr_fields = array_reverse(array_merge($solr_misc_fields,$solr_search_fields,$solr_facet_fields));
     }
     // replace date-spans with year-spans, expect $filter to contain "...sued_dt:[2014-01-01T00:00:00Z TO 2021-12-31T23:59:59Z]&..." or even URL-encoded.
-    while( !isset($yearRange) || !empty($yearRange) ) {			// loop, as support for multiple dates
-      $yearRange = array();
-      if ( ( $pos0 = stripos($filter,'_dt:',@intval($pos)) ) || ( $pos0 = stripos($filter,'_dt%3A',@intval($pos)) ) ) {
-        if ( ( ( $pos1 = strpos($filter,'[',$pos0) ) && ( $len1 = 1 ) ) || ( ( $pos1 = stripos($filter,'%5B',$pos0) ) && ( $len1 = 3 ) ) ) {
+    while( @!isset($yearRange) || @!empty($yearRange) ) {			// loop, as support for multiple dates
+      $yearRange = array(); // intentionally initiate here/later!
+      if ( ( ( $pos0 = stripos($filter,'_dt:',@intval($pos)) ) && ( $len0 = 4 ) ) || ( ( $pos0 = stripos($filter,'_dt%3A',@intval($pos)) ) && ($len0 = 6 ) ) ) {
+		if ( ( substr($filter.'&',$pos0+$len0,2) == '*&' && ( $len1 = 1 ) ) || ( strtoupper(substr($filter.'&',$pos0+$len0,4)) == '%2A&' && ( $len1 = 3 ) ) ) {
+          // so we just have an '*' - replace it with 'any...':
+          $yTmp = ( variable_get('islandora_solr_facets_year_only',true) ? 'Any Year' : 'Any Date' );
+          if ( !stripos(strrchr(substr('&'.substr($filter,$pos,$pos0-$pos),'&')),'date') ) { $yTmp = 'Anytime'; /* for _dt Solr fields without 'date' inside */ }
+          $filter = substr($filter,0,$pos0+$len0) . $yTmp . substr($filter,$pos0+$len0+$len1);
+          $pos = $pos0 + 8;	// to step forward a bit in $filter
+        }
+        elseif ( ( ( $pos1 = strpos($filter,'[',$pos0) ) && ( $len1 = 1 ) ) || ( ( $pos1 = stripos($filter,'%5B',$pos0) ) && ( $len1 = 3 ) ) ) {
           if ( ( ( $pos2 = stripos($filter,' TO ',$pos1) ) && ( $len2 = 4 ) ) || ( ( $pos2 = stripos($filter,'%20TO%20',$pos1) ) && ( $len2 = 8 ) ) ) {
             if ( ( ( $pos3 = strpos($filter,']',$pos2) ) && ( $len3 = 1 ) ) || ( ( $pos3 = stripos($filter,'%5D',$pos2) ) && ( $len3 = 3 ) ) ) {
               $yearRange[0] = trim(substr($filter,$pos1+$len1,$pos2-$pos1-$len1));		// will be e.g. 2014-01-01T00:00:00Z
-              $yearRange[0] = ( $date_format == NULL ) ? strval(intval($yearRange[0])) : format_date(strtotime($yearRange[0]) + (60 * 60 * 24), 'custom', $date_format);
               $yearRange[1] = trim(substr($filter,$pos2+$len2,$pos3-$pos2-$len2));		// will be e.g. 2021-12-31T23:59:59Z
-              if ( $date_format == NULL ) {
-                $yearRange[1] = ( intval($yearRange[1]) ? strval(intval($yearRange[1])) : ( ( strpos($yearRange[1],'*') === 0 ) ? 'NOW' : $yearRange[1] ) );
-              } else {
-                $yearRange[1] = format_date(strtotime(trim($yearRange[1])) - (60 * 60 * 24), 'custom', $date_format);
+              if ( $date_format != NULL ) {  // Hopefully...
+                $yearRange = array(
+                  0 => ( ( !empty($yearRange[0]) && strpos($yearRange[0],'*') !== 0 ) ? format_date(strtotime($yearRange[0]) + (60 * 60 * 24), 'custom', $date_format) : 'Big Bang' ),
+                  1 => ( ( !empty($yearRange[1]) && strpos($yearRange[1],'*') !== 0 ) ? format_date(strtotime($yearRange[1]) - (60 * 60 * 24), 'custom', $date_format) : 'Now' ),
+                );
+              } else { // improvise...
+                $yearRange[0] = ( intval($yearRange[0]) ? strval(intval($yearRange[0])) : ( ( !empty($yearRange[0]) && strpos($yearRange[0],'*') !== 0 ) ? $yearRange[0] : 'Big Bang' ) );
+                $yearRange[1] = ( intval($yearRange[1]) ? strval(intval($yearRange[1])) : ( ( !empty($yearRange[0]) && strpos($yearRange[1],'*') !== 0 ) ? $yearRange[1] : 'Now' ) );
               }
-              $filter = substr($filter,0,$pos1) . implode( ( stripos($filter,'%') ? '%20-%20' : ' - ' ), $yearRange ) . substr($filter,$pos3+$len3);
-			  $pos = $pos0 + 10;
+              $yTmp = ( strcmp($yearRange[0],$yearRange[1]) ? implode( ( stripos($filter,'%') ? '%20-%20' : ' - ' ), $yearRange ) : $yearRange[0] );
+              $filter = substr($filter,0,$pos1) . $yTmp . substr($filter,$pos3+$len3);
+              $pos = $pos0 + 16;	// to step forward a bit in $filter
             }
           }
         }
       }
     }
-	// Try to teplace names of Solr fields with their (configured) labels:
+    // Try to teplace names of Solr fields with their (configured) labels:
     $filter = $this->lib4ridora_replace_field_with_label( $filter, $solr_fields );
     // Enprettyments:
     $filter = html_entity_decode($filter,ENT_HTML401,'UTF-8'); // there may be special characters as HTML-encoding inside that may become double-encoded.
@@ -484,11 +495,16 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
           }
         }
         // Split range filter string to return formatted date values.
-        $filter_str = $filter_split[1];
-        $filter_str = trim($filter_str, '[');
-        $filter_str = trim($filter_str, ']');
-        $filter_array = explode(' TO ', $filter_str);
-        $filter_split[1] = format_date(strtotime(trim($filter_array[0])) + (60 * 60 * 24), 'custom', $format) . ' - ' . format_date(strtotime(trim($filter_array[1])) - (60 * 60 * 24), 'custom', $format);
+        if ( empty($filter_split[1]) || empty(rtrim($filter_split[1],'*')) ) {
+          $filter_split[1] = ( variable_get('islandora_solr_facets_year_only',true) ? 'Any Year' : 'Any Date' );  // if only a '*', rather special case...
+        } else {
+          $yearRange = array_map( function($y) { return trim($y,"[] \n\r\t\v\0"); }, explode(' TO ',$filter_split[1]) );
+          $yearRange = array(
+            0 => ( ( !empty($yearRange[0]) && strpos($yearRange[0],'*') !== 0 ) ? format_date(strtotime($yearRange[0]) + (60 * 60 * 24), 'custom', $format) : 'Big Bang' ),
+            1 => ( ( !empty($yearRange[1]) && strpos($yearRange[1],'*') !== 0 ) ? format_date(strtotime($yearRange[1]) - (60 * 60 * 24), 'custom', $format) : 'Now' ),
+          );
+          $filter_split[1] = ( strcmp($yearRange[0],$yearRange[1]) ? implode(' - ',$yearRange) : $yearRange[0] );
+        }
       }
       $filter_string = $filter_split[1];
     }
