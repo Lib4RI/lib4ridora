@@ -63,6 +63,9 @@ function lib4ridora_uninstall() {
 	'lib4ridora_download_count_ignore_role',
 	'lib4ridora_download_count_extra_tuning',
 	'lib4ridora_impact_factor_force_update',
+	'lib4ridora_omit_user_agent',
+	'lib4ridora_adv_search_psi_unitz_by_mysql',
+	'lib4ridora_funding_solr_field_funder',
   );
   array_walk($variables, 'variable_del');
 }

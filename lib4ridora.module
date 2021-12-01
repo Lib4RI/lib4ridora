@@ -503,7 +503,37 @@ function lib4ridora_menu() {
     'type' => MENU_CALLBACK,
     'access callback' => TRUE,
   );
+  
+  // 'Theme-less' apporach, see https://www.webomelette.com/how-create-autocomplete-form-element-drupal-7
+  if ( module_exists('lib4ri_funding') ) {
+    $items['islandora/fundersearch/autocomplete'] = array(
+      'module' => 'lib4ridora',
+      'file' => 'includes/advanced_search.funding.inc',
+      'page callback' => 'lib4ridora_fundersearch_autocomplete',
+      'page arguments' => array(1),
+      'type' => MENU_CALLBACK,
+      'access callback' => 'lib4ridora_fundersearch_access_callback',
+    );
+
+	$items['lib4ridora/fundersearch/autocomplete'] = array(
+      'module' => 'lib4ridora',
+      'file' => 'includes/advanced_search.funding.inc',
+      'page callback' => 'lib4ridora_adv_search_funding_callback',
+  //  'page arguments' => array(1),	/* https://www.drupal.org/forum/support/module-development-and-code-questions/2009-05-08/passing-arguments-to-form-functions */
+	  'type' => MENU_CALLBACK,
+      'access callback' => 'lib4ridora_fundersearch_access_callback',
+	);
+  }
+
   return $items;
+}
+
+function lib4ridora_fundersearch_access_callback() {
+  if ( !user_is_logged_in() ) {
+    module_load_include('inc', 'lib4ridora', 'includes/utilities');
+    return ( !lib4ridora_user_is_bot('',false,true) );
+  }
+  return true;
 }
 
 /**
@@ -1499,7 +1529,7 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
       '#suffix' => '</div>',
     );
   }
-  
+
   $form['peer_review'] = array(
     '#type' => 'checkboxes',
     '#options' => array(
@@ -1528,6 +1558,85 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#prefix' => '<div id="lib4ri-advanced-search-full-text">',
     '#suffix' => '</div>',
   );
+
+
+/*	vvv Dev-Note vvv TEST vvv */
+  global $user;
+  if ( stripos('/DoraDev/Frank/',strval($user->name)) ) {
+
+	  module_load_include('inc', 'lib4ridora', 'includes/advanced_search.funding');
+
+	  $optAry = lib4ridora_get_funding_options( 'funder_name_test' );
+	  $auxAry = array( "Funder_Name_1" => "Funder Name 1", "Funder_Name_2" => "Funder Name 2" );
+	  $form['funder_name_test'] = array(
+		'#type' => 'select',
+		'#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
+		'#title' => t('Funder Names (Test)'),
+		'#prefix' => '<div id="lib4ri-advanced-search-funding" style="background-color:#def; padding-left:1em;">',
+	  );
+
+	  $optAry = lib4ridora_get_funding_options( 'funding_stream_test' );
+	  $auxAry = array( "Funding_Stream_1" => "Funding Stream 1", "Funding_Stream_2" => "Funding Stream 2" );
+	  $form['funding_stream_test'] = array(
+		'#type' => 'select',
+		'#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
+		'#title' => t('Funding Streams (Test)'),
+	  );
+
+	  $optAry = lib4ridora_get_funding_options( 'award_number_test' );
+	  $auxAry = array( "Award_Number_1" => "Award Number 1", "Award_Number_2" => "Award Number 2" );
+	  $form['award_number_test'] = array(
+		'#type' => 'select',
+		'#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
+		'#title' => t('Award Numbers (Test)'),
+		'#attributes' => array( 'style' => 'width:15em;' ),
+	  );
+
+	  $optAry = lib4ridora_get_funding_options( 'award_title_test' );
+	  $auxAry = array( "Award_Title_1" => "Award Title 1", "Award_Title_2" => "Award Title 2" );
+	  $form['award_title_test'] = array(
+		'#type' => 'select',
+		'#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
+		'#title' => t('Award Titles (Test)'),
+		'#attributes' => array( 'style' => 'width:75em;' ),
+		'#suffix' => '</div>',
+	  );
+
+	// ------------------------------------------------------------
+
+	  if ( module_exists('lib4ri_funding') ) {
+		module_load_include('module', 'lib4ri_funding', 'lib4ri_funding' );
+
+		$optAry = lib4ridora_get_funding_options( 'funderselect' );
+		$auxAry = array( "Funder_Name_1" => "Funder Name 1", "Funder_Name_2" => "Funder Name 2" );
+		$form['funderselect'] = array(
+		  '#id' => 'funderselect',
+		  '#type' => 'select',
+		  '#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
+		  '#title' => t('Funder'),	/* for funding *streams* actually */
+		  '#maxlength' => 1024,
+		  '#prefix' => '<div id="lib4ri-advanced-search-funding" style="background-color:#fec; padding-left:1em;">',
+		  '#suffix' => '</div>',
+		);
+		$form['fundersearch'] = array(
+		  '#id' => 'fundersearch',
+		  '#title' => t('Project Title or Funder (EC, SNSF)'),
+		  '#type' => 'textfield',
+		  '#maxlength' => 1024,
+		  '#size' => 144,
+		  '#autocomplete_path' => /* 'islandora/funding/autocomplete/atitle/0' */ variable_get('lib4ridora_fundersearch','lib4ridora/fundersearch/autocomplete') ,
+		  '#prefix' => '<div id="lib4ri-advanced-search-funding" style="background-color:#dec; padding-left:1em;">',
+		  '#suffix' => '</div>',
+		);
+	  }
+
+  }
+  elseif ( @isset($form['fund1']) ) {
+    unset($form['fund1']);
+  }
+/*	^^^ TEST ^^^ */
+
+
   $form['controls']['#weight'] = 100;
   $form['#validate'][] = 'lib4ridora_solr_advanced_search_form_validate';
   $form['#submit'][] = 'lib4ridora_solr_advanced_search_form_submit';
@@ -1578,23 +1687,24 @@ function lib4ridora_solr_advanced_search_form_validate($form, &$form_state) {
  * @see islandora_solr_advanced_search_form()
  */
 function lib4ridora_solr_advanced_search_form_submit($form, &$form_state) {
-  module_load_include('inc', 'lib4ridora', 'includes/advanced_search');
+  module_load_include('inc', 'lib4ridora', 'includes/advanced_search.funding');
   $filters = array(
     lib4ridora_construct_year_filter($form_state),
     lib4ridora_construct_publication_type_filter($form_state),
     lib4ridora_construct_organization_unit_filter($form_state),
     lib4ridora_construct_peer_reviewed_filter($form_state),
     lib4ridora_construct_full_text_filter($form_state),
+    lib4ridora_construct_funding_element_filter($form_state, 'funder_name_test' ),
+    lib4ridora_construct_funding_element_filter($form_state, 'funding_stream_test' ),
+    lib4ridora_construct_funding_element_filter($form_state, 'award_title_test' ),
+    lib4ridora_construct_funding_element_filter($form_state, 'award_number_test' ),
   );
-  $filters = array_filter($filters);
-  if ($filters) {
-    // Jam our filters into the redirect.
-    $form_state['redirect'][1] = array_merge_recursive($form_state['redirect'][1], array(
-      'query' => array(
-        'f' => $filters,
-      ),
-    ));
-
+  $filters = array_filter( array_merge( $filters,
+    lib4ridora_construct_funding_element_filters($form_state),
+    lib4ridora_construct_funding_combined_filters($form_state) /* , */
+  ) );
+  if ($filters) { // Jam our filters into the redirect:
+    $form_state['redirect'][1] = array_merge_recursive($form_state['redirect'][1], array( 'query' => array( 'f' => $filters ) ) );
   }
 }
 
