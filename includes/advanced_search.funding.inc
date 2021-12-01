@@ -582,7 +582,7 @@ function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $fiel
 			if ( $wordSolr != $word ) {
 				$varAry[] = $wordSolr;
 			}
-			if ( $word_wild_card > 0 && strtoupper($word) != $word && ( $partial_ditgit || !preg_match('/^\d+$/',$word) ) ) {
+			if ( $word_wild_card > 0 && ( $partial_ditgit || !preg_match('/^\d+$/',$word) ) ) {
 				$varAry[] = '*'.$wordSolr.'*';
 				if ( $wLen > 2 ) { 
 					$varAry[] = substr($word,0,-1).'*';
