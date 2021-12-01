@@ -458,6 +458,44 @@ function lib4ridora_metadata_display_elements(&$elements) {
   }
 }
 
+/*
+ * function to get information of metadata fields as configured Solr
+ *
+ * based on islandora_solr_get_fields
+ */
+function lib4ridora_get_metadata_fields($field_as_key = true) {
+  // Fields query.
+  $query = db_select('islandora_solr_metadata_fields', 'ismf');
+  $query->fields('ismf');
+  $query->orderBy('ismf.weight', 'ASC');
+  try {
+    $result = $query->execute();
+    $records = $result->fetchAll(PDO::FETCH_ASSOC);
+  }
+  catch (Exception $e) {
+    if ($e->errorInfo[0] == '42S02') {
+      drupal_set_message(t('Islandora Solr metadata fields table not found. Try running <a href="@update_url">update.php</a>.', array('@update_url' => url('update.php'))), 'error');
+    }
+    else {
+      drupal_set_message($e->getMessage(), 'error');
+    }
+    return array();
+  }
+  // Unserialize Solr field settings blob.
+  foreach ($records as &$value) {
+    $value['data'] = unserialize($value['data']);
+  }
+  // Fields as keys.
+  if ( $field_as_key ) {
+    $original = $records;
+    $records = array();
+    foreach ($original as $field) {
+      $records[$field['solr_field']] = $field;
+    }
+  }
+  return $records;
+}
+
 /**
  * DOI-validation helper function
  *
@@ -843,8 +881,8 @@ function lib4ridora_access_rejection( $batch = NULL ) {
   if ( $uaList = variable_get('lib4ridora_omit_user_agent',NULL) ) {  // expected to have a browser's user agent string, or an array with multiple of them.
     global $base_path;
     if ( !drupal_is_cli() || @!empty($_SERVER['DOCUMENT_ROOT']) ) {	// see: https://api.drupal.org/api/drupal/includes%21bootstrap.inc/function/drupal_is_cli/7.x
-      foreach( ( is_array($uaList) ? $uaList : array($uaList) ) as $uaString ) {
-        if ( empty(trim($_SERVER['HTTP_USER_AGENT'])) || stripos($_SERVER['HTTP_USER_AGENT'],strval($uaString)) !== false ) {
+      foreach( ( is_array($uaList) ? array_map('trim',$uaList) : array(trim($uaList)) ) as $uaString ) {
+        if ( empty(trim($_SERVER['HTTP_USER_AGENT'])) || ( !empty($uaString) && stripos($_SERVER['HTTP_USER_AGENT'],$uaString) !== false ) ) {
           $tmpPath = '/tmp/browser-user-agent.denied' . strtr($base_path,'/','.') . 'txt';
           $ipAry = array( date("Y-m-d.H-i-s"), $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_X_REAL_IP'], $_SERVER['HTTP_X_FORWARDED_FOR'], $_SERVER['REQUEST_URI'], $_SERVER['HTTP_USER_AGENT'] );
           file_put_contents( $tmpPath, @strval(file_get_contents($tmpPath)) . implode(' | ',$ipAry) . "\r\n" );
