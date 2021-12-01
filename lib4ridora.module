@@ -1559,83 +1559,9 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#suffix' => '</div>',
   );
 
-
-/*	vvv Dev-Note vvv TEST vvv */
-  global $user;
-  if ( stripos('/DoraDev/Frank/',strval($user->name)) ) {
-
-	  module_load_include('inc', 'lib4ridora', 'includes/advanced_search.funding');
-
-	  $optAry = lib4ridora_get_funding_options( 'funder_name_test' );
-	  $auxAry = array( "Funder_Name_1" => "Funder Name 1", "Funder_Name_2" => "Funder Name 2" );
-	  $form['funder_name_test'] = array(
-		'#type' => 'select',
-		'#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
-		'#title' => t('Funder Names (Test)'),
-		'#prefix' => '<div id="lib4ri-advanced-search-funding" style="background-color:#def; padding-left:1em;">',
-	  );
-
-	  $optAry = lib4ridora_get_funding_options( 'funding_stream_test' );
-	  $auxAry = array( "Funding_Stream_1" => "Funding Stream 1", "Funding_Stream_2" => "Funding Stream 2" );
-	  $form['funding_stream_test'] = array(
-		'#type' => 'select',
-		'#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
-		'#title' => t('Funding Streams (Test)'),
-	  );
-
-	  $optAry = lib4ridora_get_funding_options( 'award_number_test' );
-	  $auxAry = array( "Award_Number_1" => "Award Number 1", "Award_Number_2" => "Award Number 2" );
-	  $form['award_number_test'] = array(
-		'#type' => 'select',
-		'#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
-		'#title' => t('Award Numbers (Test)'),
-		'#attributes' => array( 'style' => 'width:15em;' ),
-	  );
-
-	  $optAry = lib4ridora_get_funding_options( 'award_title_test' );
-	  $auxAry = array( "Award_Title_1" => "Award Title 1", "Award_Title_2" => "Award Title 2" );
-	  $form['award_title_test'] = array(
-		'#type' => 'select',
-		'#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
-		'#title' => t('Award Titles (Test)'),
-		'#attributes' => array( 'style' => 'width:75em;' ),
-		'#suffix' => '</div>',
-	  );
-
-	// ------------------------------------------------------------
-
-	  if ( module_exists('lib4ri_funding') ) {
-		module_load_include('module', 'lib4ri_funding', 'lib4ri_funding' );
-
-		$optAry = lib4ridora_get_funding_options( 'funderselect' );
-		$auxAry = array( "Funder_Name_1" => "Funder Name 1", "Funder_Name_2" => "Funder Name 2" );
-		$form['funderselect'] = array(
-		  '#id' => 'funderselect',
-		  '#type' => 'select',
-		  '#options' => array_merge( array("*" => "All"), ( @empty(reset($optAry)) ? $auxAry : $optAry ) ),
-		  '#title' => t('Funder'),	/* for funding *streams* actually */
-		  '#maxlength' => 1024,
-		  '#prefix' => '<div id="lib4ri-advanced-search-funding" style="background-color:#fec; padding-left:1em;">',
-		  '#suffix' => '</div>',
-		);
-		$form['fundersearch'] = array(
-		  '#id' => 'fundersearch',
-		  '#title' => t('Project Title or Funder (EC, SNSF)'),
-		  '#type' => 'textfield',
-		  '#maxlength' => 1024,
-		  '#size' => 144,
-		  '#autocomplete_path' => /* 'islandora/funding/autocomplete/atitle/0' */ variable_get('lib4ridora_fundersearch','lib4ridora/fundersearch/autocomplete') ,
-		  '#prefix' => '<div id="lib4ri-advanced-search-funding" style="background-color:#dec; padding-left:1em;">',
-		  '#suffix' => '</div>',
-		);
-	  }
-
-  }
-  elseif ( @isset($form['fund1']) ) {
+  if ( @isset($form['fund1']) ) {	// sanity check: fund1 is no longer used, but better let this until all affected modules are updated - 2021-11-30/fh
     unset($form['fund1']);
   }
-/*	^^^ TEST ^^^ */
-
 
   $form['controls']['#weight'] = 100;
   $form['#validate'][] = 'lib4ridora_solr_advanced_search_form_validate';

@@ -40,7 +40,7 @@ function template_preprocess_lib4ridora_pdf_link(&$variables) {
   $values = lib4ridora_get_embargo_info($variables['datastream']);
   
   // for Google bot only show the open Access PDF as in the scholar meta tags (realized by 'lib4ri_sitemap' module):
-  if ( module_exists('lib4ri_sitemap') && ( stripos($_SERVER['HTTP_USER_AGENT'],'Googlebot/') || stripos($_GET['bot'],'Google') === 0 ) ) {
+  if ( module_exists('lib4ri_sitemap') && ( stripos($_SERVER['HTTP_USER_AGENT'],'Googlebot/') || @stripos($_GET['bot'],'Google') === 0 ) ) {
     if ( !lib4ridora_is_embargo_info_oa($values,true) ) { return; }
   }
  

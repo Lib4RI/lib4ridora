@@ -371,82 +371,86 @@ function lib4ridora_construct_funding_combined_filters(&$form_state, $funding_el
 			$sTmp = $solr_field_funder . ':' . ( empty(trim($sTmp,'" ')) ? '*' : ( sizeof($tmpAry) > 1 ? '('.$sTmp.')' : $sTmp ) );		// similar to lib4ridora_construct_solr_statement()
 			$filterTmpAry[$solr_field.'__'.crc32(strtolower($sStr))] = $sTmp;
 		}
+
+		if ( sizeof($resultAry) != 1 || strtolower(reset($resultAry)) != strtolower($search_string) ) {
+			// so we do not have one funder name/stream alone, or the one we have does not really match the input string,
+			// hence let's check the award numbers+title too:
 		
-		// check if award number/title
-		$award_number_idx = '';
-		if ( !( $award_number = intval(ltrim($search_string,"[({-})] \n\r\t\v\0")) ) ) {
-			// no number found at the beginning, so let's see if there is a number at the end (as eg. on Detailed Record Page):
-			$tmpAry = array(); 
-			preg_match('/\s+\d+$/',rtrim(strtr($search_string,'[({-})]','       ')),$tmpAry);
-			$award_number = @intval(ltrim($tmpAry[0]));
-		}
-		if ( $award_number ) {
-			$solr_field = $solr_field_anumber;
-			$resultAry = lib4ridora_funding_data_solr_autocomplete( strval($award_number), $solr_field );
-			foreach( $resultAry as $value ) {
-				if ( stripos($value,strval($award_number)) !== false ) {
-					$sTmp = $solr_field . ':' . strval($award_number);			// similar to lib4ridora_construct_solr_statement()
-					$award_number_idx = $solr_field.'__'.strval($award_number);
-					$filterTmpAry[$award_number_idx] = $sTmp;
-					break;
-				}
+			$award_number_idx = '';
+			if ( !( $award_number = intval(ltrim($search_string,"[({-})] \n\r\t\v\0")) ) ) {
+				// no number found at the beginning, so let's see if there is a number at the end (as eg. on Detailed Record Page):
+				$tmpAry = array(); 
+				preg_match('/\s+\d+$/',rtrim(strtr($search_string,'[({-})]','       ')),$tmpAry);
+				$award_number = @intval(ltrim($tmpAry[0]));
 			}
-		}
-		if ( empty($award_number_idx) || strval($award_number) != $search_string ) {
-			// Issue: Which Solr field (mt/ms) to use?
-			// Assumed the user really selected a (full) award title when we can use the ms field.
-			// however if there is only a partial string (typed of partially copied+pasted) we have to try a token search with 'mt'.
-			$ssAry = array();
-			$sTmp = ( empty($award_number_idx) ? $search_string : str_replace(strval($award_number),'',$search_string) /* remove the number, so we just have text */ );
-			if ( $sTmp = trim( preg_replace('/\s*\(\s*\)\s*/',' ',strtr($sTmp,'[{-}]','(( ))')), "[({-})] \n\r\t\v\0" ) ) {	// clean up
-				if ( !empty($award_number_idx) ) {
-					$search_string = $sTmp;	// update the search string after removing a valid award number, since in Solr no award title has this number inside.
-				}
-				$tmpAry = explode(' ',$sTmp);
-				foreach( $tmpAry as $word ) {
-					$word = lib4ridora_word_clean( $word );
-					if ( strlen($word) < 3 ) { continue; }
-					$ssAry[] = lib4ridora_word_solr($word);
-				}
-			}
-			if ( empty($ssAry) ) { $ssAry = array('*'); }
-			
-			$optAry = array( /* case sensitive with _ms ! */
-				$solr_field_ms_atitle . ':"' . $search_string . '"'	/* usually only full award title will be successful here */ ,
-				$solr_field_ms_atitle . ':*' . trim( str_replace(' ',"\\ ",$search_string), '*' ) . '*',
-				$solr_field_atitle . ':' . ( ( sizeof($ssAry) > 1 ) ? '('.implode(' AND ',$ssAry).')' : $search_string ),
-				$solr_field_atitle . ':' . preg_replace('/\*+/','*',( ( sizeof($ssAry) > 1 ) ? '(*'.implode('* AND *',$ssAry).'*)' : '*'.$search_string.'*' )),
-			);
-			$filter_string = '';
-			$numFound = 0;
-			foreach( $optAry as $optNum => $fs_ss ) {
-				$solr = new IslandoraSolrQueryProcessor();
-				$solr->buildQuery( $fs_ss );		// (better) use quotes for the '_ms' field!
-				$solr->solrLimit = 2;
-				$solr->executeQuery(FALSE);
-				if ( $numFound = @intval( $solr->islandoraSolrResult['response']['numFound'] ) ) {
-					$filter_string = $fs_ss;
-					$solr_field = strtok($fs_ss,':');
-					if ( $optNum == 0 && !empty($award_number_idx) ) {
-						unset($filterTmpAry[$award_number_idx]);	// remove again, since we have gound something with the full string
+			if ( $award_number ) {
+				$solr_field = $solr_field_anumber;
+				$resultAry = lib4ridora_funding_data_solr_autocomplete( strval($award_number), $solr_field );
+				foreach( $resultAry as $value ) {
+					if ( stripos($value,strval($award_number)) !== false ) {
+						$sTmp = $solr_field . ':' . strval($award_number);			// similar to lib4ridora_construct_solr_statement()
+						$award_number_idx = $solr_field.'__'.strval($award_number);
+						$filterTmpAry[$award_number_idx] = $sTmp;
+						break;
 					}
-					break;
 				}
 			}
-			if ( empty($filter_string) ) {
-				$filter_string = $optAry[sizeof($optAry)-1];
-				$solr_field = strtok($filter_string,':');
-				if ( $optNum > 1 && empty($filterTmpAry) && variable_get('lib4ridora_adv_search_user_hint',false) ) { // optional/test
-					// since we did not find a direct hit, give a message with/when more than one search words:
-					if ( $numFound ) {
-						$sTmp .= '. However there ' . ( ( $numFound == 1 ) ? 'is a potential match' : 'are potential matches' ) . ' when splitting it up';
-					} else {
-						$sTmp .= ', even after splitting it up';
+			if ( empty($award_number_idx) || strval($award_number) != $search_string ) {
+				// Issue: Which Solr field (mt/ms) to use?
+				// Assumed the user really selected a (full) award title when we can use the ms field.
+				// however if there is only a partial string (typed of partially copied+pasted) we have to try a token search with 'mt'.
+				$ssAry = array();
+				$sTmp = ( empty($award_number_idx) ? $search_string : str_replace(strval($award_number),'',$search_string) /* remove the number, so we just have text */ );
+				if ( $sTmp = trim( preg_replace('/\s*\(\s*\)\s*/',' ',strtr($sTmp,'[{-}]','(( ))')), "[({-})] \n\r\t\v\0" ) ) {	// clean up
+					if ( !empty($award_number_idx) ) {
+						$search_string = $sTmp;	// update the search string after removing a valid award number, since in Solr no award title has this number inside.
 					}
-					drupal_set_message( t($sTmp.'.'), 'warning' );
+					$tmpAry = explode(' ',$sTmp);
+					foreach( $tmpAry as $word ) {
+						$word = lib4ridora_word_clean( $word );
+						if ( strlen($word) < 3 ) { continue; }
+						$ssAry[] = lib4ridora_word_solr($word);
+					}
 				}
+				if ( empty($ssAry) ) { $ssAry = array('*'); }
+				
+				$optAry = array( /* case sensitive with _ms ! */
+					$solr_field_ms_atitle . ':"' . $search_string . '"'	/* usually only full award title will be successful here */ ,
+					$solr_field_ms_atitle . ':*' . trim( str_replace(' ',"\\ ",$search_string), '*' ) . '*',
+					$solr_field_atitle . ':' . ( ( sizeof($ssAry) > 1 ) ? '('.implode(' AND ',$ssAry).')' : $search_string ),
+					$solr_field_atitle . ':' . preg_replace('/\*+/','*',( ( sizeof($ssAry) > 1 ) ? '(*'.implode('* AND *',$ssAry).'*)' : '*'.$search_string.'*' )),
+				);
+				$filter_string = '';
+				$numFound = 0;
+				foreach( $optAry as $optNum => $fs_ss ) {
+					$solr = new IslandoraSolrQueryProcessor();
+					$solr->buildQuery( $fs_ss );		// (better) use quotes for the '_ms' field!
+					$solr->solrLimit = 2;
+					$solr->executeQuery(FALSE);
+					if ( $numFound = @intval( $solr->islandoraSolrResult['response']['numFound'] ) ) {
+						$filter_string = $fs_ss;
+						$solr_field = strtok($fs_ss,':');
+						if ( $optNum == 0 && !empty($award_number_idx) ) {
+							unset($filterTmpAry[$award_number_idx]);	// remove again, since we have gound something with the full string
+						}
+						break;
+					}
+				}
+				if ( empty($filter_string) ) {
+					$filter_string = $optAry[sizeof($optAry)-1];
+					$solr_field = strtok($filter_string,':');
+					if ( $optNum > 1 && empty($filterTmpAry) && variable_get('lib4ridora_adv_search_user_hint',false) ) { // optional/test
+						// since we did not find a direct hit, give a message with/when more than one search words:
+						if ( $numFound ) {
+							$sTmp .= '. However there ' . ( ( $numFound == 1 ) ? 'is a potential match' : 'are potential matches' ) . ' when splitting it up';
+						} else {
+							$sTmp .= ', even after splitting it up';
+						}
+						drupal_set_message( t($sTmp.'.'), 'warning' );
+					}
+				}
+				$filterTmpAry[$solr_field.'__'.crc32(strtolower($search_string))] = $filter_string;
 			}
-			$filterTmpAry[$solr_field.'__'.crc32(strtolower($search_string))] = $filter_string;
 		}
 		$filterMainAry[implode('___',array_keys($filterTmpAry))] = array( 'filter' => $filterTmpAry, 'op' => @strval($fieldAry['boolean']) );
 	}
@@ -616,14 +620,6 @@ function lib4ridora_solr_search_words( $words = array(), $solr_field = '', $fiel
 	$solr_url .= '?wt=json&csv.separator=' . $solr_sep . '&indent=true&rows=987654321&sort=PID%20asc';
 	$solr_url .= '&fl=PID%2c+' . /* implode('%2c+',$fieldAry) */ $solr_field;
 	$solr_url .= '&q=PID:' . ( strlen($base_path) > 2 ? trim($base_path,'/') : '*' ) . '%5c%3a*+AND+' . $solr_field . ':(' . $valueList . ')';
-/*
-	global $user;
-	if ( stripos('/DoraDev/Frank/',strval($user->name)) ) {
-		dpm( date("Y-m-d H:i:s")."\r\n"."Solr-URL:\r\n".$solr_url );
-		file_put_contents('/tmp/adv-s.solr-url.test.txt',date("Y-m-d H:i:s")."\r\n".$solr_url);
-		dpm( "mustHaveAry: " . print_r($mustHaveAry,1) . "\r\n" );
-	}
-*/
 
 	$resultAry = array();
 	$numFound = -1;
@@ -744,7 +740,7 @@ function lib4ridora_adv_search_funding_callback( $search_string ) {
 	}
 	else {
 		$solr_field_anumber = array_shift( lib4ridora_get_solr_field_funding('award_number','mt') );
-		$doraAry = lib4ridora_funding_data_solr_autocomplete( $award_number, $solr_field_anumber );
+		$doraAry = lib4ridora_funding_data_solr_autocomplete( rtrim(strval($award_number),'*').'*', $solr_field_anumber );
 	/*	returns: array(
 			'4567'  => 4567,		
 			'45671' => '45671',
