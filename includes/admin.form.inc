@@ -317,7 +317,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
     $form['lib4ridora_bot_white_list'] = array(
         '#type' => 'textfield',
         '#title' => t('Bots detection white list'),
-        '#description' => t('List of IP addresses not to be rejected as bots (comma separated)'),
+        '#description' => t('IP addresses not to be rejected as bots (comma separated list of single IPs or ranges. Example: 127.0.0.1, [193.134.202.0; 193.134.202.255])'),
         '#default_value' => variable_get('lib4ridora_bot_white_list', ''),
         '#required' => FALSE,
         '#size' => $textfield_size,

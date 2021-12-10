@@ -877,10 +877,13 @@ function lib4ridora_user_is_bot($user_agent = '', $demand_language = FALSE, $use
  *   as found 'underneath' the CSV/Ecxel icon the hook_init does not seem to be triggered (always) but hook_bach_alter() can interrupt it.
  */
  function lib4ridora_access_rejection( $batch = NULL ) {
-     $white_list = array_map('trim', explode(',', variable_get('lib4ridora_bot_white_list')));
-     if (in_array($_SERVER['HTTP_X_REAL_IP'], $white_list) || in_array($_SERVER['REMOTE_ADDR'], $white_list)){
-         return;
-     }
+//     $white_list = array_map('trim', explode(',', variable_get('lib4ridora_bot_white_list')));
+//      if (in_array($_SERVER['HTTP_X_REAL_IP'], $white_list) || in_array($_SERVER['REMOTE_ADDR'], $white_list)){
+
+     if (lib4ridora_is_white_listed($_SERVER['HTTP_X_REAL_IP']) || lib4ridora_is_white_listed($_SERVER['REMOTE_ADDR'])){
+          return;
+      }
+
   // Task 1: user-agent check:
   if ( $uaList = variable_get('lib4ridora_omit_user_agent',NULL) ) {  // expected to have a browser's user agent string, or an array with multiple of them.
     global $base_path;
@@ -931,4 +934,41 @@ function lib4ridora_user_is_bot($user_agent = '', $demand_language = FALSE, $use
       }
     }
   }
+}
+
+function lib4ridora_is_white_listed($ip) {
+    $white_list = array_map('trim', explode(',', variable_get('lib4ridora_bot_white_list')));
+    
+    $ips = [];
+    $ranges = [];
+    
+    foreach ($white_list as $entry){
+        $e = explode(';', $entry);
+        
+        if (sizeof($e) == 1) {
+            array_push($ips, $e[0]);
+        }
+        elseif (sizeof($e) == 2){
+            $e[0] = trim($e[0]," \n\r\t\v\0[]");
+            $e[1] = trim($e[1]," \n\r\t\v\0[]");
+            
+            array_push($ranges, $e);
+        }        
+    }
+    
+    if (in_array($ip, $ips)){
+        return TRUE;
+    }
+    
+    foreach ($ranges as $range){
+        $ipl = ip2long($ip);
+        $low = ip2long($range[0]);
+        $high = ip2long($range[1]);
+        
+        if($low <= $ipl && $ipl <= $high){
+            return TRUE;
+        }
+    }
+    
+    return FALSE;
 }
