@@ -877,7 +877,8 @@ function lib4ridora_user_is_bot($user_agent = '', $demand_language = FALSE, $use
  *   as found 'underneath' the CSV/Ecxel icon the hook_init does not seem to be triggered (always) but hook_bach_alter() can interrupt it.
  */
  function lib4ridora_access_rejection( $batch = NULL ) {
-     if (in_array($_SERVER['HTTP_X_REAL_IP'], explode(',', variable_get('lib4ridora_bot_white_list'))) || in_array($_SERVER['REMOTE_ADDR'], explode(',', variable_get('lib4ridora_bot_white_list')))){
+     $white_list = array_map('trim', explode(',', variable_get('lib4ridora_bot_white_list')));
+     if (in_array($_SERVER['HTTP_X_REAL_IP'], $white_list) || in_array($_SERVER['REMOTE_ADDR'], $white_list)){
          return;
      }
   // Task 1: user-agent check:
