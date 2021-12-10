@@ -314,6 +314,15 @@ function lib4ridora_admin(array $form, array &$form_state) {
         ),
     );
   
+    $form['lib4ridora_bot_white_list'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Bots detection white list'),
+        '#description' => t('List of IP addresses not to be rejected as bots'),
+        '#default_value' => variable_get('lib4ridora_bot_white_list', ''),
+        '#required' => FALSE,
+        '#size' => $textfield_size,
+    );
+    
   // related to Redmine issue #189 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/189 (about HTML tags in page title)
   $form['lib4ridora_page_title_tag_fix'] = array(
     '#type' => 'checkbox',

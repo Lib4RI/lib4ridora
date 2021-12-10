@@ -876,7 +876,10 @@ function lib4ridora_user_is_bot($user_agent = '', $demand_language = FALSE, $use
  * - For https://www.dora.lib4ri.ch/empa/islandora/search/dc.title%3Acarbon?islandora_solr_search_navigation=1&solr_profile=lib4ri_csv
  *   as found 'underneath' the CSV/Ecxel icon the hook_init does not seem to be triggered (always) but hook_bach_alter() can interrupt it.
  */
-function lib4ridora_access_rejection( $batch = NULL ) {
+ function lib4ridora_access_rejection( $batch = NULL ) {
+     if (in_array($_SERVER['HTTP_X_REAL_IP'], explode(',', variable_get('lib4ridora_bot_white_list'))) || in_array($_SERVER['REMOTE_ADDR'], explode(',', variable_get('lib4ridora_bot_white_list')))){
+         return;
+     }
   // Task 1: user-agent check:
   if ( $uaList = variable_get('lib4ridora_omit_user_agent',NULL) ) {  // expected to have a browser's user agent string, or an array with multiple of them.
     global $base_path;
