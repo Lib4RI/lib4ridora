@@ -823,9 +823,10 @@ function lib4ridora_user_is_bot($user_agent = '', $demand_language = FALSE, $use
 			return TRUE;	// with an empty user agent string we will consider the user as a bot
 		}
 	}
-	// If available use the check in islandora_usage_stats, see islandora_usage_stats/includes/utilities.inc, 
+	// If available use the check in islandora_usage_stats, see islandora_usage_stats/includes/utilities.inc
+	// see for example: https://www.dora.lib4ri.ch/eawag/admin/islandora/tools/islandora_usage_stats
 	$bot_regex = trim(variable_get('islandora_usage_stats_exclude_bots_regex', '/bot|rambler|spider|crawl|slurp|curl|^$/i'));
-	if ( !module_exists('islandora_usage_stats') || strlen($bot_regex) < 40 ) {
+	if ( !( module_exists('islandora_usage_stats') && variable_get('islandora_usage_stats_exclude_bots', '1') ) || strlen($bot_regex) < 10 ) {
 		// let's use a hard-coded list then, patially however expandable
 		$botAry = array(
 			'Bot,Search,Crawl,Spider,Scan,Scout,Archiv,Index,Ads,Job,SEO', 			/* generic */
@@ -876,27 +877,49 @@ function lib4ridora_user_is_bot($user_agent = '', $demand_language = FALSE, $use
  * - For https://www.dora.lib4ri.ch/empa/islandora/search/dc.title%3Acarbon?islandora_solr_search_navigation=1&solr_profile=lib4ri_csv
  *   as found 'underneath' the CSV/Ecxel icon the hook_init does not seem to be triggered (always) but hook_bach_alter() can interrupt it.
  */
- function lib4ridora_access_rejection( $batch = NULL ) {
-//     $white_list = array_map('trim', explode(',', variable_get('lib4ridora_bot_white_list')));
-//      if (in_array($_SERVER['HTTP_X_REAL_IP'], $white_list) || in_array($_SERVER['REMOTE_ADDR'], $white_list)){
+function lib4ridora_access_rejection( $batch = NULL ) {
 
-     if (lib4ridora_is_white_listed($_SERVER['HTTP_X_REAL_IP']) || lib4ridora_is_white_listed($_SERVER['REMOTE_ADDR'])){
-          return;
+  $ipAry = array(
+    @strval( $_SERVER['HTTP_CLIENT_IP'] ),
+    @strval( $_SERVER['HTTP_X_REAL_IP'] ),
+    @strval( ip_address() /* by Drupal */ ),
+  );
+  $ipClient = array_shift( array_filter($ipAry) );
+
+  if ( lib4ridora_is_white_listed($ipClient) ) {
+	return;		// never reject with an explicit IP
+  }
+  if ( variable_get('lib4ridora_bot_intranet_ok',true) && lib4ridora_check_ip($ipClient) ) {
+	return;		// never reject a bot from inside Lib4RI network
+  }
+
+  $isBot = 0;    // bot detection via islandora_usage_stats, needs a user agent string (fails if empty)
+  $uaOk = 0;    // for the result of user-agent string check, 1 for ok, -1 for rejectable.
+
+  $uaList = array_filter( array_map('trim', explode(',',strtr(variable_get('lib4ridora_bot_user_agent_list'),"|;\n",",,,"))) );
+  $uaString = @trim($_SERVER['HTTP_USER_AGENT']);
+  if ( $uaString && $uaList ) {
+	// uaList: expected to have a browser's user agent string, or an array with multiple of them.
+    foreach( ( is_array($uaList) ? array_map('trim',$uaList) : array(trim($uaList)) ) as $uaTerm ) {
+      $uaTmp = ( substr($uaTerm,0,1) == '+' ) ? 1 : -1;
+      if ( stripos($uaString,ltrim($uaTern,"+- \n\r\t\v\0")) !== false ) {
+        $uaOk = $uaTmp;
+        break;
       }
+    }
+    $isBot = lib4ridora_user_is_bot($uaString,variable_get('lib4ridora_bot_needs_language',false),true);
+  }
 
-  // Task 1: user-agent check:
-  if ( $uaList = variable_get('lib4ridora_omit_user_agent',NULL) ) {  // expected to have a browser's user agent string, or an array with multiple of them.
+  if ( $uaOk < 0 ) { // Task 1: user-agent check:
     global $base_path;
     if ( !drupal_is_cli() || @!empty($_SERVER['DOCUMENT_ROOT']) ) {	// see: https://api.drupal.org/api/drupal/includes%21bootstrap.inc/function/drupal_is_cli/7.x
-      foreach( ( is_array($uaList) ? array_map('trim',$uaList) : array(trim($uaList)) ) as $uaString ) {
-        if ( empty(trim($_SERVER['HTTP_USER_AGENT'])) || ( !empty($uaString) && stripos($_SERVER['HTTP_USER_AGENT'],$uaString) !== false ) ) {
-          $tmpPath = '/tmp/browser-user-agent.denied' . strtr($base_path,'/','.') . 'txt';
-          $ipAry = array( date("Y-m-d.H-i-s"), $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_X_REAL_IP'], $_SERVER['HTTP_X_FORWARDED_FOR'], $_SERVER['REQUEST_URI'], $_SERVER['HTTP_USER_AGENT'] );
-          file_put_contents( $tmpPath, @strval(file_get_contents($tmpPath)) . implode(' | ',$ipAry) . "\r\n" );
-          header("HTTP/1.0 503 Service Unavailable");
-          echo("503 Service Unavailable");
-          exit;
-        }
+      if ( empty($uaString) || $uaOk < 0 ) {
+        $tmpPath = '/tmp/browser-user-agent.denied' . strtr($base_path,'/','.') . 'txt';
+        $ipAry = array( date("Y-m-d.H-i-s"), $_SERVER['REMOTE_ADDR'], $_SERVER['HTTP_X_REAL_IP'], $_SERVER['HTTP_X_FORWARDED_FOR'], $_SERVER['REQUEST_URI'], $_SERVER['HTTP_USER_AGENT'] );
+        file_put_contents( $tmpPath, @strval(file_get_contents($tmpPath)) . implode(' | ',$ipAry) . "\r\n" );
+        header("HTTP/1.0 503 Service Unavailable");
+        echo("503 Service Unavailable");
+        exit;
       }
     }
   }
@@ -912,7 +935,7 @@ function lib4ridora_user_is_bot($user_agent = '', $demand_language = FALSE, $use
       }
       // Retrieve the current state of the batch. However this is for explicit batch links, so bascially act always.
       if ( !$batch || ( function_exists('batch_load') && !( $batch = batch_load($_REQUEST['id']) ) ) ) {
-        if ( lib4ridora_user_is_bot('',true,true) ) {
+        if ( $isBot < 0 ) {
           header("HTTP/1.0 404 Not Found");		// 404 similar as in Drupal 9: https://www.drupal.org/project/drupal/issues/1986330
           echo("404 Not Found");
           exit;
@@ -927,7 +950,7 @@ function lib4ridora_user_is_bot($user_agent = '', $demand_language = FALSE, $use
       if ( !$batch ) {
         $batch = &batch_get();
       }
-      if ( $batch && lib4ridora_user_is_bot('',true,true) ) {
+      if ( $batch && $isBot < 0 ) {
         header("HTTP/1.0 404 Not Found");		// 404 similar as in Drupal 9: https://www.drupal.org/project/drupal/issues/1986330
         echo("404 Not Found");
         exit;
@@ -937,7 +960,7 @@ function lib4ridora_user_is_bot($user_agent = '', $demand_language = FALSE, $use
 }
 
 function lib4ridora_is_white_listed($ip) {
-    $white_list = array_map('trim', explode(',', variable_get('lib4ridora_bot_white_list')));
+    $white_list = array_filter( array_map('trim', explode(',',strtr(variable_get('lib4ridora_bot_white_list'),"|;\n",",,,"))) );
     
     $ips = [];
     $ranges = [];
