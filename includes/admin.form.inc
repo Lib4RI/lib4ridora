@@ -22,9 +22,9 @@ function lib4ridora_admin(array $form, array &$form_state) {
     $form['lib4ridora_advanced_conf_options'] = array(
         '#type' => 'checkbox',
         '#default_value' => @boolval( $_SESSION[$sessionName] ),
-        '#title' => t('Show developer\'s configuration options on this page'),
-  		'#prefix' => "<a name='html'><!-- to jump here --></a><span style='font-size:10pt; position:relative; left:-0.25em; background-color:#ffefdc;'>&nbsp;<b>Advanced Configuration</b>&nbsp;</span>",
-		'#suffix' => "<br></br>",
+        '#title' => t(''),
+  		'#prefix' => '<b>Advanced Configuration</b>',
+  		'#suffix' => '<span style="position:relative; left:1.75em; top:-2.25em;">Show <span style="background-color:#ffe3d7; color:#670700;">developer\'s configuration options</span> on this page</span><br>',
     );
   }
   $form['lib4ridora_multi_pdf_defaults_property_availability'] = array(
@@ -57,7 +57,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
           ),
         ),
 		'#size' => $textfield_size,
-	    '#attributes' => array('style' => 'background-color:#ffefdc;'),
+	    '#attributes' => array('style' => 'background-color:#ffe3d7; color:#670700;'),
 	  );
   
   // related to Redmine issue #67 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/67
@@ -73,7 +73,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
           ),
         ),
 		'#size' => $textfield_size,
-	    '#attributes' => array('style' => 'background-color:#ffefdc;'),
+	    '#attributes' => array('style' => 'background-color:#ffe3d7; color:#670700;'),
 	  );
   
   $form['lib4ridora_restricted_datastreams'] = array(
@@ -176,7 +176,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	          ),
 	      ),
 		'#size' => $textfield_size,
-	    '#attributes' => array('style' => 'background-color:#ffefdc;'),
+	    '#attributes' => array('style' => 'background-color:#ffe3d7; color:#670700;'),
 	  );
 	  $form['lib4ridora_pseudo_solr_field_factor_none_yet'] = array(
 	    '#type' => 'textfield',
@@ -190,7 +190,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	          ),
 	      ),
 		'#size' => $textfield_size,
-	    '#attributes' => array('style' => 'background-color:#ffefdc;'),
+	    '#attributes' => array('style' => 'background-color:#ffe3d7; color:#670700;'),
 	  );
   
   $form['lib4ri_citation_export_form_placeholder'] = array(		/*  for citations in Excel/CSV exports */
@@ -287,7 +287,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
             ),
         ),
 		'#size' => $textfield_size,
-	    '#attributes' => array('style' => 'background-color:#ffefdc;'),
+	    '#attributes' => array('style' => 'background-color:#ffe3d7; color:#670700;'),
     );
   
   // 'prepo' ~= label prepositions, see also http://lib-dora-dev1.emp-eaw.ch:3000/issues/57
@@ -313,7 +313,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
             ),
         ),
 		'#size' => $textfield_size,
-	    '#attributes' => array('style' => 'background-color:#ffefdc;'),
+	    '#attributes' => array('style' => 'background-color:#ffe3d7; color:#670700;'),
     );
   
   
@@ -333,7 +333,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	          ),
 	      ),
 	//	'#size' => $textfield_size,
-	    '#attributes' => array('style' => 'background-color:#ffefdc;'),
+	    '#attributes' => array('style' => 'background-color:#ffe3d7; color:#670700;'),
 	);
 
 	  $form['lib4ridora_bot_intranet_ok'] = array(
@@ -342,23 +342,18 @@ function lib4ridora_admin(array $form, array &$form_state) {
 		'#description' => t("If checked/enabled there will be no bot check/restriction of the client's request from from inside Lib4RI's intranet!"),
 		'#default_value' => variable_get('lib4ridora_intranet_bot_approved',true),
 		'#required' => FALSE,
-		'#prefix' => "<a name='html'><!-- to jump here --></a><span style='font-size:10pt; position:relative; top:0.5em; background-color:#ffefdc;'>&nbsp;<b>Bots: Lib4RI's own bots and requests</b>&nbsp;",
+		'#prefix' => "<a name='html'><!-- to jump here --></a><span style='font-size:10pt; position:relative; top:0.5em;'><b>Bots: Lib4RI's own bots and requests</b>",
 		'#suffix' => "</span><br>",
-	      '#states' => array(
-	          'visible' => array(
-	              ':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
-	          ),
-	      ),
 	//	'#size' => $textfield_size,
-	    '#attributes' => array('style' => 'background-color:#ffefdc;'),
+	    '#attributes' => array('style' => 'background-color:#ffe3d7; color:#670700;'),
 	  );
 
       $ua_list = array_filter( array_map('trim', explode(',',strtr(variable_get('lib4ridora_bot_user_agent_list'),"|;\n",",,,"))) );
 	  $hint = 'Comma- or linebreak delimted list of terms (case insensitive), if one of them exists in a user-agent string the client/bot is (not) tolerated.';
 	  $hint .= "<br>Add a plus sign '+' in front of each term to tolerate the bot, or a minus sign '-' to reject it.";
 	  if ( module_exists('islandora_usage_stats') && variable_get('islandora_usage_stats_exclude_bots', '1') ) {
-		$hint .= '<br>Please consider updating the <a href="' . url('/admin/islandora/tools/islandora_usage_stats',array('absolute' => true)) . '" target="_blank">Bot Exclusion Regex</a> list';
-		$hint .= "<br>from the 'Islandora Usage Stats' module which currently used to provide a bot detection reference.";
+		$hint .= '<br>Please consider updating the <a href="' . url('/admin/islandora/tools/islandora_usage_stats',array('absolute' => true)) . '" target="_blank">Bot Exclusion Regex</a>';
+		$hint .= " list from the 'Islandora Usage Stats' module which currently used to provide a bot detection reference.";
 	  }
 	  $form['lib4ridora_bot_user_agent_list'] = array(
 		'#type' => 'textarea',
@@ -376,10 +371,44 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	          ),
 	      ),
 	//	'#size' => $textfield_size,
-	    '#attributes' => array('style' => 'background-color:#ffefdc;'),
+	    '#attributes' => array('style' => 'background-color:#ffe3d7; color:#670700;'),
 	);
   
-  
+
+	  // See redmine ticket #426 http://lib-dora-dev1.emp-eaw.ch:3000/issues/426
+      global $base_path;
+      $inst = trim($base_path,'/');
+      $inst = ( strlen($inst) < 4 ? strtoupper($inst) : ( empty($inst) ? 'Lib4RI' : ucfirst($inst) ) ); 
+	  $form['lib4ridora_doi_pattern'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Lib4RI DOI: Pattern for ' . $inst),
+		'#default_value' => variable_get('lib4ridora_doi_pattern',''),
+		'#description' => t('Leading numbers/charaters typical for DOIs assigned by ' . $inst . '.'),
+		'#required' => FALSE,
+        '#states' => array(
+          'visible' => array(
+              ':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
+          ),
+        ),
+		'#size' => $textfield_size,
+	    '#attributes' => array('style' => 'background-color:#ffe3d7; color:#670700;'),
+	  );
+	  $form['lib4ridora_doi_markup'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Lib4RI DOI: Web page HTML'),
+		'#default_value' => variable_get('lib4ridora_doi_markup',''),
+		'#description' => t('Optional: HTML code for the \'Detailed Record\' page to show the Lib4RI DOI.<br> Place \'[doi]\' there to insert the DOI of the current pulication.'),
+		'#required' => FALSE,
+        '#states' => array(
+          'visible' => array(
+              ':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
+          ),
+        ),
+		'#size' => $textfield_size,
+	    '#attributes' => array('style' => 'background-color:#ffe3d7; color:#670700;'),
+	);
+
+
 	  // related to Redmine issue #189 / http://lib-dora-dev1.emp-eaw.ch:3000/issues/189 (about HTML tags in page title)
 	  $form['lib4ridora_page_title_tag_fix'] = array(
 		'#type' => 'checkbox',
@@ -387,15 +416,9 @@ function lib4ridora_admin(array $form, array &$form_state) {
 		'#description' => t("Activate work-around to decode accidentially encoded HTML tags (related to HTML-editing of publications)."),
 		'#default_value' => variable_get('lib4ridora_page_title_tag_fix', TRUE),
 		'#required' => FALSE,
-		'#prefix' => "<a name='html'><!-- to jump here --></a><span style='font-size:10pt; position:relative; top:0.5em;'><b>Layout</b>",
-		'#suffix' => "</span><br>",
-        '#states' => array(
-            'visible' => array(
-                ':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
-            ),
-        ),
+		'#prefix' => "<a name='html'><!-- to jump here --></a><span style='font-size:10pt; position:relative; top:1em;'><b>DORA Webpage Layout</b>",
+		'#suffix' => "</span><br></br>",
 		'#size' => $textfield_size,
-	    '#attributes' => array('style' => 'background-color:#ffefdc;'),
 	);
   
   $form['lib4ridora_config_dummy_line'] = array(

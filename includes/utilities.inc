@@ -884,7 +884,8 @@ function lib4ridora_access_rejection( $batch = NULL ) {
     @strval( $_SERVER['HTTP_X_REAL_IP'] ),
     @strval( ip_address() /* by Drupal */ ),
   );
-  $ipClient = array_shift( array_filter($ipAry) );
+  $ipAry = array_filter($ipAry);	// separate row to avoid a 'strict' warning
+  $ipClient = array_shift( /* array_filter($ipAry) */ $ipAry );
 
   if ( lib4ridora_is_white_listed($ipClient) ) {
 	return;		// never reject with an explicit IP
