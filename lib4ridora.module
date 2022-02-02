@@ -365,21 +365,23 @@ function lib4ridora_block_view_alter(&$data, $block) {
 
 /**
  * Implements hook_block_view_alter()
+ * 
+ * Hiding "View at Publisher (DOI)" for Lib4RI's own DOIs, see: http://lib-dora-dev1.emp-eaw.ch:3000/issues/426
  */
 function lib4ridora_block_view_alter(&$data, $block) {
-	if ( $data['content']['#contextual_links']['views_ui'][1][0] == 'publication_links') {
-		if ( ( $doiTmp = @trim(variable_get('lib4ridora_doi_pattern','')) /* pattern, beginning of the DOI */ ) &&
-			( $doiHtml = @trim(variable_get('lib4ridora_doi_markup','')) /* HTML code where to place the info/DOI */ ) ) {
-			if ( $doi = @strchr($data['content']['#markup'],'dx.doi.org/') ) {
-				$doi = strtok(strtr(substr($doi,11),"'",'"'),'"');
-				if ( intval($doi) && stripos($doi,$doiTmp) === 0 ) {
-					$url = str_replace('[doi]',$doi,strtok(strtr(strchr($doiHtml,'http'),"'",'"'),'"'));
-					$data['content']['#markup'] = str_replace('http://dx.doi.org/'.$doi,$url,$data['content']['#markup']);
-					$data['content']['#markup'] = str_replace('Publisher (DOI)','Lib4RI (DOI)',$data['content']['#markup']);
-				}
-			}
-		}
-	}
+  if ( $data['content']['#contextual_links']['views_ui'][1][0] == 'publication_links') {
+    if ( $doiTmp = @trim(variable_get('lib4ridora_doi_pattern','')) /* pattern, beginning of the DOI */ ) {
+      if ( $pos = strpos($data['content']['#markup'],'views-field-mods-identifier-doi-s') ) {
+        if ( $doi = @strchr($data['content']['#markup'],'dx.doi.org/') ) {
+          $doi = strtok(strtr(substr($doi,11),"'",'"'),'"');
+          if ( intval($doi) && stripos($doi,$doiTmp) === 0 ) {
+            $aryTmp = explode('>',substr($data['content']['#markup'],$pos),2);
+            $data['content']['#markup'] = substr($data['content']['#markup'],0,$pos) . implode(' style="display:none;">',$aryTmp);
+          }
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -1276,22 +1278,24 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
     );
     unset($rendered['citation.tab']['citation']);
     
-	// Show/promote Lib4RI's own DOIs:
-	if ( ( $doiTmp = @trim(variable_get('lib4ridora_doi_pattern','')) /* pattern, beginning of the DOI */ ) &&
-		( $doiHtml = @trim(variable_get('lib4ridora_doi_markup','')) /* HTML code where to place the info/DOI */ ) ) {
-		if ( $nodeTmp = $xpath->query("//mods:mods/mods:identifier[@type='doi']") ) {
-			if ( $doi = @trim( $nodeTmp->item(0)->nodeValue ) ) {
-				if ( intval($doi) && stripos($doi,$doiTmp) === 0 ) {
-					$rendered['citation.tab']['lib4ri_doi'] = array(
-					  '#type' => 'item',
-					  '#title' => t( variable_get('lib4ridora_doi_label','Lib4RI DOI') ),
-					  '#markup' => str_ireplace('[doi]',$doi,$doiHtml),
-					  '#weight' => 3,
-					);
-				}
-			}
-		}
-	}
+    // Show/promote Lib4RI's own DOIs, see: http://lib-dora-dev1.emp-eaw.ch:3000/issues/426
+    if ( ( $doiTmp = @trim(variable_get('lib4ridora_doi_pattern','')) /* pattern, beginning of the DOI */ ) &&
+      ( $doiHtml = @trim(variable_get('lib4ridora_doi_markup','')) /* HTML code where to place the info/DOI */ ) ) {
+      if ( substr($doiHtml,0,1) != '#' /* skip with leading comment sign */ ) {
+        if ( $nodeTmp = $xpath->query("//mods:mods/mods:identifier[@type='doi']") ) {
+          if ( $doi = @trim( $nodeTmp->item(0)->nodeValue ) ) {
+            if ( intval($doi) && stripos($doi,$doiTmp) === 0 ) {
+              $rendered['citation.tab']['lib4ri_doi'] = array(
+                '#type' => 'item',
+                '#title' => t( variable_get('lib4ridora_doi_label','View at Lib4RI') ),
+                '#markup' => str_ireplace('[doi]',$doi,$doiHtml),
+                '#weight' => 3,
+              );
+            }
+          }
+        }
+      }
+    }
 
   }
 }

@@ -397,7 +397,7 @@ function lib4ridora_admin(array $form, array &$form_state) {
 		'#type' => 'textfield',
 		'#title' => t('Lib4RI DOI: Web page HTML'),
 		'#default_value' => variable_get('lib4ridora_doi_markup',''),
-		'#description' => t('Optional: HTML code for the \'Detailed Record\' page to show the Lib4RI DOI.<br> Place \'[doi]\' there to insert the DOI of the current pulication.'),
+		'#description' => t('Optional: HTML code for the \'Detailed Record\' page to show the Lib4RI DOI.<br> Place \'[doi]\' there to insert the DOI of the current pulication. <br>With a leading \'#\' this setting will be ignored and no DOI hint will be added.'),
 		'#required' => FALSE,
         '#states' => array(
           'visible' => array(
