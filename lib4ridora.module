@@ -1285,10 +1285,13 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
         if ( $nodeTmp = $xpath->query("//mods:mods/mods:identifier[@type='doi']") ) {
           if ( $doi = @trim( $nodeTmp->item(0)->nodeValue ) ) {
             if ( intval($doi) && stripos($doi,$doiTmp) === 0 ) {
+              $jsTmp = "<script type='text/javascript'> window.document.getElementById('lib4ri_doi').style.cssText = 'position:relative; top:-1em;'; </script>";			
               $rendered['citation.tab']['lib4ri_doi'] = array(
+            /*  '#attributes' => array( 'id' => 'lib4ri_doi', 'style' => 'position:relative; top:-1em;' ),	*/
+                '#id' => 'lib4ri_doi',
                 '#type' => 'item',
                 '#title' => t( variable_get('lib4ridora_doi_label','View at Lib4RI') ),
-                '#markup' => str_ireplace('[doi]',$doi,$doiHtml),
+                '#markup' => str_ireplace('[doi]',$doi,$doiHtml) . $jsTmp,
                 '#weight' => 3,
               );
             }
