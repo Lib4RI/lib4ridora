@@ -358,13 +358,6 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
             }
           }
         }
-        foreach( array($label,html_entity_decode($label)) as $sTmp ) {
-          // trying not to repeat/reshow the facet label inside the filter string, since (by former default) the facet label with be added in front.
-          while( ( $pos = strpos($filter_string,$sTmp) ) !== false ) {
-            $filter_string = substr($filter_string,0,$pos) . ltrim(substr($filter_string,strlen($sTmp)+$pos),'= :');
-          }
-          if ( $pos ) { break; }
-        }
         $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a> ' . $label . ' ' . $symbol . ' ' . check_plain(ltrim($filter_string,'-!'));
       }
       else { // Default to old behavior.
