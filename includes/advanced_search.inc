@@ -216,10 +216,9 @@ function lib4ridora_construct_publication_type_filter($form_state) {
  *   Solr query statement
  */
 function lib4ridora_construct_solr_statement($field_name, $field_value) {
-  if ($field_value != "*") {
-    $field_value = '"' . $field_value . '"';
-  }
-  return "$field_name:$field_value";
+  $field_value = trim($field_value,"\"' \n\r\t\v\x00");
+  $quote = ( empty(rtrim($field_value,'*')) || !preg_match('/\s+/',urldecode($field_value)) ) ? '' : '"';
+  return ( $field_name . ':' . $quote . $field_value . $quote );
 }
 
 /**
@@ -297,7 +296,7 @@ function lib4ridora_construct_peer_reviewed_filter(&$form_state) {
     $filters[] = "$peer_review_field:No";
   }
   if ($form_state['values']['peer_review']['not specified']) {
-    $filters[] = "(*:* NOT $peer_review_field:*)";
+    $filters[] = /* "(*:* NOT $peer_review_field:*)" */ '-' . $peer_review_field . ':*';	// same, however easier to interpret+display for the 'Active Filters' function.
   }
 
   return lib4ridora_construct_filter_string_from_array($filters);
@@ -341,5 +340,37 @@ function lib4ridora_construct_full_text_filter(&$form_state) {
     $filters[] = $availability_field . " : " . $embargo_restricted;
   }
 
+  return lib4ridora_construct_filter_string_from_array($filters);
+}
+
+/**
+ * Builds an optional filter query based on research data link.
+ *
+ * @param array $form_state
+ *   Form state.
+ *
+ * @return string
+ *   Solr filter query.
+ */
+function lib4ridora_construct_research_data_filter(&$form_state) {
+  if ( @!isset($form_state['values']['research_data']['yes']) ) {
+	return;
+  }
+  $ary = array_map('trim',explode('|',variable_get('lib4ridora_solr_field_research_data', 'mods_relatedItem_otherType_identifier_uri_mt')));
+  if ( empty($ary[0]) /* || $ary[0][0] == '#' */ ) {
+	return;
+  }
+  module_load_include("inc", "islandora_solr", "includes/utilities");
+
+  // Get field name out of configuration.
+  $solr_field = islandora_solr_lesser_escape( ltrim($ary[0],"# \n\r\t\v\x00") );
+
+  $filters = array();
+  if ( $form_state['values']['research_data']['yes'] ) {
+    $filters[] = $solr_field . ':*';
+  }
+  if ( @isset($form_state['values']['research_data']['no']) && $form_state['values']['research_data']['no'] ) {
+    $filters[] = '-' . $solr_field . ':*';
+  }
   return lib4ridora_construct_filter_string_from_array($filters);
 }

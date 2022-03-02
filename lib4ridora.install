@@ -70,6 +70,7 @@ function lib4ridora_uninstall() {
 	'lib4ridora_bot_white_list',
 	'lib4ridora_doi_pattern',
 	'lib4ridora_doi_markup',
+	'lib4ridora_solr_field_research_data',
   );
   array_walk($variables, 'variable_del');
 }

@@ -1545,8 +1545,7 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#type' => 'checkboxes',
     '#options' => lib4ridora_get_all_publication_types(),
     '#title' => t('Publication Type'),
-    // XXX: Wrapping element desired to counteract core CSS at this level, and
-    // #theme_wrappers do not quite cut it.
+    // XXX: Wrapping element desired to counteract core CSS at this level, and #theme_wrappers do not quite cut it.
     '#prefix' => '<div id="lib4ri-advanced-search-pub-type">',
     '#suffix' => '</div>',
   );
@@ -1567,8 +1566,7 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
       '#type' => 'select',
       '#options' => lib4ridora_get_all_organizational_units(),
       '#title' => t('Organizational Unit'),
-      // XXX: Wrapping element desired to counteract core CSS at this level, and
-      // #theme_wrappers do not quite cut it.
+      // XXX: Wrapping element desired to counteract core CSS at this level, and #theme_wrappers do not quite cut it.
       '#prefix' => '<div id="lib4ri-advanced-search-org-unit">',
       '#suffix' => '</div>',
     );
@@ -1582,12 +1580,28 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
       'not specified' => t('Not Specified'),
     ),
     '#title' => t('Peer Reviewed'),
-    // XXX: Wrapping element desired to counteract core CSS at this level, and
-    // #theme_wrappers do not quite cut it.
+    // XXX: Wrapping element desired to counteract core CSS at this level, and #theme_wrappers do not quite cut it.
     '#prefix' => '<div id="lib4ri-advanced-search-peer-review">',
     '#suffix' => '</div>',
   );
 
+  $ary = array_map('trim',explode('|',variable_get('lib4ridora_solr_field_research_data', 'mods_relatedItem_otherType_identifier_uri_mt')));
+  if ( !empty($ary[0]) && $ary[0][0] != '#' ) {
+    $form['research_data'] = array(
+      '#type' => 'checkboxes',
+      '#options' => array(
+        'yes' => ( @empty($ary[2]) ? t('Yes') : t($ary[2]) ),
+      ),
+      '#title' => ( @empty($ary[1]) ? t('Research Data') : t($ary[1]) ),
+      // XXX: Wrapping element desired to counteract core CSS at this level, and #theme_wrappers do not quite cut it.
+      '#prefix' => '<div id="lib4ri-advanced-search-research-data">',
+      '#suffix' => '</div>',
+    );
+    if ( @!empty($ary[3]) ) {
+      $form['research_data']['#options']['no'] = t($ary[3]);
+    }
+  }
+  
   $form['full_text'] = array(
     '#type' => 'checkboxes',
     '#options' => array(
@@ -1664,6 +1678,7 @@ function lib4ridora_solr_advanced_search_form_submit($form, &$form_state) {
     lib4ridora_construct_organization_unit_filter($form_state),
     lib4ridora_construct_peer_reviewed_filter($form_state),
     lib4ridora_construct_full_text_filter($form_state),
+    lib4ridora_construct_research_data_filter($form_state),
     lib4ridora_construct_funding_element_filter($form_state, 'funder_name_test' ),
     lib4ridora_construct_funding_element_filter($form_state, 'funding_stream_test' ),
     lib4ridora_construct_funding_element_filter($form_state, 'award_title_test' ),

@@ -961,8 +961,15 @@ function lib4ridora_access_rejection( $batch = NULL ) {
 }
 
 function lib4ridora_is_white_listed($ip) {
-    $white_list = array_filter( array_map('trim', explode(',',strtr(variable_get('lib4ridora_bot_white_list'),"|;\n",",,,"))) );
-    
+
+    $white_list = array_filter( array_map('trim', explode(',',strtr(variable_get('lib4ridora_bot_white_list'),"|\n",",,"))) );
+    /* Turning...
+			[193.134.202.0;193.134.202.255],[195.176.244.0;195.176.245.255]
+	...into an array:
+        [0] => [193.134.202.0;193.134.202.255]
+		[1] => [195.176.244.0;195.176.245.255]
+    */
+  
     $ips = [];
     $ranges = [];
     
