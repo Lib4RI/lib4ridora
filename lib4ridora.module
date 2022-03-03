@@ -1572,6 +1572,7 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     );
   }
 
+  $js = "var ids = ['edit-peer-review-no','edit-peer-review-yes']; if ( this.id == ids[0] || this.id == ids[1] ) { for( cbId of ids ) { if ( this.checked && this.id != cbId && ( cb = document.getElementById(cbId) ) && cb.checked ) { cb.checked = false; } } }";
   $form['peer_review'] = array(
     '#type' => 'checkboxes',
     '#options' => array(
@@ -1583,10 +1584,12 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     // XXX: Wrapping element desired to counteract core CSS at this level, and #theme_wrappers do not quite cut it.
     '#prefix' => '<div id="lib4ri-advanced-search-peer-review">',
     '#suffix' => '</div>',
+    '#attributes' => array('onclick' => $js),
   );
 
   $ary = array_map('trim',explode('|',variable_get('lib4ridora_solr_field_research_data', 'mods_relatedItem_otherType_identifier_uri_mt')));
   if ( !empty($ary[0]) && $ary[0][0] != '#' ) {
+    $js = "var ids = ['edit-research-data-no','edit-research-data-yes']; for( cbId of ids ) { if ( this.checked && this.id != cbId && ( cb = document.getElementById(cbId) ) && cb.checked ) { cb.checked = false; } }";
     $form['research_data'] = array(
       '#type' => 'checkboxes',
       '#options' => array(
@@ -1596,9 +1599,10 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
       // XXX: Wrapping element desired to counteract core CSS at this level, and #theme_wrappers do not quite cut it.
       '#prefix' => '<div id="lib4ri-advanced-search-research-data">',
       '#suffix' => '</div>',
+      '#attributes' => array('onclick' => $js),
     );
-    if ( @!empty($ary[3]) ) {
-      $form['research_data']['#options']['no'] = t($ary[3]);
+    if ( @!isset($ary[3]) || @!empty($ary[3]) ) {
+      $form['research_data']['#options']['no'] = ( @empty($ary[3]) ? t('No') : t($ary[3]) );
     }
   }
   
