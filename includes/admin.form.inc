@@ -84,16 +84,6 @@ function lib4ridora_admin(array $form, array &$form_state) {
 		'#required' => FALSE,
 		'#size' => $textfield_size,
 	);
-/*	if ( @isset($_GET['all']) || @isset($_GET['ip']) ) {		// IPv*4* assignments for intranet, see lib4ridora.module, function lib4ridora_check_ip(). The origin of the IPs is unknown - up-to-date!?
-		$form['lib4ridora_intranet_ip_range_list'] = array(
-			'#type' => 'textfield',
-			'#title' => t('Intranet IPv4 restriction'),
-			'#description' => t('If the publication is available on the intranet only, user\'s IP must be in one of the specified ranges (a comma-seperated list, slash allowed on the last IP part to indicate min/max).'),
-			'#default_value' => variable_get( 'lib4ridora_intranet_ip_range_list', "129.129.0.0/16, 152.88.0.0/16, 192.33.118.0/24, 193.134.200.0/21, 195.176.244.0/23" ),
-			'#required' => TRUE,
-			'#size' => 160,
-		);
-	}		 */
 	$form['lib4ridora_author_fullname_solr_field'] = array(
 		'#type' => 'textfield',
 		'#title' => t('Author Full Name Solr Field'),
@@ -325,29 +315,18 @@ function lib4ridora_admin(array $form, array &$form_state) {
 		'#attributes' => array('style' => 'background-color:#f8f0d8; color:#670700;'),
 	);
 	
-	
-	$white_list = array_filter( array_map('trim', explode(',',strtr(variable_get('lib4ridora_bot_white_list'),"|\n",",,"))) );
-    /* Turning...
-			[193.134.202.0;193.134.202.255],[195.176.244.0;195.176.245.255]
-	...into an array:
-        [0] => [193.134.202.0;193.134.202.255]
-		[1] => [195.176.244.0;195.176.245.255]
-    */
-	$form['lib4ridora_bot_white_list'] = array(
-		'#type' => 'textarea',
-		'#title' => t("Bots: IP white-list to ignore any restrictions"),
-		'#description' => t('Comma- or linebreak delimted list of full IPs.<br>Clients with one of these IPs do not need to stand the bot check.'),
-		'#default_value' => implode("\n",$white_list),	/* so we finally can enter it with pipes or line-breaks */
-		'#required' => FALSE,
-		'#cols' => max( $textfield_size >> 1 , 72 ),
-		'#rows' => max( sizeof($white_list) + 1, 3 ),
-		'#resizable' => TRUE,
+	$form['lib4ridora_intranet_ip_range_list'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Lib4RI intranet IP masks/restrictions'),
+		'#description' => t('If the publication is available on the intranet only, user\'s IP must be in one of the specified ranges <br>as comma-seperated list with <a href="https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing" target="_blank">CIDR</a> IP masks.'),
+		'#default_value' => variable_get( 'lib4ridora_intranet_ip_range_list', "129.129.0.0/16, 152.88.0.0/16, 192.33.118.0/24, 193.134.200.0/21, 195.176.244.0/23" ),
+		'#required' => TRUE,
 		'#states' => array(
 			'visible' => array(
 				':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
 			),
 		),
-	//	'#size' => $textfield_size,
+		'#size' => $textfield_size,
 		'#attributes' => array('style' => 'background-color:#f8f0d8; color:#670700;'),
 	);
 
@@ -359,6 +338,31 @@ function lib4ridora_admin(array $form, array &$form_state) {
 		'#required' => FALSE,
 		'#prefix' => "<a name='html'><!-- to jump here --></a><span style='font-size:10pt; position:relative; top:0.5em;'><b>Bots: Lib4RI's own bots and requests</b>",
 		'#suffix' => "</span><br>",
+	//	'#size' => $textfield_size,
+		'#attributes' => array('style' => 'background-color:#f8f0d8; color:#670700;'),
+	);
+
+	$white_list = array_filter( array_map('trim', explode(',',strtr(variable_get('lib4ridora_bot_white_list'),"|\n",",,"))) );
+    /* Turning...
+			[193.134.202.0;193.134.202.255],[195.176.244.0;195.176.245.255]
+	...into an array:
+        [0] => [193.134.202.0;193.134.202.255]
+		[1] => [195.176.244.0;195.176.245.255]
+    */
+	$form['lib4ridora_bot_white_list'] = array(
+		'#type' => 'textarea',
+		'#title' => t("Bots: IP white-list to ignore any restrictions"),
+		'#description' => t('Comma- or linebreak delimted list of full IPs of pair-wise IP ranges like: [123.44.55.177;234.11.33.166] <br>Clients with one of these IPs do not need to stand the bot check. <br>Note: There is a Drupal in-built <a href="' . url('/admin/config/people/ip-blocking',array('absolute' => true)) . '" target="_blank">black-list</a> too.'),
+		'#default_value' => implode("\n",$white_list),	/* so we finally can enter it with pipes or line-breaks */
+		'#required' => FALSE,
+		'#cols' => max( $textfield_size >> 1 , 72 ),
+		'#rows' => max( sizeof($white_list) + 1, 3 ),
+		'#resizable' => TRUE,
+		'#states' => array(
+			'visible' => array(
+				':input[name="lib4ridora_advanced_conf_options"]' => array('checked' => TRUE),
+			),
+		),
 	//	'#size' => $textfield_size,
 		'#attributes' => array('style' => 'background-color:#f8f0d8; color:#670700;'),
 	);
@@ -393,12 +397,12 @@ function lib4ridora_admin(array $form, array &$form_state) {
 	// See redmine ticket #426 http://lib-dora-dev1.emp-eaw.ch:3000/issues/426
 	global $base_path;
 	$inst = trim($base_path,'/');
-	$inst = ( strlen($inst) < 4 ? strtoupper($inst) : ( empty($inst) ? 'Lib4RI' : ucfirst($inst) ) ); 
+	$inst = ( strlen($inst) > 3 ? ucfirst($inst) : ( empty($inst) ? 'Lib4RI' : strtoupper($inst) ) ); 
 	$form['lib4ridora_doi_pattern'] = array(
 		'#type' => 'textfield',
-		'#title' => t('Lib4RI DOI: Pattern for ' . $inst),
+		'#title' => t('Lib4RI DOI: Pattern for ' . ( $inst == 'Lib4RI' ? 'all institutes' : $inst ) ),
 		'#default_value' => variable_get('lib4ridora_doi_pattern',''),
-		'#description' => t('Leading numbers/charaters typical for DOIs assigned by ' . $inst . '.'),
+		'#description' => t('List of |-separated <a href="https://www.crossref.org/documentation/member-setup/constructing-your-dois/" target="_blank">DOI suffixes</a> typical for DOIs assigned by ' . $inst . '.'),
 		'#required' => FALSE,
 		'#states' => array(
 			'visible' => array(

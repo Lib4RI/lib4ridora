@@ -596,6 +596,28 @@ function lib4ridora_doi_get_document_url($doi) {
   return FALSE;
 }
 
+/*
+ * function to check if a given was assigned by Lib4RI
+ * resp. if a DOI has the same DOI-suffix as those DOIs given by Lib4RI
+ */
+function lib4ridora_doi_by_lib4ri( $doi, $suffix_list = '', $ret_empty_list = false ) {
+  if ( ( $doi = ltrim($doi) ) && @intval($doi) ) {	/* minimum check, just to see it starts with a +number */
+    if ( empty($suffix_list) ) {
+      $suffix_list = @trim(variable_get('lib4ridora_doi_pattern','')); // pattern list with DOI-suffixes separated by '|'
+      if ( empty($suffix_list) ) {
+        return $ret_empty_list;
+      }
+    }
+    $suffixAry = array_filter(array_map('trim',explode('|',$suffix_list)));
+    foreach( $suffixAry as $doiSuffix ) {
+      if ( stripos($doi,$doiSuffix) === 0 ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * DOI-validator callback
  *
@@ -710,30 +732,46 @@ function lib4ridora_doi_validate($element, &$form_state, $form, $ingesting=FALSE
       )));
     }
   }
+  // check empty title
+  if ( @empty(trim($element['#title'])) ) {
+    form_error($element, t('@title is required.', array(
+      '@title' => $element['#title'],
+    )));
+    return FALSE;
+  }
+
   // check for valid doi
-  $doc_url = lib4ridora_doi_get_document_url(trim($element['#value']));
-  $mods = islandora_doi_get_mods(trim($element['#value']));
+  $doc_url = ''; // for the Publisher URL, with Lib4RI-DOIs we actually suppress it on the 'Detailed Record' page, so we can leave it empty
+  $doi = trim($element['#value']);
+  if ( !intval($doi) ) {
+    form_error($element, t('"@value" is not a DOI.', array(
+      '@value' => $doi,
+    )));
+    return (!$ingesting) ? $doc_url : FALSE;
+  }
+  if ( lib4ridora_doi_by_lib4ri($doi) ) {
+	// Our 'modern' DOIs must match https://www.crossref.org/blog/dois-and-matching-regular-expressions/
+    if ( preg_match('/^10.\d{4,9}\/[\-\._;()\/\:A-Z0-9]+$/i',$doi) ) {
+      return TRUE;
+    }
+    form_error($element, t('"@value" is linked to Lib4RI, but it does not seem to be a valid DOI.', array(
+      '@value' => $doi,
+    )));
+    return (!$ingesting) ? $doc_url : FALSE;
+  }
+
+  $mods = islandora_doi_get_mods($doi);
   if ($mods === FALSE) {
-    if ($element['#value'] == "") {
-      form_error($element, t('@title is required.', array(
-        '@title' => $element['#title'],
-      )));
-    }
-    elseif (trim($element['#value']) == "") {
-      form_error($element, t('"@value" is not a DOI.', array(
-        '@value' => $element['#value'],
-      )));
-    }
-    elseif ($doc_url !== FALSE) {
+    $doc_url = lib4ridora_doi_get_document_url($doi); 
+    if ($doc_url !== FALSE) {
       if ($element['#id'] == "edit-doi") {
         form_error($element, t('"@value" does appear to be a valid DOI, but no MODS could be retrieved, so there could be an issue with the DOI configuration.', array(
-          '@value' => $element['#value'],
+          '@value' => $doi,
         )));
       }
-    }
-    else {
+    } else {
       form_error($element, t('"@value" does not appear to be a valid DOI.', array(
-        '@value' => $element['#value'],
+        '@value' => $doi,
       )));
     }
     return (!$ingesting) ? $doc_url : FALSE;
@@ -1003,3 +1041,4 @@ function lib4ridora_is_white_listed($ip) {
     
     return FALSE;
 }
+

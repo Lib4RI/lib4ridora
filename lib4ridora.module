@@ -330,10 +330,9 @@ function lib4ridora_check_ip($ip_address = NULL) {
   );
   */
   $cidr_list = variable_get( 'lib4ridora_intranet_ip_range_list', "129.129.0.0/16, 152.88.0.0/16, 192.33.118.0/24, 193.134.200.0/21, 195.176.244.0/23" );
-  $cidr_ranges = explode( ",", str_replace( " ", "", strtr( $cidr_list, ";-\t", ",/ " ) ) );	// so tab considered as space, while semi-colon as separator, and minus (like slash) as min-max indicator
+  $cidr_ranges = explode(',',strtr(preg_replace('/\s+/','',$cidr_list),';|',',,'));
 
-  // Transform an IPv4 CIDR block to an array containing the first and last IPs
-  // in the block.
+  // Transform an IPv4 CIDR block to an array containing the first and last IPs in the block.
   $cidr_range_to_points = function ($cidr_string) {
     list($base, $bits) = explode('/', $cidr_string);
     $mask = pow(2, 32 - $bits) - 1;
@@ -367,22 +366,32 @@ function lib4ridora_block_view_alter(&$data, $block) {
  * Implements hook_block_view_alter()
  * 
  * Hiding "View at Publisher (DOI)" for Lib4RI's own DOIs, see: http://lib-dora-dev1.emp-eaw.ch:3000/issues/426
+ * 
+ * Issue: if there is only one/the publisher link, and we remove it, then the block title 'Links:' still will be there.
  */
 function lib4ridora_block_view_alter(&$data, $block) {
-  if ( $data['content']['#contextual_links']['views_ui'][1][0] == 'publication_links') {
-    if ( $doiTmp = @trim(variable_get('lib4ridora_doi_pattern','')) /* pattern, beginning of the DOI */ ) {
+  if ( @strval($data['content']['#contextual_links']['views_ui'][1][0]) == 'publication_links') {
+    if ( $doiList = @trim(variable_get('lib4ridora_doi_pattern','')) /* pattern list with DOI-suffixes separated by '|' */ ) {
       if ( $pos = strpos($data['content']['#markup'],'views-field-mods-identifier-doi-s') ) {
         if ( $doi = @strchr($data['content']['#markup'],'dx.doi.org/') ) {
           $doi = strtok(strtr(substr($doi,11),"'",'"'),'"');
-          if ( intval($doi) && stripos($doi,$doiTmp) === 0 ) {
-            $aryTmp = explode('>',substr($data['content']['#markup'],$pos),2);
-            $data['content']['#markup'] = substr($data['content']['#markup'],0,$pos) . implode(' style="display:none;">',$aryTmp);
+          module_load_include('inc', 'lib4ridora', 'includes/utilities');
+          if ( lib4ridora_doi_by_lib4ri($doi,$doiList) ) {
+            $aryTmp = explode('a href',$data['content']['#markup']);	// counting the countent parts may fail, so we just check the amount of links
+            if ( sizeof($aryTmp) < 3 ) { 	// so if we have just one link (must be the publisher link) then let's hide the entire block:
+              $data['content']['#markup'] = '<script type="text/javascript"> if ( blk = document.getElementById("block-views-publication-links-block") ) { blk.style = "display:none;" } </script>';
+            } else {
+              $aryTmp = explode('>',substr($data['content']['#markup'],$pos),2);
+              $data['content']['#markup'] = substr($data['content']['#markup'],0,$pos) . implode(' style="display:none;">',$aryTmp);
+            }
           }
         }
       }
     }
   }
 }
+
+// block-views-publication-links-block
 
 /**
  * Access callback, to determine whether or not to create the RoMEO tab.
@@ -1277,14 +1286,15 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
       'citation' => $rendered['citation.tab']['citation'],
     );
     unset($rendered['citation.tab']['citation']);
-    
+
     // Show/promote Lib4RI's own DOIs, see: http://lib-dora-dev1.emp-eaw.ch:3000/issues/426
-    if ( ( $doiTmp = @trim(variable_get('lib4ridora_doi_pattern','')) /* pattern, beginning of the DOI */ ) &&
+    if ( ( $doiList = @trim(variable_get('lib4ridora_doi_pattern','')) /* pattern, beginning of the DOI */ ) &&
       ( $doiHtml = @trim(variable_get('lib4ridora_doi_markup','')) /* HTML code where to place the info/DOI */ ) ) {
       if ( substr($doiHtml,0,1) != '#' /* skip with leading comment sign */ ) {
         if ( $nodeTmp = $xpath->query("//mods:mods/mods:identifier[@type='doi']") ) {
           if ( $doi = @trim( $nodeTmp->item(0)->nodeValue ) ) {
-            if ( intval($doi) && stripos($doi,$doiTmp) === 0 ) {
+            module_load_include('inc', 'lib4ridora', 'includes/utilities');
+            if ( lib4ridora_doi_by_lib4ri($doi,$doiList) ) {
               $jsTmp = "<script type='text/javascript'> window.document.getElementById('lib4ri_doi').style.cssText = 'position:relative; top:-1em;'; </script>";			
               $rendered['citation.tab']['lib4ri_doi'] = array(
             /*  '#attributes' => array( 'id' => 'lib4ri_doi', 'style' => 'position:relative; top:-1em;' ),	*/
