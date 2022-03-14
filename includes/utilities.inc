@@ -932,23 +932,19 @@ function lib4ridora_access_rejection( $batch = NULL ) {
 	return;		// never reject a bot from inside Lib4RI network
   }
 
-  $isBot = 0;    // bot detection via islandora_usage_stats, needs a user agent string (fails if empty)
-  $uaOk = 0;    // for the result of user-agent string check, 1 for ok, -1 for rejectable.
-
   $uaList = array_filter( array_map('trim', explode(',',strtr(variable_get('lib4ridora_bot_user_agent_list'),"|;\n",",,,"))) );
   $uaString = @trim($_SERVER['HTTP_USER_AGENT']);
+  $uaOk = 0;    // for the result of user-agent string check, 1 for ok, -1 for rejectable.
   if ( $uaString && $uaList ) {
 	// uaList: expected to have a browser's user agent string, or an array with multiple of them.
     foreach( ( is_array($uaList) ? array_map('trim',$uaList) : array(trim($uaList)) ) as $uaTerm ) {
       $uaTmp = ( substr($uaTerm,0,1) == '+' ) ? 1 : -1;
-      if ( stripos($uaString,ltrim($uaTern,"+- \n\r\t\v\0")) !== false ) {
+      if ( stripos($uaString,ltrim($uaTerm,"+- \n\r\t\v\0")) !== false ) {
         $uaOk = $uaTmp;
         break;
       }
     }
-    $isBot = lib4ridora_user_is_bot($uaString,variable_get('lib4ridora_bot_needs_language',false),true);
   }
-
   if ( $uaOk < 0 ) { // Task 1: user-agent check:
     global $base_path;
     if ( !drupal_is_cli() || @!empty($_SERVER['DOCUMENT_ROOT']) ) {	// see: https://api.drupal.org/api/drupal/includes%21bootstrap.inc/function/drupal_is_cli/7.x
@@ -964,6 +960,8 @@ function lib4ridora_access_rejection( $batch = NULL ) {
   }
   // Task 2: bot rejection:
   if ( variable_get('lib4ridora_no_batch_for_bot',true) ) {	// TRUE by default - Jour Fixe 2021-10-21
+    // Bot detection via islandora_usage_stats, needs a user agent string, this condition but also the used regular expression will return true empty!
+    $isBot = ( empty($uaString) || lib4ridora_user_is_bot($uaString,variable_get('lib4ridora_bot_needs_language',false),true) );
     // Special case, catch obsolete links like: https://www.dora.lib4ri.ch/eawag/batch?op=start&id=78228
     if ( isset($_REQUEST['id']) && ( @empty($_SERVER['REQUEST_URI']) || strpos(strtok($_SERVER['REQUEST_URI'].'?','?'),'/batch') ) ) {
       if ( !function_exists('batch_load') ) {
