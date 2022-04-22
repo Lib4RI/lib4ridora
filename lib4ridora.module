@@ -1360,7 +1360,23 @@ function lib4ridora_form_alter(&$form, $form_state, $form_id) {
 	if ( $form_id == 'lib4ridora_admin' ) {
 		module_load_include('inc', 'lib4ridora', 'includes/admin.form');
 		$form['#validate'][] = 'lib4ridora_admin_form_value_check';
-    }
+	}
+	elseif ( substr($form_id,0,31) == 'islandora_solr_date_filter_form' ) {  // can carry '_0' number suffix
+		$form['date_filter']['date_filter']['#markup'] = '<!-- Format: ... hint is unwanted, removed -->';
+		$form['date_filter']['date_filter_from']['#attributes'] = array( 'style' => 'display:inline-block' );
+		$form['date_filter']['date_filter_to']['#attributes'] = array( 'style' => 'display:inline' );
+		$jsCode = array( 	/* work-around, since code above may not work!? */
+			"<scr"."ipt type='text/jav"."asc"."ript'> ",
+			"fAux = document.getElementsByClassName('date-filter-toggle-text'); ",
+			"for (i=0;i<fAux.length;i++) { fAux[i].innerHTML = fAux[i].innerHTML.replace('Specify date range','Specify year range'); } ",
+			"fAux = document.getElementsByClassName('form-item-date-filter-date-filter-from'); ",
+			"for (i=0;i<fAux.length;i++) { fAux[i].style = 'display:inline-block; margin-right:1ex;'; } ",
+			"fAux = document.getElementsByClassName('form-item-date-filter-date-filter-to'); ",
+			"for (i=0;i<fAux.length;i++) { fAux[i].style = 'display:inline;'; } ",
+			"</sc"."ript>",
+		);
+		$form['date_filter']['date_filter_button_wrapper']['#prefix'] = implode("\r\n",$jsCode);
+	}
 	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) && user_is_logged_in() ) { 
 		if ( in_array($form_id,array("islandora_object_properties_form","islandora_object_properties_form_delete")) ) {
 			// related to HTML-editor issues: Changing the value of this submit button by jQuery/JavaScript may be tricky,

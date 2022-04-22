@@ -384,7 +384,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
    * e.g. with stripos($filter,'_dt:') and prefer formatFilter() then.
    * 
    */
-  public function formatFilterSimple($filter, $solr_fields = array(), $date_format = NULL /* see handing in formatFilter() */ ) {
+  public function formatFilterSimple($filter, $solr_fields = array(), $date_format = '') {		// date_format: e.g. "Y-m-d"
     if ( empty($solr_all_fields) ) {
       module_load_include('inc', 'islandora', 'includes/utilities');
       module_load_include('inc', 'lib4ridora', 'includes/utilities');
@@ -415,15 +415,10 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
             if ( ( ( $pos3 = strpos($filter,']',$pos2) ) && ( $len3 = 1 ) ) || ( ( $pos3 = stripos($filter,'%5D',$pos2) ) && ( $len3 = 3 ) ) ) {
               $yearRange[0] = trim(substr($filter,$pos1+$len1,$pos2-$pos1-$len1));		// will be e.g. 2014-01-01T00:00:00Z
               $yearRange[1] = trim(substr($filter,$pos2+$len2,$pos3-$pos2-$len2));		// will be e.g. 2021-12-31T23:59:59Z
-              if ( $date_format != NULL ) {  // Hopefully...
-                $yearRange = array(
-                  0 => ( ( !empty($yearRange[0]) && strpos($yearRange[0],'*') !== 0 ) ? format_date(strtotime($yearRange[0]) + (60 * 60 * 24), 'custom', $date_format) : 'Big Bang' ),
-                  1 => ( ( !empty($yearRange[1]) && strpos($yearRange[1],'*') !== 0 ) ? format_date(strtotime($yearRange[1]) - (60 * 60 * 24), 'custom', $date_format) : 'Now' ),
-                );
-              } else { // improvise...
-                $yearRange[0] = ( intval($yearRange[0]) ? strval(intval($yearRange[0])) : ( ( !empty($yearRange[0]) && strpos($yearRange[0],'*') !== 0 ) ? $yearRange[0] : 'Big Bang' ) );
-                $yearRange[1] = ( intval($yearRange[1]) ? strval(intval($yearRange[1])) : ( ( !empty($yearRange[0]) && strpos($yearRange[1],'*') !== 0 ) ? $yearRange[1] : 'Now' ) );
-              }
+              $yearRange = array(
+                0 => ( ( !empty($yearRange[0]) && substr($yearRange[0],0,1) != '*' ) ? date(( empty($date_format) ? "Y" : $date_format ),strtotime($yearRange[0])) : 'since ever' ),
+                1 => ( ( !empty($yearRange[1]) && substr($yearRange[1],0,1) != '*' ) ? date(( empty($date_format) ? "Y" : $date_format ),strtotime($yearRange[1])) : 'now' ),
+              );
               $yTmp = ( strcmp($yearRange[0],$yearRange[1]) ? implode( ( stripos($filter,'%') ? '%20-%20' : ' - ' ), $yearRange ) : $yearRange[0] );
               $filter = substr($filter,0,$pos1) . $yTmp . substr($filter,$pos3+$len3);
               $pos = $pos0 + 16;	// to step forward a bit in $filter
@@ -451,7 +446,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
    * @return string
    *   The formatted filter string for breadcrumbs and active query.
    */
-  public function formatFilter($filter, $islandora_solr_query) {
+  public function formatFilter($filter, $islandora_solr_query, $date_format = '') {		// date_format: e.g. "Y-m-d"
     // @todo See how this interacts with multiple date filters.
     // Check if there are operators in the filter.
     $fq_split = preg_split('/ (OR|AND|NOT) /', $filter);
@@ -475,7 +470,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
       $filter_string = trim($filter_string);
     }
     else {
-      // Split the filter into field and value.
+      // Split the filter into field and value, for e.g. array( 'mods_originInfo_encoding_w3cdtf_keyDate_yes_dateIssued_dt', '[2007-01-01T00:00:00Z TO 2012-01-01T00:00:00Z]' )
       $filter_split = preg_split(ISLANDORA_SOLR_QUERY_FIELD_VALUE_SPLIT_REGEX, $filter, 2);
       // Trim brackets.
       $filter_split[1] = trim($filter_split[1], "\"");
@@ -493,8 +488,8 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
         } else {
           $yearRange = array_map( function($y) { return trim($y,"[] \n\r\t\v\0"); }, explode(' TO ',$filter_split[1]) );
           $yearRange = array(
-            0 => ( ( !empty($yearRange[0]) && strpos($yearRange[0],'*') !== 0 ) ? format_date(strtotime($yearRange[0]) + (60 * 60 * 24), 'custom', $format) : 'Big Bang' ),
-            1 => ( ( !empty($yearRange[1]) && strpos($yearRange[1],'*') !== 0 ) ? format_date(strtotime($yearRange[1]) - (60 * 60 * 24), 'custom', $format) : 'Now' ),
+            0 => ( ( !empty($yearRange[0]) && substr($yearRange[0],0,1) != '*' ) ? date(( empty($date_format) ? "Y" : $date_format ),strtotime($yearRange[0])) : 'since ever' ),
+            1 => ( ( !empty($yearRange[1]) && substr($yearRange[1],0,1) != '*' ) ? date(( empty($date_format) ? "Y" : $date_format ),strtotime($yearRange[1])) : 'now' ),
           );
           $filter_split[1] = ( strcmp($yearRange[0],$yearRange[1]) ? implode(' - ',$yearRange) : $yearRange[0] );
         }

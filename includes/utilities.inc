@@ -296,6 +296,14 @@ function lib4ridora_get_author_info(AbstractObject $object) {
 
   $authors = array();
 
+  module_load_include('inc', 'lib4ridora', 'includes/advanced_search');	// for lib4ridora_parse_affiliation_fields()
+  $solr_field = array_shift( lib4ridora_parse_affiliation_fields() );	// let's just consider the 1st (most important!?) Solr field
+  $solr_field = substr($solr_field,0,strrpos($solr_field,'_'));		// cut off the '_ms'/'_mt' ending!
+
+  // Now cut out the attribute type like 'group' after 'affiliation' form e.g. 'mods_name_personal_affiliation_group':
+  $solr_field_type = ( !( $pos = strpos($solr_field,'_affiliation_') ) ? '' : strtok(substr($solr_field,$pos+13).'_','_') );
+  $path_to_eval = ( empty($solr_field_type) ? 'mods:affiliation' /* former default */ : 'mods:affiliation[@type="'.$solr_field_type.'"]' );
+  
   foreach ($xpath->query('//mods:mods/mods:name[@type="personal"][mods:role/mods:roleTerm[@authority="marcrelator" and @type="text"]/text() = "author"]') as $person) {
     $info = array(
       'author' => array(
@@ -303,7 +311,7 @@ function lib4ridora_get_author_info(AbstractObject $object) {
         'id' => $xpath->evaluate('string('.variable_get('lib4ridora_mods_query_author_id', 'mods:nameIdentifier[@type="authorId"]').'/text())', $person),
       ),
       'org' => array(
-        'name' => $xpath->evaluate('normalize-space(mods:affiliation)', $person),
+        'name' => $xpath->evaluate('normalize-space('.$path_to_eval.')', $person),
         'id' => $xpath->evaluate('string(mods:nameIdentifier[@type="organizational unit id"]/text())', $person),
       ),
     );
