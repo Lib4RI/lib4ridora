@@ -127,6 +127,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
   * 	- islandora_solr_get_fields("facet_fields", FALSE, FALSE);
   */
   public function lib4ridora_replace_field_with_label( $query_string = '', $solr_fields = array(), $remove_weight = false ) {
+	$labelAry = array( /* 'full' => array(  solr_field_with_mxy => Field-Label ), 'aux' => array(  solr_field_no_mxy => Field-Label ) ) */ );
     foreach ($solr_fields as $solr_field => $data) {		// $solr_field also can be just a digit depending on the data source used!
       if ( empty($data) ) { continue; }
       $label = '';
@@ -142,11 +143,24 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
           }
         }
       }
-      // cut off '_mt', '_ms', ... - remind there are dc.title, dc.creator, ... or psuedo-solr-fields:
-      if ( !strpos($solr_field,'.') && ( $pos = strrpos($solr_field,'_') ) ) {
-        $query_string = preg_replace('/'.substr($solr_field,0,$pos).'_\w+/', $label, $query_string);
-      } else {
-        $query_string = preg_replace('/'.$solr_field.'/', $label, $query_string);
+      if ( @empty($labelAry['full'][$solr_field]) ) {
+        $labelAry['full'][$solr_field] = $label;
+        if ( ( $pos = strrpos($solr_field,'_') ) && in_array( strtolower(substr($solr_field,$pos+1)), array('s','ss','ms','mt','mlt','dt','mdt') ) ) {
+          $solr_field = substr($solr_field,0,$pos);	// without _ms, _mt, ...
+          if ( @empty($labelAry['aux'][$solr_field]) ) {
+            $labelAry['aux'][$solr_field] = $label;
+          }
+        }
+      }
+    }
+    if ( @isset($labelAry['full']) ) {
+      foreach( $labelAry['full'] as $solr_field => $label ) {
+        $query_string = str_ireplace($solr_field, $label, $query_string);
+      }
+    }
+    if ( @isset($labelAry['aux']) ) {
+      foreach( $labelAry['aux'] as $solr_field => $label ) {
+		$query_string = preg_replace('/'.substr($solr_field,0,$pos).'_\w+/i', $label, $query_string);
       }
     }
     if ( $remove_weight && strpos($query_string,'^') ) {  // try to remove search-weights:
