@@ -268,11 +268,11 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
     foreach ($fq as $key => $filter) {
       // Check for exclude filter.
       $symbol = ($filter[0] == '-') ? '&ne;' /* 'not equal' sign */ : '=';
-      $filter_string = urldecode($filter);
+      $filter_string = str_replace('\\','',urldecode($filter));		// ensure %5c%20 or %5c%3a will not end up with a backslash inside!
       if ( /* stripos($filter_string,'_dt:') || */ !preg_match('/\s+(AND|OR|NOT)\s+/',$filter_string) ) {
         $filter_string = $this->formatFilter($filter,$islandora_solr_query);
       } else {
-        $filter_string = $this->formatFilterSimple($filter,$solr_all_fields);
+        $filter_string = $this->formatFilterSimple($filter_string,$solr_all_fields);
       }
       // Pull out filter (for exclude link).
       $query_minus = array();
