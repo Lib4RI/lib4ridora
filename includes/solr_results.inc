@@ -413,6 +413,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
       );
       $solr_fields = array_reverse(array_merge($solr_misc_fields,$solr_search_fields,$solr_facet_fields));
     }
+    if ( empty($date_format) ) { $date_format = "Y"; }
     // replace date-spans with year-spans, expect $filter to contain "...sued_dt:[2014-01-01T00:00:00Z TO 2021-12-31T23:59:59Z]&..." or even URL-encoded.
     while( @!isset($yearRange) || @!empty($yearRange) ) {			// loop, as support for multiple dates
       $yearRange = array(); // intentionally initiate here/later!
@@ -429,9 +430,9 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
             if ( ( ( $pos3 = strpos($filter,']',$pos2) ) && ( $len3 = 1 ) ) || ( ( $pos3 = stripos($filter,'%5D',$pos2) ) && ( $len3 = 3 ) ) ) {
               $yearRange[0] = trim(substr($filter,$pos1+$len1,$pos2-$pos1-$len1));		// will be e.g. 2014-01-01T00:00:00Z
               $yearRange[1] = trim(substr($filter,$pos2+$len2,$pos3-$pos2-$len2));		// will be e.g. 2021-12-31T23:59:59Z
-              $yearRange = array(
-                0 => ( ( !empty($yearRange[0]) && substr($yearRange[0],0,1) != '*' ) ? date(( empty($date_format) ? "Y" : $date_format ),strtotime($yearRange[0])) : 'since ever' ),
-                1 => ( ( !empty($yearRange[1]) && substr($yearRange[1],0,1) != '*' ) ? date(( empty($date_format) ? "Y" : $date_format ),strtotime($yearRange[1])) : 'now' ),
+              $yearRange = array(	/* we do not want the timezone to be affected, so better use date_create()+date_format() than strtotime()+date() */
+                0 => ( ( !empty($yearRange[0]) && substr($yearRange[0],0,1) != '*' ) ? date_format(date_create($yearRange[0]),$date_format) : 'since ever' ),
+                1 => ( ( !empty($yearRange[1]) && substr($yearRange[1],0,1) != '*' ) ? date_format(date_create($yearRange[1]),$date_format) : 'now' ),
               );
               $yTmp = ( strcmp($yearRange[0],$yearRange[1]) ? implode( ( stripos($filter,'%') ? '%20-%20' : ' - ' ), $yearRange ) : $yearRange[0] );
               $filter = substr($filter,0,$pos1) . $yTmp . substr($filter,$pos3+$len3);
@@ -484,6 +485,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
       $filter_string = trim($filter_string);
     }
     else {
+      if ( empty($date_format) ) { $date_format = "Y"; }
       // Split the filter into field and value, for e.g. array( 'mods_originInfo_encoding_w3cdtf_keyDate_yes_dateIssued_dt', '[2007-01-01T00:00:00Z TO 2012-01-01T00:00:00Z]' )
       $filter_split = preg_split(ISLANDORA_SOLR_QUERY_FIELD_VALUE_SPLIT_REGEX, $filter, 2);
       // Trim brackets.
@@ -501,9 +503,9 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
           $filter_split[1] = ( variable_get('islandora_solr_facets_year_only',true) ? 'Any Year' : 'Any Date' );  // if only a '*', rather special case...
         } else {
           $yearRange = array_map( function($y) { return trim($y,"[] \n\r\t\v\0"); }, explode(' TO ',$filter_split[1]) );
-          $yearRange = array(
-            0 => ( ( !empty($yearRange[0]) && substr($yearRange[0],0,1) != '*' ) ? date(( empty($date_format) ? "Y" : $date_format ),strtotime($yearRange[0])) : 'since ever' ),
-            1 => ( ( !empty($yearRange[1]) && substr($yearRange[1],0,1) != '*' ) ? date(( empty($date_format) ? "Y" : $date_format ),strtotime($yearRange[1])) : 'now' ),
+          $yearRange = array(	/* we do not want the timezone to be affected, so better use date_create()+date_format() than strtotime()+date() */
+            0 => ( ( !empty($yearRange[0]) && substr($yearRange[0],0,1) != '*' ) ? date_format(date_create($yearRange[0]),$date_format) : 'since ever' ),
+            1 => ( ( !empty($yearRange[1]) && substr($yearRange[1],0,1) != '*' ) ? date_format(date_create($yearRange[1]),$date_format) : 'now' ),
           );
           $filter_split[1] = ( strcmp($yearRange[0],$yearRange[1]) ? implode(' - ',$yearRange) : $yearRange[0] );
         }
