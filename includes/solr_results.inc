@@ -446,6 +446,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
     $filter = $this->lib4ridora_replace_field_with_label( $filter, $solr_fields );
     // Enprettyments:
     $filter = html_entity_decode($filter,ENT_HTML401,'UTF-8'); // there may be special characters as HTML-encoding inside that may become double-encoded.
+    $filter = str_replace('*:* NOT','NOT',$filter);		// the *:* before NOT may be Solr-logically needed, for human readability it's not
     return preg_replace('/\s+/',' ',str_replace(':',': ',$filter));         // should not harm, just looks better with 1 space after semicolon
   }
 
@@ -512,6 +513,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
       }
       $filter_string = $filter_split[1];
     }
+    $filter_string = str_replace('*:* NOT','NOT',$filter_string);	// the *:* before NOT may be Solr-logically needed, for human readability it's not
     return stripslashes($filter_string);
   }
 }

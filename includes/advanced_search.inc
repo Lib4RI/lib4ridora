@@ -296,7 +296,11 @@ function lib4ridora_construct_peer_reviewed_filter(&$form_state) {
     $filters[] = "$peer_review_field:No";
   }
   if ($form_state['values']['peer_review']['not specified']) {
-    $filters[] = /* "(*:* NOT $peer_review_field:*)" */ '-' . $peer_review_field . ':*';	// same, however easier to interpret+display for the 'Active Filters' function.
+	if ( sizeof($filters) ) {
+      $filters[] = "(*:* NOT $peer_review_field:*)"; 	// safer in conjunction with other filters
+	} else {
+      $filters[] = '-' . $peer_review_field . ':*';	// easier to interpret+display for the 'Active Filters' function
+    }
   }
 
   return lib4ridora_construct_filter_string_from_array($filters);
