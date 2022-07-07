@@ -269,9 +269,11 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
       // Check for exclude filter.
       $symbol = ($filter[0] == '-') ? '&ne;' /* 'not equal' sign */ : '=';
       $filter_string = str_replace('\\','',urldecode($filter));		// ensure %5c%20 or %5c%3a will not end up with a backslash inside!
+      $is_filter_with_op = false;
       if ( /* stripos($filter_string,'_dt:') || */ !preg_match('/\s+(AND|OR|NOT)\s+/',$filter_string) ) {
         $filter_string = $this->formatFilter($filter,$islandora_solr_query);
       } else {
+        $is_filter_with_op = true;
         $filter_string = $this->formatFilterSimple($filter_string,$solr_all_fields);
       }
       // Pull out filter (for exclude link).
@@ -372,7 +374,12 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
             }
           }
         }
-        $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a> ' . $label . ' ' . $symbol . ' ' . check_plain(ltrim($filter_string,'-!'));
+        $tmp = check_plain(ltrim($filter_string,'-!'));
+        if ( $is_filter_with_op && stripos($tmp,$label) !== false ) {	// they got a special treatment, so do not add the label (=Solr field name) once again
+			$filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a> ' . $tmp;
+		} else {
+			$filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a> ' . $label . ' ' . $symbol . ' ' . $tmp;
+		}
       }
       else { // Default to old behavior.
         $filter_list[] = '<a' . drupal_attributes($attributes['minus']['attr']) . '>(-)</a> &hellip; ' . $symbol . ' ' . check_plain(ltrim($filter_string,'-!'));
@@ -444,6 +451,7 @@ class IslandoraSolrResultsLib4riBookmark extends IslandoraSolrResultsBookmark {
     }
     // Try to teplace names of Solr fields with their (configured) labels:
     $filter = $this->lib4ridora_replace_field_with_label( $filter, $solr_fields );
+
     // Enprettyments:
     $filter = html_entity_decode($filter,ENT_HTML401,'UTF-8'); // there may be special characters as HTML-encoding inside that may become double-encoded.
     $filter = str_replace('*:* NOT','NOT',$filter);		// the *:* before NOT may be Solr-logically needed, for human readability it's not
