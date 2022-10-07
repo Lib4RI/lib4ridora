@@ -196,7 +196,12 @@ function lib4ridora_get_related_research_data(AbstractObject $object) {
     $dom->loadXML($object['MODS']->content);
     $xpath = new DOMXPath($dom);
     $xpath->registerNamespace('mods', 'http://www.loc.gov/mods/v3');
-    $results = $xpath->query('//mods:relatedItem[@type="otherType"]/mods:identifier[@type="uri"]');
+//  $results = $xpath->query('//mods:relatedItem[@type="otherType"]/mods:identifier[@type="uri"]');
+    $ary = array_map('trim',explode('|',variable_get('lib4ridora_solr_field_research_data', 'mods_extension_resource_identifier_mt | mods:extension/mods:resource/mods:identifier[@identifierTyp="DOI"]')));
+    if ( @empty($ary[1]) /* at [1] there should be the MODS-X-Path */ ) {
+      return FALSE;
+    }
+    $results = $xpath->query('//' . trim($ary[1],"/ \r\n\t\v\x00") );
     // Filter out empty results now.
     $filtered_results = array();
     foreach ($results as $result) {

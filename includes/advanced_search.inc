@@ -360,20 +360,20 @@ function lib4ridora_construct_research_data_filter(&$form_state) {
   if ( @!isset($form_state['values']['research_data']['yes']) ) {
 	return;
   }
-  $ary = array_map('trim',explode('|',variable_get('lib4ridora_solr_field_research_data', 'mods_relatedItem_otherType_identifier_uri_mt')));
-  if ( empty($ary[0]) /* || $ary[0][0] == '#' */ ) {
+  $ary = array_map('trim',explode('|',variable_get('lib4ridora_solr_field_research_data', 'mods_extension_resource_identifier_mt | mods:extension/mods:resource/mods:identifier[@identifierTyp="DOI"]')));
+  if ( @empty($ary[0]) /* at [1] there should be the MODS-X-Path */ ) {
 	return;
   }
   module_load_include("inc", "islandora_solr", "includes/utilities");
 
   // Get field name out of configuration.
-  $solr_field = islandora_solr_lesser_escape( ltrim($ary[0],"# \n\r\t\v\x00") );
+  $solr_field = islandora_solr_lesser_escape( $ary[0] );
 
   $filters = array();
   if ( $form_state['values']['research_data']['yes'] ) {
     $filters[] = $solr_field . ':*';
   }
-  if ( @isset($form_state['values']['research_data']['no']) && $form_state['values']['research_data']['no'] ) {
+  if ( $form_state['values']['research_data']['no'] ) {
     $filters[] = '-' . $solr_field . ':*';
   }
   return lib4ridora_construct_filter_string_from_array($filters);

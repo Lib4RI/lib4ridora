@@ -257,11 +257,10 @@ function lib4ridora_admin(array $form, array &$form_state) {
 		'#size' => $textfield_size,
 	);
 	$form['lib4ridora_solr_field_research_data'] = array(
-	/* sudo drush -r /var/www/html -y @sites php-eval "variable_set('lib4ridora_solr_field_research_data','mods_relatedItem_otherType_identifier_uri_mt | Research Data | Yes | No')"	*/
 		'#type' => 'textfield',
 		'#title' => t('Research Data Solr Field'),
-		'#description' => t('A Solr field we use to determine the link to research data.<br> Is used by the advanced search block.<br> With a leading \'#\' this option/value will be ignored.'),
-		'#default_value' => variable_get('lib4ridora_solr_field_research_data', 'mods_relatedItem_otherType_identifier_uri_mt'),
+		'#description' => t('Requires two research data related values, separated by a \'|\' character:<br>- Name of Solr field<br>- MODS-X-Path like: mods:relatedItem[@type="othe...'),
+		'#default_value' => variable_get('lib4ridora_solr_field_research_data', 'mods_extension_resource_identifier_mt | mods:extension/mods:resource/mods:identifier[@identifierTyp="DOI"]'),
 		'#required' => TRUE,
 		'#size' => $textfield_size,
 	);
