@@ -563,22 +563,34 @@ function lib4ridora_add_citation_key(&$json) {
   // leveraged. Thus, we'll build up the citation-key ourselves in PHP. The
   // below is very much based off what the CSL is doing. That is use
   // the authors' last name(s) if present suffixed with the year.
+  // Similarly, Zotero doesn't support much of anything beyond English
+  // alphanumeric characters. It could be possible to pull in a transliteration
+  // library to make this much nicer, however it would require bundling an
+  // external module or library. Given that citation keys pure requirement are
+  // being unique just replace it with nothing.
+  $author_sanitization = function ($string) {
+    $capital_replacements = [
+      '{' => '',
+      '}' => '',
+    ];
+    return preg_replace('/[^\w\s-]/', '', strtr($string, $capital_replacements));
+  };
   $authors = [];
   if (isset($json->author)) {
     foreach ($json->author as $author) {
-      $authors[] = strtr($author->family, ['{' => '', '}' => '']);
+      $authors[] = $author_sanitization($author->family);
     }
   }
   // When there's no authors fallback to looking at editor and translator.
   if (empty($authors)) {
     if (isset($json->editor)) {
       foreach ($json->editor as $editor) {
-        $authors[] = strtr($editor->family, ['{' => '', '}' => '']);
+        $authors[] = $author_sanitization($editor->family);
       }
     }
     if (isset($json->translator)) {
       foreach ($json->translator as $translator) {
-        $authors[] = strtr($translator->family, ['{' => '', '}' => '']);
+        $authors[] = $author_sanitization($translator->family);
       }
     }
   }
