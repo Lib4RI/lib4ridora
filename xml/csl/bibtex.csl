@@ -136,7 +136,7 @@
     </sort>
     <layout>
       <text macro="zotero2bibtexType" prefix=" @"/>
-      <group prefix="{" suffix="}" delimiter=", ">
+      <group prefix="{" suffix="}" delimiter=", &#10;">
         <text macro="citeKey"/>
         <text variable="publisher-place" prefix=' place="' suffix='"'/>
         <text variable="chapter-number" prefix=' chapter="' suffix='"'/>
