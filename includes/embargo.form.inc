@@ -647,11 +647,19 @@ function lib4ridora_multi_pdf_defaults_properties($for_forms = FALSE) {
     global $base_path;
     $for_forms = ( strtok($_SERVER['REQUEST_URI'].'?','?') == $base_path.'system/ajax' );
   }
-  return array(
-    'availability' => ( $for_forms ? trim(strtolower(variable_get('lib4ridora_multi_pdf_defaults_property_availability', 'intranet'))) : 'private' ),
+  if ( $for_forms ) {
+    return array(
+      'availability' => trim(strtolower(variable_get('lib4ridora_multi_pdf_defaults_property_availability', 'intranet'))), /* orig. variable name */
+      'embargo_date' => $embargo_date,
+      'document_version' => trim(strtolower(variable_get('lib4ridora_pdf_default_doc_ver_form', 'published version'))),
+      'use_permission' => NULL,
+    );
+  }
+  return array(	/* in general safter, should a manual upload/ingestion fail, RELS-INT miss, or when we run a batch */
+    'availability' => trim(strtolower(variable_get('lib4ridora_pdf_default_availability_main', 'private'))),
     'embargo_date' => $embargo_date,
-    'document_version' => ( $for_forms ? 'published version' : 'internal document' ),
-    'use_permission' => NULL,
+    'document_version' => trim(strtolower(variable_get('lib4ridora_pdf_default_doc_ver_main', 'internal document'))),
+    'use_permission' => /* trim(strtolower(variable_get('lib4ridora_pdf_default_permission_main', '???'))) */ NULL,
   );
 }
 
