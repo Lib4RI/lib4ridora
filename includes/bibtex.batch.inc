@@ -86,6 +86,15 @@ function lib4ridora_batch_append_citations_to_file($set_id, $total, $text_filena
         $json = lib4ridora_convert_citeproc_array_to_object($citeproc_array);
         lib4ridora_add_citation_key($json);
         $text = $citeproc->render($json, 'bibliography');
+        // XXX: Depending on the source input it's possible to get into a state
+        // where the source MODS contain invalid characters and so forth.
+        // When this is encountered log the error the watchdog and do not
+        // include it in the output.
+        $xml_to_test = "<div>$text</div>";
+        if (!@simplexml_load_string($xml_to_test)) {
+          watchdog('lib4ridora', 'Unable to process BiBTeX output for @pid, encountered invalid values.', ['@pid' => $object->id]);
+          continue;
+        }
         if ($file) {
           fwrite($file, "$text");
         }
@@ -528,7 +537,10 @@ function lib4ridora_replace_to_bibtex($value) {
 function lib4ridora_convert_citeproc_array_to_object($in) {
 
   if (!is_array($in)) {
-    return lib4ridora_replace_to_bibtex($in);
+    // XXX: SimpleXML likes to replace already encoded entities earlier up in
+    // the Citeproc chain back to their unencoded values. Once again encode
+    // them.
+    return lib4ridora_replace_to_bibtex(htmlentities($in));
   }
   elseif (count($in) > 0 && count(array_filter(array_keys($in), 'is_int')) == count($in)) {
     foreach ($in as &$value) {
