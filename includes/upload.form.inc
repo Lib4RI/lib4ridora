@@ -29,10 +29,12 @@ function lib4ridora_upload_form($form, &$form_state) {
     $files = array_merge($files, lib4ridora_get_uploaded_files(array('wrapper', 'upload'), $form_state));
   }
 
-  $button = end($form_state['clicked_button']['#parents']);
-  if ($button == 'remove') {
-    $selected = array_filter($form_state['values']['wrapper']['table_wrapper']['files']);
-    $files = array_values(array_diff_key($files, $selected));
+  if (isset($form_state['clicked_button']['#parents'])){
+      $button = end($form_state['clicked_button']['#parents']);
+      if ($button == 'remove') {
+        $selected = array_filter($form_state['values']['wrapper']['table_wrapper']['files']);
+        $files = array_values(array_diff_key($files, $selected));
+      }
   }
   $current_step = islandora_ingest_form_get_step($form_state);
   if (($current_step == 'lib4ridora_multi_pdf_upload' && $form_state['values']['next'] == t('Ingest') && !empty($files)) ||
@@ -151,4 +153,32 @@ function lib4ridora_get_uploaded_files($parents, &$form_state) {
   };
 
   return array_map($map, $files);
+}
+
+/**
+ * Merging pdf upload and embargo forms.
+ */
+function lib4ridora_jpdf_form($form, &$form_state) {
+    form_load_include($form_state,'inc', 'lib4ridora', 'includes/upload.form');
+    form_load_include($form_state,'inc', 'lib4ridora', 'includes/embargo.form');
+    $form = lib4ridora_upload_form($form, $form_state);
+    
+    $form['accepted_warning'] = array(
+        '#type' => 'markup',
+        '#markup' => '<div id="accepted-version-warning" class="accepted-version-warning-hidden"> </div>',
+    );
+    
+    $form = lib4ridora_multi_embargo_form($form, $form_state);
+    
+    return $form;
+}
+
+function lib4ridora_jpdf_form_submit($form, &$form_state) {
+    form_load_include($form_state,'inc', 'lib4ridora', 'includes/embargo.form');
+    lib4ridora_multi_embargo_form_submit($form, $form_state);
+}
+
+function lib4ridora_jpdf_form_undo_submit($form, &$form_state) {
+    form_load_include($form_state,'inc', 'lib4ridora', 'includes/embargo.form');
+    lib4ridora_multi_embargo_form_undo_submit($form, $form_state);
 }

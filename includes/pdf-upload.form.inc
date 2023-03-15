@@ -12,7 +12,7 @@ function lib4ridora_single_pdf_upload_form($form, &$form_state, AbstractObject $
   form_load_include($form_state, 'inc', 'lib4ridora', 'includes/pdf-upload.form');
   form_load_include($form_state, 'inc', 'lib4ridora', 'includes/embargo.form');
   $options = lib4ridora_multi_pdf_get_options();
-  $defaults = lib4ridora_multi_pdf_defaults_properties();
+  $defaults = lib4ridora_multi_pdf_defaults_properties(TRUE);
 
   $form['#tree'] = TRUE;
   $form['pdf'] = array(
@@ -67,7 +67,21 @@ function lib4ridora_single_pdf_upload_form($form, &$form_state, AbstractObject $
   $form['add'] = array(
     '#type' => 'submit',
     '#value' => t('Add PDF'),
+    '#prefix' => '<br>',
+    '#suffix' => '<br><br><br>',
   );
+  
+  // Adding a JS function to switch the availability to 'private' for 'internal documents'.
+  // This shall assist the work-flow, but to enforce 'private' in DORA we better should use a valiation or submit hook.
+  // drupal_add_js( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.js', 'file' );
+  if ( $jsCode = file_get_contents( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.js' ) ) {
+    if ( $jsCode = strchr(substr($jsCode,strpos($jsCode,'<script')),'>') ) {
+      if ( $jsCode = trim(substr($jsCode,0,strpos($jsCode,'</script>'))," </-!>\t") ) {
+        drupal_add_js( $jsCode, 'inline' );		// This is less 'caching-resistent', also a reset of ['#attached']['js'] cannot drop it.
+      }
+    }
+  }
+  $form['file']['document_version']['#attributes']['onchange'] = "PdfInternalAsPrivate('');"; // here we not need an UUID or a PDF-ID
 
   return $form;
 }
@@ -102,6 +116,15 @@ function lib4ridora_single_pdf_upload_form_submit(&$form, &$form_state) {
   $info = lib4ridora_assemble_pdf_info($object);
   $max_index = lib4ridora_determine_max_extra_pdf_index($info);
 
+  $forced_intdoc_as_priv = false;
+  foreach( array('values','input') as $idxMain ) {
+    if ( stripos($form_state[$idxMain]['file']['document_version'],'internal') !== false && stripos($form_state[$idxMain]['file']['availability'],'private') === false ) {
+      $form_state[$idxMain]['file']['availability'] = 'private';
+      $forced_intdoc_as_priv = true;
+    }
+  }
+  if ( $forced_intdoc_as_priv ) { drupal_set_message("The availability of the 'Internal Document' was set to 'Private'.", 'warning'); }
+
   $new_token = '--NEW--';
   $info[$new_token] = $form_state['values']['file'];
 
@@ -125,7 +148,7 @@ function lib4ridora_single_pdf_upload_form_submit(&$form, &$form_state) {
       drupal_unlink($temp_file);
       $object->ingestDatastream($new_old);
       lib4ridora_update_datastream_relationships($new_old, $info['PDF']);
-      $to_purge = array('PDF', 'TN', 'PREVIEW', 'FULL_TEXT');
+      $to_purge = array('PDF', 'TN', 'PREVIEW', 'FULL_TEXT', 'PDF'.variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A') );
       array_map(array($object, 'purgeDatastream'), $to_purge);
     }
 
@@ -149,6 +172,35 @@ function lib4ridora_single_pdf_upload_form_submit(&$form, &$form_state) {
 }
 
 /**
+ * Implements validation from the Form API.
+ * 
+ * @param $form
+ *   A copy as structured array containing the elements and properties of the form.
+ * @param $form_state
+ *   An array that hold the submitted information about the form's current state during processing.
+ * 
+ * Used here to force the 'private' availability for internal documents.
+ */
+function lib4ridora_single_pdf_upload_form_validate(&$form, &$form_state) {
+  $forced_intdoc_as_priv = false;
+  foreach( array('values','input') as $idxMain ) {
+    if ( stripos($form_state[$idxMain]['file']['document_version'],'internal') !== false && stripos($form_state[$idxMain]['file']['availability'],'private') === false ) {
+      $form_state[$idxMain]['file']['availability'] = 'private';
+      $forced_intdoc_as_priv = true;
+    }
+  }
+  if ( $forced_intdoc_as_priv ) { drupal_set_message("The availability of the 'Internal Document' was set to 'Private'.", 'warning'); }
+}
+
+/**
+ * heloper function for lib4ridora_assemble_pdf_info()
+ */
+function lib4ridora_assemble_pdf_info_helper(AbstractDatastream $datastream) {
+  module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+  return lib4ridora_get_embargo_info($datastream, TRUE, TRUE);
+}
+
+/**
  * Get info for all PDFs on the object.
  *
  * @param AbstractObject $object
@@ -164,5 +216,5 @@ function lib4ridora_assemble_pdf_info(AbstractObject $object) {
   $datastreams = iterator_to_array($object);
   $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter');
 
-  return array_map('lib4ridora_get_embargo_info', $pdf_datastreams);
+  return array_map('lib4ridora_assemble_pdf_info_helper', $pdf_datastreams);
 }

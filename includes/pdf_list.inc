@@ -30,7 +30,10 @@ function lib4ridora_list_pdfs(AbstractObject $object) {
 
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
   $datastreams = iterator_to_array($object);
-  $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter');
+  $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter_soft');
+  if ( sizeof($pdf_datastreams) > 1 ) {
+	$pdf_datastreams = lib4ridora_ds_pdf_sort( $pdf_datastreams );
+  }
   $options = lib4ridora_multi_pdf_get_options();
   $get_option = function ($name, $info, $default = NULL) use ($options) {
     return isset($options[$name][$info[$name]]) ?
@@ -65,12 +68,18 @@ function lib4ridora_list_pdfs(AbstractObject $object) {
     if (!islandora_datastream_access(ISLANDORA_VIEW_OBJECTS, $pdf_datastream)) {
       continue;
     }
-
     $info = lib4ridora_get_embargo_info($pdf_datastream);
-
+	if ( !lib4ridora_internal_doc_access($info) ) {
+		continue;
+	}
+    $pid = $object->id;
+	$dsId = $pdf_datastream->id;
+    $dsLabel = $pdf_datastream->label;
+  	// if the DS label is no filename, then let's compose an auxiliary one:
+  	$pdfName =  ( strtolower(substr($dsLabel,-4)) == '.pdf' ) ? $dsLabel : ( strtr($pid,":","-") . ".{$dsId}.pdf" );
     $row = array(
-      l($pdf_datastream->id, "islandora/object/{$object->id}/datastream/{$pdf_datastream->id}/view"),
-      $pdf_datastream->label,
+      l($dsId, "islandora/object/{$pid}/datastream/{$dsId}/{$pdfName}"),
+      $dsLabel,
       $get_availability_option($info),
       $get_option('document_version', $info),
       $get_option('use_permission', $info),

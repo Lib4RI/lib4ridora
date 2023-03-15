@@ -20,6 +20,10 @@ function lib4ridora_get_citation_mapping_info($metadata_display = FALSE) {
       'name' => t('Journal Article'),
       'description' => t('An article in a scientific journal.  Not necessarily peer-reviewed. May be an electronic-only medium such as online journal.'),
     ),
+    'journal_issue' => array(
+      'name' => t('Journal Issue'),
+      'description' => t(variable_get('lib4ridora_desc_journal_issue','A printed or online available magazine holding articles dedicated to specialized subjects.')),
+    ),
     'book_chapter' => array(
       'name' => t('Book Chapter'),
       'description' => t('A chapter or contribution in a book.'),
@@ -94,6 +98,7 @@ function lib4ridora_get_citation_mapping_info($metadata_display = FALSE) {
 function lib4ridora_citation_get_genre_map($metadata_display = FALSE) {
   return array(
     'Journal Article' => 'journal_article',
+    'Journal Issue' => 'journal_issue',
     'Book Chapter' => 'book_chapter',
     'Book' => 'book',
     'Brochure' => $metadata_display ? 'book' : 'brochure',
@@ -118,6 +123,7 @@ function lib4ridora_citation_get_genre_semantics_map() {
   $head = 'info:eu-repo/semantics/';
   return array(
     'journal_article' => $head . 'article',
+    'journal_issue' => $head . 'contributionToPeriodical',
     'book_chapter' => $head . 'bookPart',
     'book' => $head . 'book',
     'brochure' => $head . 'book',
