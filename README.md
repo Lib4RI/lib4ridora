@@ -15,7 +15,8 @@ This module requires the following modules/libraries:
 
 ## Installation
 
-Install as usual, see [this](https://drupal.org/documentation/install/modules-themes/modules-7) for further information.
+Install as usual, see [this](https://drupal.org/documentation/install/modules-themes/modules-7) for further information.<br>
+There is also a Lib4RI specific [mini-HowTo for Github](https://github.com/Lib4RI/dora_github-mini-howto) related interactions.
 
 ## Usage
 
@@ -38,9 +39,10 @@ For example, if one wanted to allow access to an element to those with the "Repl
 
 ### Islandora Solr Metadata Author and Org linking
 
-The `lib4ridora_mods_pseudo_field` pseudo-field has been introduced to produce markup for authors in Solr Metadata displays. The produced markup should create a link to both:
+The `lib4ridora_mods_pseudo_field` pseudo-field has been introduced to produce markup for authors in Solr Metadata displays (see: admin/islandora/search/islandora_solr_metadata). The produced markup should create a link to both:
 * Documents by the same author
 * Documents from the same affiliated organization
+2021-03-30: Added a similar field called `lib4ridora_mods_pseudo_field_funding` to compose a markup string combining different funding details with correspoinding search links.
 
 ### Context-based Islandora Solr Metadata Displays
 

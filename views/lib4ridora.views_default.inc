@@ -128,7 +128,7 @@ function lib4ridora_views_default_views() {
   $handler->display->display_options['fields']['mods_identifier_doi_s']['field'] = 'mods_identifier_doi_s';
   $handler->display->display_options['fields']['mods_identifier_doi_s']['label'] = '';
   $handler->display->display_options['fields']['mods_identifier_doi_s']['alter']['alter_text'] = TRUE;
-  $handler->display->display_options['fields']['mods_identifier_doi_s']['alter']['text'] = '<a href="http://dx.doi.org/[mods_identifier_doi_s]" target="_blank">View at Publisher (DOI)</a>';
+  $handler->display->display_options['fields']['mods_identifier_doi_s']['alter']['text'] = '<a href="http://doi.org/[mods_identifier_doi_s]" target="_blank">View at Publisher (DOI)</a>';
   $handler->display->display_options['fields']['mods_identifier_doi_s']['element_label_colon'] = FALSE;
   $handler->display->display_options['fields']['mods_identifier_doi_s']['hide_empty'] = TRUE;
   $handler->display->display_options['fields']['mods_identifier_doi_s']['link_to_object'] = 0;
@@ -194,7 +194,7 @@ function lib4ridora_views_default_views() {
     t('Sort by'),
     t('Asc'),
     t('Desc'),
-    t('<a href="http://dx.doi.org/[mods_identifier_doi_s]" target="_blank">View at Publisher (DOI)</a>'),
+    t('<a href="http://doi.org/[mods_identifier_doi_s]" target="_blank">View at Publisher (DOI)</a>'),
     t('<a href="[mods_identifier_uri_s]" target="_blank">View at Publisher (URL)</a>'),
     t('<a href="http://ws.isiknowledge.com/cps/openurl/service?url_ver=Z39.88-2004&rft_id=info:ut/[mods_identifier_ut_s]" target="_blank">View at Web of Science</a>'),
     t('<a href="http://www.scopus.com/scopus/openurl/link.url?ctx_ver=Z39.88-2004&rft_id=info:eid/[mods_identifier_scopus_s]" target="_blank">View at Scopus</a>'),

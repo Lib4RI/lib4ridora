@@ -6,7 +6,9 @@
 
 // Permissions.
 define('LIB4RIDORA_ADMINISTRATOR_PERMISSION', 'administer lib4ridora objects');
+define('LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION', 'visibility of internal documents');
 define('LIB4RIDORA_JOURNAL_IMPACT_FACTOR_PERMISSION', 'import journal impact factors');
+if ( !defined('LIB4RIDORA_SOLR_EXPORT_AUTHOR_WITH_UNIT') ) { define('LIB4RIDORA_SOLR_EXPORT_AUTHOR_WITH_UNIT', 'add affiliation to author in export'); }
 
 // PIDS.
 define('LIB4RIDORA_JOURNAL_CONTENT_MODEL', 'lib4ri:journalCModel');
@@ -19,7 +21,8 @@ define('LIB4RIDORA_JOURNAL_FORM', 'Lib4RI Journal MODS Form');
 // Datastream ID.
 define('LIB4RIDORA_FACTOR_DSID', 'IMPACT-FACTORS');
 
-const LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD = 'lib4ridora_mods_pseudo_field';
+const LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD = 'lib4ridora_mods_pseudo_field';  // see inside: admin/islandora/search/islandora_solr_metadata
+const LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD = 'lib4ridora_mods_pseudo_field_funding';
 
 /**
  * Implements hook_islandora_required_objects().
@@ -183,6 +186,7 @@ function lib4ridora_ir_citationCModel_islandora_ingest_steps_alter(array &$steps
   unset($steps['xml_form_builder_association_step']);
   unset($steps['islandora_scholar_file_upload']);
   unset($steps['islandora_populator_select']);
+  unset($steps['islandora_mini_workflow_form']);
 }
 
 /**
@@ -202,30 +206,13 @@ function lib4ridora_ir_citationCModel_islandora_ingest_steps(array &$form_state)
   $steps['lib4ridora_multi_pdf_upload'] = array(
     'weight' => 8,
     'type' => 'form',
-    'form_id' => 'lib4ridora_upload_form',
+    'form_id' => 'lib4ridora_jpdf_form',
     'module' => 'lib4ridora',
     'file' => 'includes/upload.form.inc',
   );
-  $steps['lib4ridora_license'] = array(
-    'weight' => 49,
-    'type' => 'form',
-    'form_id' => 'lib4ridora_license_form',
-    'module' => 'lib4ridora',
-    'file' => 'includes/license.form.inc',
-  );
-
-  // Only continue with more steps if there are files being ingested,
-  // otherwise it should be ingested right away.
-  $upload_step_storage =& islandora_ingest_form_get_step_storage($form_state, 'lib4ridora_multi_pdf_upload');
-  if (isset($upload_step_storage['files']) && $upload_step_storage['files']) {
-    $steps['lib4ridora_pdf_embargo'] = array(
-      'weight' => 16,
-      'type' => 'form',
-      'form_id' => 'lib4ridora_multi_embargo_form',
-      'module' => 'lib4ridora',
-      'file' => 'includes/embargo.form.inc',
-    );
-  }
+  
+  
+  
   return $steps;
 }
 
@@ -279,10 +266,23 @@ function lib4ridora_islandora_datastream_access($op, AbstractDatastream $datastr
   module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
   $availability = $datastream->relationships->get(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('availability'));
   $availability = reset($availability);
-  if ($availability) {
+  $doc_version = $datastream->relationships->get(LIB4RIDORA_RELS_URI, lib4ridora_multi_embargo_build_predicate('document_version'));
+  $doc_version = reset($doc_version);
+  if ($availability && $doc_version) {
     $availability = $availability['object']['value'];
-    if ((isset($user->name) && $datastream->parent->owner == $user->name) || user_access(LIB4RIDORA_ADMINISTRATOR_PERMISSION, $user)) {
-      // Allow owner or admins.
+    $doc_version = $doc_version['object']['value'];
+    $is_internal_doc = ( @stripos($doc_version,'internal') !== false && stripos($availability,'private') !== false );
+    // Note, if a user has the LIB4RIDORA_ADMINISTRATOR_PERMISSION it does not mean the user is a *system* administrator (it is just related to Lib4RI objects)
+    $can_do_admin4ri = ( user_is_logged_in() && user_access(LIB4RIDORA_ADMINISTRATOR_PERMISSION, $user) );
+    $can_do_internal = ( $can_do_admin4ri && user_access(LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION, $user) ); // ...presuming the user must be a 'Lib4RI admin' already.
+    // Allow owner or admins, expect of internal documents, since these documents also could be uploaded afterwards by somebody else (like an administrator).
+    if ( !$is_internal_doc && @isset($user->name) && $datastream->parent->owner == $user->name ) {
+      $result['lib4ridora_admin_or_owner'] = TRUE;
+    }
+    elseif ( !$is_internal_doc && $can_do_admin4ri ) {
+      $result['lib4ridora_admin_or_owner'] = TRUE;
+    }
+    elseif ( $is_internal_doc && $can_do_internal ) {
       $result['lib4ridora_admin_or_owner'] = TRUE;
     }
     elseif ($availability == 'private') {
@@ -314,6 +314,9 @@ function lib4ridora_islandora_datastream_access($op, AbstractDatastream $datastr
  *   TRUE if the IP is in an allowed range; otherwise, FALSE.
  */
 function lib4ridora_check_ip($ip_address = NULL) {
+  if ( @isset($_GET['far-away']) ) {
+  	return FALSE;		// consider the intranet IP check as failed, as an (test) option for employees and associated workers to see how it looks like beyond the intranet.
+  }
   if (!$ip_address) {
     $ip_address = ip_address();
   }
@@ -326,11 +329,10 @@ function lib4ridora_check_ip($ip_address = NULL) {
     '195.176.244.0/23',
   );
   */
-  $cidr_list = variable_get( 'lib4ridora_ip_range_list', "129.129.0.0/16, 152.88.0.0/16, 192.33.118.0/24, 193.134.200.0/21, 195.176.244.0/23" );
-  $cidr_ranges = explode( ",", str_replace( " ", "", strtr( $cidr_list, ";-\t", ",/ " ) ) );	// so tab considered as space, while semi-colon as separator, and minus (like slash) as min-max indicator
+  $cidr_list = variable_get( 'lib4ridora_intranet_ip_range_list', "129.129.0.0/16, 152.88.0.0/16, 192.33.118.0/24, 193.134.200.0/21, 195.176.244.0/23" );
+  $cidr_ranges = explode(',',strtr(preg_replace('/\s+/','',$cidr_list),';|',',,'));
 
-  // Transform an IPv4 CIDR block to an array containing the first and last IPs
-  // in the block.
+  // Transform an IPv4 CIDR block to an array containing the first and last IPs in the block.
   $cidr_range_to_points = function ($cidr_string) {
     list($base, $bits) = explode('/', $cidr_string);
     $mask = pow(2, 32 - $bits) - 1;
@@ -351,57 +353,45 @@ function lib4ridora_check_ip($ip_address = NULL) {
 }
 
 /**
- *	hook_page_alter
- *	Matter: it may be that deleting the RELS-INT datastream *plus* its derivatives will also delete RELS-EXT, which however is required to re-edit the object/publication.
- *	Work-around: Let's show a red warning.
- *	Example/test: https://www.dora-dev.lib4ri.ch/eawag/islandora/object/eawag%3A9334/manage/datastreams
- */
-function lib4ridora_page_alter(&$page) {
-	if ( user_is_logged_in() && substr(strtok($_SERVER['REQUEST_URI']."?","?"),-16) == "/RELS-INT/delete" ) {
-	//	dpm(var_dump($page['content']['system_main']));
-		if ( $content = @$page['content']['system_main']['derivative_info']['#markup'] ) {
-			$page['content']['system_main']['derivative_info']['#markup'] = str_replace( ", RELS-EXT", " &plus; <font color='#e70707'><b>RELS-EXT</b> &nbsp; &nbsp; &nbsp; (warning: also the <a href='../../manage/datastreams'>RELS-EXT datastream</a> will be deleted, causing future editing problems)</font>", $content );
-			if ( $content = @$page['content']['system_main']['derivative_info']['#title'] ) {
-				$page['content']['system_main']['derivative_info']['#title'] = str_replace( "Datastream(s) to be purged", "Datastreams to be purged:", $content );
-			}
-		}
-	}
-}
-
-/**
- * Implements hook_menu_alter().
- */
-function lib4ridora_menu_alter(&$items) {
-  // Nuke old "Document" tab.
-  unset($items['islandora/object/%islandora_object/islandora_scholar_upload']);
-  // Nuke default "Embargo" submenu.
-  unset($items['islandora/object/%islandora_object/manage/embargo']);
-  $items['islandora/object/%islandora_object/islandora_scholar_romeo']['access callback']
-    = 'lib4ridora_romeo_access';
-}
-
-/**
- * Implements hook_preprocess_menu_link().
- */
-function lib4ridora_preprocess_menu_link(&$vars) {
-  $element = &$vars['element'];
-  if ($element['#href'] == 'uuid/node/db02d4f6-92fc-4539-ac8a-77d5da620c8e') {
-    $element['#href'] = 'mailto:dora@lib4ri.ch?subject=DORA%20PROBLEM&body=PROBLEM%20REPORT%0D%0A%0D%0APAGE:%20' . urlencode($GLOBALS['base_url'].request_uri()) . '%0D%0AREFERRER:%20' . urlencode($_SERVER['HTTP_REFERER']) . '%0D%0A%0D%0ADESCRIPTION:%0D%0A%0D%0A%0D%0A';
-  }
-  if ($element['#href'] == 'http://www.lib4ri.ch/about/contact.html?pick_a_subject=submit') {
-      $element['#localized_options']['attributes']['target'][] = '_blank';
-  }
-}
-
-/**
- * Implements hook_block_view_alter().
- */
+ * Implements hook_block_view_alter() - currently not needed !(?)
+ *
 function lib4ridora_block_view_alter(&$data, $block) {
   if (isset($data['content']) && is_array($data['content']) && isset($data['content']['#markup']) && (strpos($data['content']['#markup'], '<a href="http://www.lib4ri.ch">') !== false)) {
     $data['content']['#markup'] = preg_replace('/<a href="http:\/\/www.lib4ri.ch">/', '<a href="http://www.lib4ri.ch" target="_blank">', $data['content']['#markup']);
   }
 }
+ */
 
+/**
+ * Implements hook_block_view_alter()
+ * 
+ * Hiding "View at Publisher (DOI)" for Lib4RI's own DOIs, see: http://lib-dora-dev1.emp-eaw.ch:3000/issues/426
+ * 
+ * Issue: if there is only one/the publisher link, and we remove it, then the block title 'Links:' still will be there.
+ */
+function lib4ridora_block_view_alter(&$data, $block) {
+  if ( @strval($data['content']['#contextual_links']['views_ui'][1][0]) == 'publication_links') {
+    if ( $doiList = @trim(variable_get('lib4ridora_doi_pattern','')) /* pattern list with DOI-suffixes separated by '|' */ ) {
+      if ( $pos = strpos($data['content']['#markup'],'views-field-mods-identifier-doi-s') ) {
+        if ( $doi = @strchr($data['content']['#markup'],'dx.doi.org/') ) {
+          $doi = strtok(strtr(substr($doi,11),"'",'"'),'"');
+          module_load_include('inc', 'lib4ridora', 'includes/utilities');
+          if ( lib4ridora_doi_by_lib4ri($doi,$doiList) ) {
+            $aryTmp = explode('a href',$data['content']['#markup']);	// counting the countent parts may fail, so we just check the amount of links
+            if ( sizeof($aryTmp) < 3 ) { 	// so if we have just one link (must be the publisher link) then let's hide the entire block:
+              $data['content']['#markup'] = '<script type="text/javascript"> if ( blk = document.getElementById("block-views-publication-links-block") ) { blk.style = "display:none;" } </script>';
+            } else {
+              $aryTmp = explode('>',substr($data['content']['#markup'],$pos),2);
+              $data['content']['#markup'] = substr($data['content']['#markup'],0,$pos) . implode(' style="display:none;">',$aryTmp);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// block-views-publication-links-block
 
 /**
  * Access callback, to determine whether or not to create the RoMEO tab.
@@ -411,6 +401,31 @@ function lib4ridora_block_view_alter(&$data, $block) {
  */
 function lib4ridora_romeo_access($object) {
   return islandora_scholar_romeo_access($object) && !user_is_anonymous();
+}
+
+/**
+ * Access callback for datastreams.
+ *
+ * Positive permissions on object access suggests on the datastream.
+ * So far however still managed by islandora itself expect of internal documents.
+ */
+function lib4ridora_datastream_access($op, $datastream, $user = NULL) {
+  module_load_include('module', 'islandora', 'islandora');
+
+  // following may be not required - already before adding this code portion LIB4RIDORA_ADMINISTRATOR_PERMISSION was not examined in this function!(?)
+  if ( stripos($datastream->id,'PDF') === 0 || stripos($datastream->mimetype,'/pdf') ) {
+    module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+    $infoAry = lib4ridora_get_embargo_info($datastream);
+    if ( @empty($infoAry['document_version']) || @empty($infoAry['availability']) ) {
+      return NULL;	// as it happens in islandora.module/islandora_datastream_access()
+    }
+    $is_internal_doc = ( @stripos($infoAry['document_version'],'internal') !== false && @stripos($infoAry['availability']) !== false );
+    if ( $is_internal_doc && !user_access(LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION, $user) ) {
+      return NULL;	// as it happens in islandora.module/islandora_datastream_access()
+    }
+  }
+
+  return islandora_datastream_access($op, $datastream, $user);
 }
 
 /**
@@ -518,7 +533,63 @@ function lib4ridora_menu() {
     'type' => MENU_CALLBACK,
     'access callback' => TRUE,
   );
+  
+  // 'Theme-less' apporach, see https://www.webomelette.com/how-create-autocomplete-form-element-drupal-7
+  if ( module_exists('lib4ri_funding') ) {
+    $items['islandora/fundersearch/autocomplete'] = array(
+      'module' => 'lib4ridora',
+      'file' => 'includes/advanced_search.funding.inc',
+      'page callback' => 'lib4ridora_fundersearch_autocomplete',
+      'page arguments' => array(1),
+      'type' => MENU_CALLBACK,
+      'access callback' => 'lib4ridora_fundersearch_access_callback',
+    );
+
+	$items['lib4ridora/fundersearch/autocomplete'] = array(
+      'module' => 'lib4ridora',
+      'file' => 'includes/advanced_search.funding.inc',
+      'page callback' => 'lib4ridora_adv_search_funding_callback',
+  //  'page arguments' => array(1),	/* https://www.drupal.org/forum/support/module-development-and-code-questions/2009-05-08/passing-arguments-to-form-functions */
+	  'type' => MENU_CALLBACK,
+      'access callback' => 'lib4ridora_fundersearch_access_callback',
+	);
+  }
+
   return $items;
+}
+
+function lib4ridora_fundersearch_access_callback() {
+  if ( !user_is_logged_in() ) {
+    module_load_include('inc', 'lib4ridora', 'includes/utilities');
+    return ( !lib4ridora_user_is_bot('',false,true) );
+  }
+  return true;
+}
+
+/**
+ * Implements hook_menu_alter().
+ */
+function lib4ridora_menu_alter(&$items) {
+  // Nuke old "Document" tab.
+  unset($items['islandora/object/%islandora_object/islandora_scholar_upload']);
+  // Nuke default "Embargo" submenu.
+  unset($items['islandora/object/%islandora_object/manage/embargo']);
+  $items['islandora/object/%islandora_object/islandora_scholar_romeo']['access callback'] = 'lib4ridora_romeo_access';
+
+  // to support/tune the islandora_usage_stats module if installed+activated:
+  if ( module_exists("islandora_usage_stats") ) {
+    $items['islandora/object/%islandora_object/datastream/%islandora_datastream'] = array(
+      'title' => ( stripos($_SERVER['REQUEST_URI'],"/datastream/PDF") ? 'Download PDF' : 'View datastream' ),
+      'page callback' => 'lib4ridora_provide_datastream',
+      'page arguments' => array(4, FALSE, NULL),
+      'type' => MENU_CALLBACK,
+      'file' => 'includes/datastream.stats.inc',
+      'module' => 'lib4ridora',
+      'access callback' => 'lib4ridora_datastream_access',
+      'access arguments' => array(ISLANDORA_VIEW_OBJECTS, 4),
+      'load arguments' => array(2),
+    );
+  }
 }
 
 /**
@@ -532,7 +603,7 @@ function lib4ri_access_denied() {
   $pid = arg(2, $destination['destination']);
   $ds = arg(4, $destination['destination']);
   $object = islandora_object_load($pid);
-  if ($object && $ds && strpos($ds, 'PDF') === 0 && isset($object[$ds]) && in_array('ir:citationCModel', $object->models)) {
+  if ($object && $ds && isset($object[$ds]) && ( stripos($ds,'PDF') === 0 || stripos($object[$ds]->mimetype,'/pdf') ) && in_array('ir:citationCModel', $object->models)) {
     module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
     $datastreams = iterator_to_array($object);
     $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter');
@@ -554,14 +625,24 @@ function lib4ridora_permission() {
   $perms = array();
 
   $perms[LIB4RIDORA_ADMINISTRATOR_PERMISSION] = array(
-    'title' => t('Administer Lib4Ri Objects'),
+    'title' => t('Administer Lib4Ri objects generally'),
     'description' => t('Permit access and management of datastream.'),
+  );
+  $perms[LIB4RIDORA_INTERNAL_DOCUMENT_PERMISSION] = array(
+    'title' => t('Administer Lib4Ri Internal Documents'),
+    'description' => t("Permit reading/replacing/removing 'internal documents' (usually DORA-private PDF files)."),
   );
   $perms[LIB4RIDORA_JOURNAL_IMPACT_FACTOR_PERMISSION] = array(
     'title' => t('Import Journal Impact Factor CSV'),
     'description' => t('Permit importing of journal impact factor CSVs.'),
   );
-
+  if ( module_exists('lib4ri_affiliation_author1') ) {
+	// leaving this here (currently) since quite Lib4RI resp. Eawag/Empa/WSL/PSI specific
+    $perms[LIB4RIDORA_SOLR_EXPORT_AUTHOR_WITH_UNIT] = array(
+      'title' => t('Extended Solr Export: Author with org. Unit'),
+      'description' => t("Attach affiliated unit onto author's name in CSV/Excel export."),
+    );
+  }
   return $perms;
 }
 
@@ -606,7 +687,7 @@ function lib4ridora_form_islandora_ingest_form_alter(&$form, &$form_state) {
     module_load_include('inc', 'lib4ridora', 'includes/citation.subtypes');
     $citation_map = lib4ridora_get_citation_mapping_info();
     $publication_type_name = $citation_map[$lib4ridora_association_step_storage['ingest_selector']]['name'];
-    if (in_array($publication_type_name, $form['publication_type']['#options'])){
+    if ( @in_array($publication_type_name, $form['publication_type']['#options'] )){	// index '#options' may not exist sometimes! And since it's an array, it also could be empty!(?)
       $form['publication_type']['#default_value'] = $publication_type_name;
       $form['publication_type']['#disabled'] = TRUE;
     }
@@ -639,7 +720,7 @@ function lib4ridora_islandora_solr_search_rss_item_alter(&$item, $doc) {
     if (isset($citation['MODS'])) {
       $items_to_set = array();
       $items_to_set['pubDate'] = $citation->createdDate->format(DATETIME::RSS);
-#      $items_to_set['pubDate'] = $citation->createdDate->format(DATETIME::RFC822);
+  //  $items_to_set['pubDate'] = $citation->createdDate->format(DATETIME::RFC822);
       foreach ($items_to_set as $key => $value) {
         foreach ($item['items'] as &$sub_item) {
           if ($sub_item['key'] == $key) {
@@ -745,8 +826,8 @@ function lib4ridora_ir_citationcmodel_islandora_solr_object_result_alter(&$resul
     // a batch.
     return;
   }
-
-  $term_failed_ary = explode( ",", variable_get('lib4ridora_pseudo_solr_field_factor_failed', '') );		// empty default by intention (and not N/A)
+  
+  $term_failed_ary = str_getcsv( variable_get('lib4ridora_pseudo_solr_field_factor_failed', '') );		// empty default by intention (and not N/A)
   $term_failed_factor = trim( $term_failed_ary[0] );
   $term_failed_year = ( @!isset($term_failed_ary[1]) ) ? $term_failed_factor : trim( $term_failed_ary[1] );
 
@@ -906,6 +987,29 @@ function lib4ridora_theme($existing, $type, $theme, $path) {
         ),
       ),
     ),
+    'lib4ridora_islandora_solr_metadata_injected_funder_info' => array(
+      'file' => 'theme/theme.inc',
+      'template' => 'theme/lib4ridora-islandora-solr-metadata-injected-funder-info',
+      'variables' => array(
+        'object' => NULL,
+        'info' => NULL,
+        'fundername_attributes' => array(
+          'class' => array(
+            'fundername',
+          ),
+        ),
+        'awardtitle_attributes' => array(
+          'class' => array(
+            'awardtitle',
+          ),
+        ),
+        'awardnumber_attributes' => array(
+          'class' => array(
+            'awardnumber',
+          ),
+        ),
+      ),
+    ),
   );
 }
 
@@ -962,10 +1066,12 @@ function lib4ridora_block_info() {
       'info' => t('Lib4RI Full Text'),
       'cache' => DRUPAL_NO_CACHE,
     ),
+    /*
     'lib4ridora_related_research' => array(
       'info' => t('Lib4RI Related Research Data'),
       'cache' => DRUPAL_NO_CACHE,
     ),
+    */ 
   );
 }
 
@@ -1008,7 +1114,7 @@ function lib4ridora_block_view($delta) {
         }
       }
       break;
-
+    /*
     case 'lib4ridora_related_research':
       module_load_include('inc', 'lib4ridora', 'includes/block');
       // See if there are results before rendering.
@@ -1023,7 +1129,7 @@ function lib4ridora_block_view($delta) {
         }
       }
       break;
-
+    */
     default:
       break;
   }
@@ -1097,6 +1203,15 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
     );
     $authors = citeproc_bibliography_from_mods($style, $object['MODS']->content);
     $csled_authors = array_map("trim", explode(',', strip_tags($authors)));
+    // Handling of 'too many authors', going to add 'et al' if there are more authors in originalAuthorList than we get here.
+    $reqEtAl = 0;		// counter (in context with originalAuthorList) for the number/difference of authors
+	$modsPathOAL = "//mods:mods/mods:extension/mods:originalAuthorList";
+	if ( strlen($modsPathOAL) > 2 ) {
+		if ( $nodeTmp = $xpath->query($modsPathOAL) ) {
+			$origAutList = @trim( $nodeTmp->item(0)->nodeValue );
+			if ( strlen($origAutList) > 1 ) { $reqEtAl = sizeof(explode("|",$origAutList)); }
+		}
+	}
     if (isset($author_json['author'])) {
       $authors = $author_json['author'];
       $author_list = array();
@@ -1104,8 +1219,12 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
       foreach ($authors as $key => &$author) {
         $family = (isset($author['family']) ? $author['family'] : "");
         $given = (isset($author['given']) ? $author['given'] : "");
+		if ( empty($family) && empty($given) ) {
+          $commaoffset -=1;
+		  continue;
+		}
         $commacnt = substr_count($family, ',') + substr_count($given, ','); // commas in family and given names
-        $entity = $xpath->evaluate('string(//mods:name[@type="personal"][php:functionString("tolowernotrailingdot", mods:namePart[@type="family"]) = "' . tolowernotrailingdot($family) . '" and php:functionString("tolowernotrailingdot", mods:namePart[@type="given"]) = "' . tolowernotrailingdot($given) . '"]/mods:nameIdentifier[@type="authorId"])');
+        $entity = $xpath->evaluate('string(//mods:name[@type="personal"][php:functionString("tolowernotrailingdot", mods:namePart[@type="family"]) = "' . tolowernotrailingdot($family) . '" and php:functionString("tolowernotrailingdot", mods:namePart[@type="given"]) = "' . tolowernotrailingdot($given) . '"]/'.variable_get('lib4ridora_mods_query_author_id', 'mods:nameIdentifier[@type="authorId"]').')');
         // Grab from our parsed CSL style string; account for possible commas in name fields
         $author_string = implode(', ', array_slice($csled_authors, $key + $commaoffset, $commacnt+1));
         $commaoffset += $commacnt;
@@ -1122,16 +1241,16 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
           ));
         }
         $author_list[] = $author_string;
+        $reqEtAl--;		// show 'et al' only if we have less authors than in originalAuthorList
       }
       if (!empty($author_list)) {
         // Pop the last author off for APA styleness.
         $last_author = array_pop($author_list);
         if (count($author_list)) {
           $authors_string = implode(', ', $author_list);
-          $authors_string .= " & {$last_author}";
-        }
-        else {
-          $authors_string = "$last_author";
+          $authors_string .= ( $reqEtAl > 0 ? ", {$last_author}, et al." : " &amp; {$last_author}" );
+        } else {
+          $authors_string = ( $reqEtAl > 0 ? "{$last_author}, et al." : $last_author );
         }
         $rendered['citation.tab']['authors'] = array(
           '#type' => 'item',
@@ -1140,24 +1259,59 @@ function lib4ridora_ir_citationCModel_islandora_view_object_alter(AbstractObject
         );
       }
     }
-
-    // Decode for human readability.
-    $persistent_url = urldecode(url("islandora/object/{$object->id}", array('absolute' => TRUE)));
+    // Handling of 'too many authors', adding 'et al' if there are more authors in originalAuthorList that we got in/via $author_json:
+    if ( $reqEtAl > 0 && strlen($modsPathOAL) > 2 ) {
+      $metaData = $rendered['citation.tab']['metadata']['#markup'];
+      if ( $posA = stripos($metaData,"Author(s)") ) {			// quite a tweak... - to be tuned
+        if ( $posZ = stripos($metaData,"</dd>",$posA) ) {
+          $rendered['citation.tab']['metadata']['#markup'] = substr($metaData,0,$posZ) . "<p>et al.</p>" . substr($metaData,$posZ);
+        }
+      }
+    }
+    
+    // Persistent URL - ensure on the main-site to have institute/namespace in the middle on the link, e.g. https://www.dora.lib4ri.ch/empa/islandora/object/empa:18645
+    global $base_path;		// 'just '/' on the main site
+    $instAux = ( strlen($base_path) > 2 ? '' /* on a sub-site, nothing to add */ : strtok(strtr($object->id,'-',':').':',':').'/' /* on main-site: add inst. taken from PID */ );
+    $pUrlEnc = url($instAux.'islandora/object/'.$object->id, array('absolute' => TRUE));
+    $pUrlDec = urldecode($pUrlEnc);	/* Decode for human readability */
     $rendered['citation.tab']['persistent_url'] = array(
       '#type' => 'item',
       '#title' => t('Persistent URL'),
-      '#markup' => format_string('<a href="@url">@url</a>', array(
-        '@url' => $persistent_url)
-      ),
+       // additional style definition for better presentation for Chrome + Safari browser (as Lothar has):
+      '#markup' => '<a href="' . ( variable_get('lib4ri_sitemap_semicolon_decoded',FALSE) ? $pUrlDec : $pUrlEnc ) . '" style="word-break:break-word;">' . $pUrlDec . '</a>',
       '#weight' => 3,
     );
     $rendered['citation.tab']['citation_wrapper'] = array(
       '#type' => 'item',
-      '#title' => t('Citation'),
+      '#title' => t('Citation&nbsp;'),
       '#weight' => 2,
       'citation' => $rendered['citation.tab']['citation'],
     );
     unset($rendered['citation.tab']['citation']);
+
+    // Show/promote Lib4RI's own DOIs, see: http://lib-dora-dev1.emp-eaw.ch:3000/issues/426
+    if ( ( $doiList = @trim(variable_get('lib4ridora_doi_pattern','')) /* pattern, beginning of the DOI */ ) &&
+      ( $doiHtml = @trim(variable_get('lib4ridora_doi_markup','')) /* HTML code where to place the info/DOI */ ) ) {
+      if ( substr($doiHtml,0,1) != '#' /* skip with leading comment sign */ ) {
+        if ( $nodeTmp = $xpath->query("//mods:mods/mods:identifier[@type='doi']") ) {
+          if ( $doi = @trim( $nodeTmp->item(0)->nodeValue ) ) {
+            module_load_include('inc', 'lib4ridora', 'includes/utilities');
+            if ( lib4ridora_doi_by_lib4ri($doi,$doiList) ) {
+              $jsTmp = "<script type='text/javascript'> window.document.getElementById('lib4ri_doi').style.cssText = 'position:relative; top:-1em;'; </script>";			
+              $rendered['citation.tab']['lib4ri_doi'] = array(
+            /*  '#attributes' => array( 'id' => 'lib4ri_doi', 'style' => 'position:relative; top:-1em;' ),	*/
+                '#id' => 'lib4ri_doi',
+                '#type' => 'item',
+                '#title' => t( variable_get('lib4ridora_doi_label','View at Lib4RI') ),
+                '#markup' => str_ireplace('[doi]',$doi,$doiHtml) . $jsTmp,
+                '#weight' => 3,
+              );
+            }
+          }
+        }
+      }
+    }
+
   }
 }
 
@@ -1181,10 +1335,193 @@ function lib4ridora_islandora_personCModel_islandora_view_object_alter(AbstractO
   }
 }
 
+// work-around to revert HTML encoding in page title (for the time being), in context with Redmine Issue #189: http://lib-dora-dev1.emp-eaw.ch:3000/issues/189
+function lib4ridora_page_title_tagless($title, $extra_safe = FALSE ) {
+	$changed = FALSE;
+	$titleAux = $title;
+	if ( $extra_safe ) {		// as long as we got the title with drupal_get_title() we don't need this.
+		// for safety when 'passed through', we only want to revert the tags in the list
+		while( stristr($titleAux,"<") ) { $titleAux = str_ireplace("<","&lt;",$titleAux); }
+		while( stristr($titleAux,">") ) { $titleAux = str_ireplace(">","&gt;",$titleAux); }
+		if ( $title != $titleAux ) { $changed = TRUE; $title = $titleAux; }
+	}
+	while( stristr($titleAux,"&amp;amp;") ) { $titleAux = str_ireplace("&amp;amp;","&amp;",$titleAux); }
+	while( stristr($titleAux,"&amp;lt;") ) { $titleAux = str_ireplace("&amp;lt;","&lt;",$titleAux); }
+	while( stristr($titleAux,"&amp;gt;") ) { $titleAux = str_ireplace("&amp;gt;","&gt;",$titleAux); }
+	if ( $title != $titleAux ) { $changed = TRUE; $title = $titleAux; }
+
+	$tagAry = array('i','em','b','strong','sup','sub','u','small');		// widely copied from here: https://www.dora.lib4ri.ch/psi/admin/config/content/formats/filtered_html
+	foreach( $tagAry as $tag ) {
+		$titleAux = str_ireplace("&lt;{$tag}&gt;","<{$tag}>",str_ireplace("&lt;/{$tag}&gt;","</{$tag}>",$title));
+		if ( $title != $titleAux ) { $changed = TRUE; $title = $titleAux; }
+	}
+	return( $changed ? $title : FALSE );
+}
+function lib4ridora_form_alter(&$form, $form_state, $form_id) {
+	// dpm($form_id);
+	if ( $form_id == 'lib4ridora_admin' ) {
+		module_load_include('inc', 'lib4ridora', 'includes/admin.form');
+		$form['#validate'][] = 'lib4ridora_admin_form_value_check';
+	}
+	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) && user_is_logged_in() ) { 
+		if ( in_array($form_id,array("islandora_object_properties_form","islandora_object_properties_form_delete")) ) {
+			// related to HTML-editor issues: Changing the value of this submit button by jQuery/JavaScript may be tricky,
+			// as tested it works smoother when changing it already as form element:
+			if ( strchr($form['delete']['#value'],"&") || strchr($form['delete']['#value'],"<") ) {		// the value may actually have truncated HTML tags!
+				// since this label the be used on the button directly, we cannnot allow HTML tags here.
+				$label = trim( strip_tags( html_entity_decode( lib4ridora_page_title_tagless( drupal_get_title() ) ) ) );
+				while( strchr($label,"  ") ) { $label = str_replace("  "," ",$label); }
+
+				$valAry = explode("'",str_replace("&#039;","'",str_replace("\'","[aPo)",$form['delete']['#value'])));
+				$valAry[1] = ( strlen($label) > 25 ) ? rtrim(substr($label,0,22))."..." : $label;
+
+				$form['delete']['#value'] = str_replace("[aPo)","\'",implode("'",$valAry));
+			}
+		}
+		elseif ( in_array($form_id,array("lib4ridora_citation_select_mods_edit_form","islandora_ip_embargo_object_embargo_form","lib4ridora_multi_embargo_edit_form")) ) {
+			if ( $title = lib4ridora_page_title_tagless( drupal_get_title() ) ) { drupal_set_title( $title, PASS_THROUGH ); }
+		}
+	}
+}
+function lib4ridora_form_islandora_scholar_citation_select_form_alter(&$form, &$form_state) {
+	if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) ) {
+		if ( $title = lib4ridora_page_title_tagless( drupal_get_title() ) ) { drupal_set_title( $title, PASS_THROUGH ); }
+	}
+}
+
 /**
- * Implements hook_form_alter().
+ *	hook_page_alter
+ *	Matter: it may be that deleting the RELS-INT datastream *plus* its derivatives will also delete RELS-EXT, which however is required to re-edit the object/publication.
+ *	Work-around: Let's show a red warning.
+ *	Example/test: https://www.dora-dev.lib4ri.ch/eawag/islandora/object/eawag%3A9334/manage/datastreams
  */
-function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$form_state, $form_id) {
+function lib4ridora_page_alter(&$page) {
+
+  $url = strtolower( strtok(strtok($_SERVER['REQUEST_URI']."?","?")."#","#") );
+
+  if ( variable_get('lib4ridora_frame_approval',TRUE) ) {
+    $frameOk = true; // to be challenged
+    $skipAry = array( 'system', 'ajax', 'ckeditor', 'admin', 'login', 'edit', 'submission', 'ingestion', 'manage' );
+    foreach( $skipAry as $skipPart ) {
+      if ( strpos($url,'/'.$skipPart) || strpos($url,$skipPart.'/') || strpos($url,'_'.$skipPart) || strpos($url,$skipPart.'_') ) {
+ 	    $frameOk = false;
+ 	    break;
+ 	  }
+    }
+    if ( $frameOk ) { 	// see: https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
+	  // Do NOT add e.g. "default-src 'self' *.lib4ri.ch; script-src 'self' *.lib4ri.ch" too (caused wide-spread problems!)
+      drupal_add_http_header("Content-Security-Policy", "frame-ancestors 'self' *.lib4ri.ch");
+      drupal_add_http_header("X-Content-Security-Policy", "frame-ancestors 'self' *.lib4ri.ch");
+      drupal_add_http_header("X-WebKit-CSP", "frame-ancestors 'self' *.lib4ri.ch");
+    }
+  }
+
+  if ( variable_get('lib4ridora_page_title_tag_fix',TRUE) ) {	// temporary work-around, in context with Redmine Issue #189: http://lib-dora-dev1.emp-eaw.ch:3000/issues/189
+    $jsCode = 'jQuery(document).ready(function() { ';
+    $jsCode .= 'document.title = document.title.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<").replace( /<\/?[^>]+(>|$)/g, ""); ';
+    $jsCode .= 'if ( ( elem = document.getElementById("page-title") ) && elem != "undefined" ) { document.getElementById("page-title").innerHTML = elem.innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } ';
+    $jsCode .= 'if ( ary = document.getElementsByTagName("caption") ) { for(i=0;i<ary.length;i++) { document.getElementsByTagName("caption")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+    $jsCode .= 'if ( ary = document.getElementsByClassName("page-title") )               { for(i=0;i<ary.length;i++) { document.getElementsByClassName("page-title")[i].innerHTML               = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+    $jsCode .= 'if ( ary = document.getElementsByClassName("islandora-object-caption") ) { for(i=0;i<ary.length;i++) { document.getElementsByClassName("islandora-object-caption")[i].innerHTML = ary[i].innerHTML.replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+    $jsCode .= 'if ( ary = document.getElementsByClassName("messages__item") )           { for(i=0;i<ary.length;i++) { document.getElementsByClassName("messages__item")[i].innerHTML           = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
+    $jsCode .= 'if ( ary = document.getElementsByClassName("placeholder") )              { for(i=0;i<ary.length;i++) { document.getElementsByClassName("placeholder")[i].innerHTML              = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } } ';
+    $jsCode .= 'if ( ary = document.getElementsByClassName("csl-entry") )                { for(i=0;i<ary.length;i++) { document.getElementsByClassName("csl-entry")[i].innerHTML                = ary[i].innerHTML.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /<p>/g, "").replace( /<\/p>/g, ""); } } ';
+    $jsCode .= 'if ( ( elem = document.getElementById("edit-object-label") ) && elem != "undefined" ) { document.getElementById("edit-object-label").value = elem.value.replace( /&amp;amp/g, "&amp").replace( /&amp;gt;/g, ">").replace( /&amp;lt;/g, "<").replace( /&gt;/g, ">").replace( /&lt;/g, "<"); } ';
+ // $jsCode .= 'if ( ( bttn = document.getElementById("edit-delete") ) && bttn != "undefined" ) { ary = bttn.value.split("\'",3); dt = document.title.substring(0,(document.title+" |").indexOf(" |")).trim(); ary[1] = ( dt.length > 32 ? dt.substring(0,30)+"..." : dt ); document.getElementById("edit-delete").value = ary.join("\'"); } ';
+ // Can be handled as form element, morever changing the value of the submit button may end up in a broken redirection to the 'confirm deletion' page,
+ // Note too that we (always?) can find the single-quote as &#039; within the form value... - however check out now the hook lib4ridora_form_alter()
+    $jsCode .= ' });';
+    drupal_add_js($jsCode,'inline');
+  }
+
+  if ( user_is_logged_in() ) {		// safety remark for editors/admins/super-users:
+    if ( substr($url,-16) == "/rels-int/delete" ) {	 // remind, we made $url lower case!
+      // dpm(var_dump($page['content']['system_main']));
+      if ( $content = @$page['content']['system_main']['derivative_info']['#markup'] ) {
+        $page['content']['system_main']['derivative_info']['#markup'] = str_replace( ", RELS-EXT", " &plus; <font color='#e70707'><b>RELS-EXT</b> &nbsp; &nbsp; &nbsp; (warning: also the <a href='../../manage/datastreams'>RELS-EXT datastream</a> will be deleted, causing future editing problems)</font>", $content );
+        if ( $content = @$page['content']['system_main']['derivative_info']['#title'] ) {
+          $page['content']['system_main']['derivative_info']['#title'] = str_replace( "Datastream(s) to be purged", "Datastreams to be purged:", $content );
+        }
+      }
+    }
+  }
+}
+
+/*
+ * submit function possibly used in lib4ridora_form_islandora_usage_stats_admin_form_alter()
+ * 
+ */
+function lib4ridora_islandora_usage_stats_admin_form_vars(array &$form, array &$form_state) {
+  variable_set('lib4ridora_download_count_ignore_role', $form_state['values']['lib4ridora_download_count_ignore_role']);
+  variable_set('lib4ridora_download_count_file_type' , $form_state['values']['lib4ridora_download_count_file_type']);
+  variable_set('lib4ridora_download_count_doc_version', $form_state['values']['lib4ridora_download_count_doc_version']);
+  drupal_set_message( t("The configuration options have been saved also for Lib4RI.") );
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Turning the text*field* for bot identifiers in the admin form of the islandora_usage_stats module into a text*area*.
+ * see: https://github.com/Islandora/islandora_usage_stats/blob/7.x/includes/admin.form.inc
+ */
+function lib4ridora_form_islandora_usage_stats_admin_form_alter(array &$form, array &$form_state) {
+	
+  $form['usage']['islandora_usage_stats_exclude_bots_regex'] = array(	/* keep! explicitely requested for Lib4RI purpose */
+    '#type' => 'textarea' 	/* originally a (too) short textfield */,
+    '#title' => t('Bot Exclusion Regex'),
+    '#description' => t('The regular expression used to filter out bots'),
+    '#default_value' => variable_get('islandora_usage_stats_exclude_bots_regex', '/bot|rambler|spider|crawl|slurp|curl|^$/i'),
+  );
+  $form['usage']['islandora_usage_stats_exclude_bots']['#prefix'] = '<br>';
+
+  if ( !variable_get('lib4ridora_download_count_extra_tuning',FALSE) ) {
+	  return;
+  }
+
+  // -----------------------------------------------------------------------------------------------------------------------
+  // Code below is intended only if the extra tuning are enabled.
+  // Right now this code is not needed and probably can be removed after download count analysis in mid 2020.
+  // Also see ./includes/datastream.stats.inc
+
+  $form['lib4ri'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Lib4RI Optimizations'),
+    '#description' => t("Dominant filter settings specific to Lib4RI. An empty text field or a leading '#' will ignore these restrictions."),
+  );
+  $form['lib4ri']['lib4ridora_download_count_ignore_role'] = array(
+    '#type' => 'textfield',
+    '#title' => t('User Roles where Download is Ignored:'),
+    '#description' => t("Comma-delimited list of user roles where the download shall NOT increase the counter. Example value for this field: 'editor, repo manager, administrator'"),
+    '#default_value' => variable_get('lib4ridora_download_count_ignore_role', /* 'editor, repo manager, administrator' */ ''),
+    '#size' => 96,
+  );
+  $form['lib4ri']['lib4ridora_download_count_file_type'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Download only counted for File Types:'),
+    '#description' => t("Comma-delimited list of MIME strings for those files that shall be counted when downloaded. Example value for this field: 'application/pdf'"),
+    '#default_value' => variable_get('lib4ridora_download_count_file_type', /* 'application/pdf' */ ''),
+    '#size' => 96,
+  );
+  $form['lib4ri']['lib4ridora_download_count_doc_version'] = array(
+    '#type' => 'textfield',
+    '#title' => t("When downloading a PDF its 'document version' must be:"),
+    '#description' => t("Comma-delimited list of terms, one of these terms must be part of the Lib4RI 'document version' to count the. Example value for this field: 'published, accepted'"),
+    '#default_value' => variable_get('lib4ridora_download_count_doc_version', /* 'published, accepted' */ ''),
+    '#size' => 96,
+  );
+  foreach( array("usage","clear","save_configuration") as $idx ) { 	 // moving existing sub-arrays of the form onto the end:
+    if( $tmpAry = @$form[$idx] ) {
+      unset($form[$idx]);
+      $form[$idx] = $tmpAry;
+    }
+  }
+  $form['#submit'][] = 'lib4ridora_islandora_usage_stats_admin_form_vars';
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$form_state) {
   module_load_include('inc', 'lib4ridora', 'includes/advanced_search');
   $form['year'] = array(
     '#type' => 'markup',
@@ -1220,22 +1557,34 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#type' => 'checkboxes',
     '#options' => lib4ridora_get_all_publication_types(),
     '#title' => t('Publication Type'),
-    // XXX: Wrapping element desired to counteract core CSS at this level, and
-    // #theme_wrappers do not quite cut it.
+    // XXX: Wrapping element desired to counteract core CSS at this level, and #theme_wrappers do not quite cut it.
     '#prefix' => '<div id="lib4ri-advanced-search-pub-type">',
     '#suffix' => '</div>',
   );
 
-  $form['org_unit'] = array(
-    '#type' => 'select',
-    '#options' => lib4ridora_get_all_organizational_units(),
-    '#title' => t('Organizational Unit'),
-    // XXX: Wrapping element desired to counteract core CSS at this level, and
-    // #theme_wrappers do not quite cut it.
-    '#prefix' => '<div id="lib4ri-advanced-search-org-unit">',
-    '#suffix' => '</div>',
-  );
+  global $base_path;  // sub-sites handling: pase-path will be "/" for main site - May 2021
+  $usHideAt = variable_get('lib4ri_advanced_search_org_unit_hide',''); // expects a comma delimited list like "eawag, wsl" there NOT to show the old/default unit search
+  if ( $base_path != '/' && stripos($usHideAt,trim($base_path,'/')) !== false ) {	// never hidden on main site
+    $form['org_unit'] = array(
+      '#title' => 'Org. Unit (obsolete)',
+      '#type' => 'hidden',
+      '#default_value' => '*',
+      '#disabled' => TRUE,
+      '#required' => FALSE,
+      '#attributes' => array( 'style' => 'display:none;' ),
+    );
+  } else {		// show former old/default search area where to select one unit (always shown on main site):
+    $form['org_unit'] = array(
+      '#type' => 'select',
+      '#options' => lib4ridora_get_all_organizational_units(),
+      '#title' => t('Organizational Unit'),
+      // XXX: Wrapping element desired to counteract core CSS at this level, and #theme_wrappers do not quite cut it.
+      '#prefix' => '<div id="lib4ri-advanced-search-org-unit">',
+      '#suffix' => '</div>',
+    );
+  }
 
+  $js = "var ids = ['edit-peer-review-no','edit-peer-review-yes']; if ( this.id == ids[0] || this.id == ids[1] ) { for( cbId of ids ) { if ( this.checked && this.id != cbId && ( cb = document.getElementById(cbId) ) && cb.checked ) { cb.checked = false; } } }";
   $form['peer_review'] = array(
     '#type' => 'checkboxes',
     '#options' => array(
@@ -1244,18 +1593,33 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
       'not specified' => t('Not Specified'),
     ),
     '#title' => t('Peer Reviewed'),
-    // XXX: Wrapping element desired to counteract core CSS at this level, and
-    // #theme_wrappers do not quite cut it.
+    // XXX: Wrapping element desired to counteract core CSS at this level, and #theme_wrappers do not quite cut it.
     '#prefix' => '<div id="lib4ri-advanced-search-peer-review">',
     '#suffix' => '</div>',
+    '#attributes' => array('onclick' => $js),
   );
 
+  $js = "var ids = ['edit-research-data-no','edit-research-data-yes']; for( cbId of ids ) { if ( this.checked && this.id != cbId && ( cb = document.getElementById(cbId) ) && cb.checked ) { cb.checked = false; } }";
+  $form['research_data'] = array(
+    '#type' => 'checkboxes',
+    '#options' => array(
+      'yes' => t('Yes'),
+      'no' => t('No'),
+    ),
+    '#title' => t('Research Data'),
+    // XXX: Wrapping element desired to counteract core CSS at this level, and #theme_wrappers do not quite cut it.
+    '#prefix' => '<div id="lib4ri-advanced-search-research-data">',
+    '#suffix' => '</div>',
+    '#attributes' => array('onclick' => $js),
+  );
+  
   $form['full_text'] = array(
     '#type' => 'checkboxes',
     '#options' => array(
-      'open access' => t('Open Access'),
       'restricted' => t('Restricted'),
+      'open access' => t('Open Access'),
       'no full text' => t('No Full Text'),
+      'embargo-restricted' => t( variable_get('lib4ridora_term_embargo_restricted', 'Restricted (Embargo)') ),
     ),
     '#title' => t('Full Text'),
     // XXX: Wrapping element desired to counteract core CSS at this level, and
@@ -1263,6 +1627,11 @@ function lib4ridora_form_islandora_solr_advanced_search_form_alter(&$form, &$for
     '#prefix' => '<div id="lib4ri-advanced-search-full-text">',
     '#suffix' => '</div>',
   );
+
+  if ( @isset($form['fund1']) ) {	// sanity check: fund1 is no longer used, but better let this until all affected modules are updated - 2021-11-30/fh
+    unset($form['fund1']);
+  }
+
   $form['controls']['#weight'] = 100;
   $form['#validate'][] = 'lib4ridora_solr_advanced_search_form_validate';
   $form['#submit'][] = 'lib4ridora_solr_advanced_search_form_submit';
@@ -1313,23 +1682,25 @@ function lib4ridora_solr_advanced_search_form_validate($form, &$form_state) {
  * @see islandora_solr_advanced_search_form()
  */
 function lib4ridora_solr_advanced_search_form_submit($form, &$form_state) {
-  module_load_include('inc', 'lib4ridora', 'includes/advanced_search');
+  module_load_include('inc', 'lib4ridora', 'includes/advanced_search.funding');
   $filters = array(
     lib4ridora_construct_year_filter($form_state),
     lib4ridora_construct_publication_type_filter($form_state),
     lib4ridora_construct_organization_unit_filter($form_state),
     lib4ridora_construct_peer_reviewed_filter($form_state),
     lib4ridora_construct_full_text_filter($form_state),
+    lib4ridora_construct_research_data_filter($form_state),
+    lib4ridora_construct_funding_element_filter($form_state, 'funder_name_test' ),
+    lib4ridora_construct_funding_element_filter($form_state, 'funding_stream_test' ),
+    lib4ridora_construct_funding_element_filter($form_state, 'award_title_test' ),
+    lib4ridora_construct_funding_element_filter($form_state, 'award_number_test' ),
   );
-  $filters = array_filter($filters);
-  if ($filters) {
-    // Jam our filters into the redirect.
-    $form_state['redirect'][1] = array_merge_recursive($form_state['redirect'][1], array(
-      'query' => array(
-        'f' => $filters,
-      ),
-    ));
-
+  $filters = array_filter( array_merge( $filters,
+    lib4ridora_construct_funding_element_filters($form_state),
+    lib4ridora_construct_funding_combined_filters($form_state) /* , */
+  ) );
+  if ($filters) { // Jam our filters into the redirect:
+    $form_state['redirect'][1] = array_merge_recursive($form_state['redirect'][1], array( 'query' => array( 'f' => $filters ) ) );
   }
 }
 
@@ -1337,10 +1708,10 @@ function lib4ridora_solr_advanced_search_form_submit($form, &$form_state) {
  * Implements hook_preprocess_islandora_solr_metadata_display().
  */
 function lib4ridora_preprocess_islandora_solr_metadata_display(&$variables) {
+  module_load_include('inc', 'lib4ridora', 'includes/utilities');
+
   if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD])) {
     $pseudo_field =& $variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD];
-
-    module_load_include('inc', 'lib4ridora', 'includes/utilities');
 
     $author_info = lib4ridora_get_author_info($variables['islandora_object']);
     $renderable_map = function (array $info) {
@@ -1349,7 +1720,7 @@ function lib4ridora_preprocess_islandora_solr_metadata_display(&$variables) {
         '#info' => $info,
       );
     };
-    $pseudo_field['lib4ridora_renderable'] = array_map($renderable_map, $author_info);
+    $pseudo_field['lib4ridora_renderable_author'] = array_map($renderable_map, $author_info);
 
     // Need to populate "value" with something, so the "omit empty values" stuff
     // doesn't strip out our pseudo-field.
@@ -1366,17 +1737,47 @@ function lib4ridora_preprocess_islandora_solr_metadata_display(&$variables) {
     };
     $pseudo_field['value'] = array_map($value_map, $author_info);
   }
+
+  if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD])) {
+    $funder_field =& $variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD];
+    if ( @!empty($funder_field) ) {
+      $funder_info = lib4ridora_get_funder_info($variables['islandora_object']);
+      if ( isset($funder_info['fundingstream']) ) {
+        unset($funder_info['fundingstream']);		// no used currently
+      }
+      $renderable_map = function (array $info) {
+        return array(
+        '#theme' => 'lib4ridora_islandora_solr_metadata_injected_funder_info',
+        '#info' => $info,
+        );
+      };
+      $funder_field['lib4ridora_renderable_funder'] = array_map($renderable_map, $funder_info);
+
+      $value_map = function (array $info) {
+        return t( '@fundername: @awardtitle (@awardnumber)', array(	/* this should match: lib4ridora-islandora-solr-metadata-injected-funder-info.tpl.php */
+          '@fundername' => $info['fundername']['name'],
+          '@awardtitle' => $info['awardtitle']['title'],
+          '@awardnumber' => $info['awardnumber']['number'],
+        ));
+      };
+      $funder_field['value'] = array_map($value_map, $funder_info);
+    }
+  }
 }
 
 /**
  * Implements hook_process_islandora_solr_metadata_display().
  */
 function lib4ridora_process_islandora_solr_metadata_display(&$variables) {
-  if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD]['lib4ridora_renderable'])) {
+  if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD]['lib4ridora_renderable_author'])) {
     $pseudo_field =& $variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD];
-    // Need to render each individually, since Solr metadata expects separate
-    // values separately.
-    $pseudo_field['value'] = array_map('drupal_render', $pseudo_field['lib4ridora_renderable']);
+    // Need to render each individually, since Solr metadata expects separate values separately.
+    $pseudo_field['value'] = array_map('drupal_render', $pseudo_field['lib4ridora_renderable_author']);
+  }
+  if (isset($variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD]['lib4ridora_renderable_funder'])) {
+    $funder_field =& $variables['solr_fields'][LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD];
+    // Need to render each individually, since Solr metadata expects separate values separately.
+    $funder_field['value'] = array_map('drupal_render', $funder_field['lib4ridora_renderable_funder']);
   }
 }
 
@@ -1402,7 +1803,7 @@ function lib4ridora_form_islandora_solr_metadata_config_form_validate(&$form, &$
     $luke_fields = array_keys($solr_luke['fields']);
     $field = $form_state['values']['islandora_solr_metadata_fields']['table_wrapper']['add_fieldset']['available_solr_fields'];
     // XXX: Field check here is divergence.
-    if ($field != LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD && !in_array($field, $luke_fields)) {
+    if ($field != LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD && $field != LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD && !in_array($field, $luke_fields)) {
       form_set_error('islandora_solr_metadata_fields][table_wrapper][add_fieldset][available_solr_fields', t('The field @field is not a valid field within Solr!', array('@field' => $field)));
     }
     else {
@@ -1454,7 +1855,7 @@ function lib4ridora_form_islandora_solr_metadata_config_form_validate(&$form, &$
  */
 function lib4ridora_form_islandora_solr_metadata_config_field_form_alter(&$form, &$form_state) {
   list($config_id, $field_name) = $form_state['build_info']['args'];
-  if ($field_name == LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD) {
+  if ($field_name == LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_AUTHOR_PSEUDO_FIELD || $field_name == LIB4RIDORA_ISLANDORA_SOLR_METADATA_MODS_FUNDING_PSEUDO_FIELD) {
     $form['wrapper']['hyperlink']['#access'] = $form['wrapper']['truncation']['#access'] = FALSE;
   }
 }
@@ -1518,33 +1919,101 @@ function lib4ridora_ir_citationCModel_islandora_object_ingested($object) {
 
 /**
  * Implements hook_islandora_datastream_modified().
+ *
+ * Take care reacting on changes on RELS-INT. Exchanging/replacing 1 value in RELS-INT my require 2 actions until done,
+ * resp. triggering this hook 2x and it will be called over and other again (or 'just' slow down the system).
  */
 function lib4ridora_islandora_datastream_modified($object, $datastream) {
-  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf') {
-    module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-    module_load_include('inc', 'lib4ridora', 'includes/full_text');
-    if (!isset($object['RELS-INT'])) {
-      $values = lib4ridora_multi_pdf_defaults_properties();
-      lib4ridora_update_datastream_relationships($datastream, $values);
+  if ( !in_array('ir:citationCModel', $object->models) ) { return; }
+  if ( stripos($datastream->id,'PDF') === 0 || stripos($datastream->mimetype,'/pdf') ) {
+    $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
+    if ( substr($datastream->id,0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
+      module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+      module_load_include('inc', 'lib4ridora', 'includes/full_text');
+	  $relsUpdate = !isset($object['RELS-INT']);
+	  $values = $relsUpdate ? lib4ridora_multi_pdf_defaults_properties() : lib4ridora_get_embargo_info($datastream);
+      if ( stripos($values['document_version'],'internal') !== false && stripos($values['availability'],'private') === false ) {
+        $values['availability'] = 'private';
+        $relsUpdate = true;
+      }
+      if ( $relsUpdate ) {
+        lib4ridora_update_datastream_relationships($datastream, $values);
+      }
+      lib4ridora_pathauto_create_alias($object, $datastream, 'update');
+      lib4ridora_update_full_text($object);
     }
-    lib4ridora_pathauto_create_alias($object, $datastream, 'update');
-    lib4ridora_update_full_text($object);
+  }
+  elseif ( strtoupper($datastream->id) == 'RELS-INT' ) {
+ // $datastreams = @iterator_to_array($object);
+ // $pdf_datastreams = array_filter($datastreams, 'lib4ridora_multi_embargo_pdf_filter_soft');
+ // foreach ($pdf_datastreams as $pdf_datastream) {
+ //   if ( stripos($pdf_datastream->id,'PDF') !== 0 ) { continue; }
+ //   if ( substr($pdf_datastream->id,0-strlen($pdfa_suffix)) == $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) { continue; }
+ //   $values = lib4ridora_get_embargo_info($pdf_datastream);
+ //   if ( stripos($values['document_version'],'internal') !== false && stripos($values['availability'],'private') === false ) {
+ //     $values['availability'] = 'private';
+ //     usleep( 375000 );		// rather for safety
+ //     lib4ridora_update_datastream_relationships($pdf_datastream, $values);
+ //   }
+ // }
+ // If we need to change RELS-INT, we need to change it in ONE step - so primitive work-around ahead (but working):
+    /*
+    if ( $xmlCode = @$object['RELS-INT']->Content ) {
+      $dom = new DomDocument;
+      $dom->preserveWhiteSpace = false;
+      $dom->formatOutput = true;
+      $dom->loadXml( $xmlCode );
+      $xpath = new DOMXPath($dom);
+   // $xpath->registerNamespace('islandora', "http://islandora.ca/ontology/relsint#");
+      $xpath->registerNamespace('rdf', "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
+      $rdfNew = false;
+      foreach( $xpath->query("//rdf:RDF/rdf:Description") as $item ) {
+        if ( stripos($item->getAttribute('rdf:about'),'/PDF') === false ) { continue; }
+        foreach( $item->getElementsByTagName('lib4ridora-multi-embargo-document_version') as $docVer ) {
+          if ( stripos($docVer->nodeValue,'internal') === false ) { continue; }
+          foreach( $item->getElementsByTagName('lib4ridora-multi-embargo-availability') as $avail ) {
+            if ( strtolower($avail->nodeValue) != 'private') {
+              $avail->nodeValue = 'private';
+              $rdfNew = true;
+            }
+          }
+        }
+      }
+      if ( $rdfNew ) {
+        $xmlCode = $dom->saveXML();
+        $object['RELS-INT']->content = $xmlCode;
+      }
+    }
+    // re-revised+disabeld: this code is OK and generally working well, but it may cause a conflict with
+    // the resorting feature of multiple PDFs, possibly leaving an incomplete RELS-INT datastream! */
   }
 }
 
 /**
  * Implements hook_islandora_datastream_ingested().
+ *
+ * Take care reacting on changes on RELS-INT. Exchanging/replacing 1 value in RELS-INT my require 2 actions until done,
+ * resp. triggering this hook 2x and it will be called over and other again (or 'just' slow down the system).
  */
 function lib4ridora_islandora_datastream_ingested($object, $datastream) {
-  if (in_array('ir:citationCModel', $object->models) && $datastream->mimetype == 'application/pdf') {
-    module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
-    module_load_include('inc', 'lib4ridora', 'includes/full_text');
-    if (!isset($object['RELS-INT'])) {
-      $values = lib4ridora_multi_pdf_defaults_properties();
-      lib4ridora_update_datastream_relationships($datastream, $values);
+  if ( !in_array('ir:citationCModel', $object->models) ) { return; }
+  if ( stripos($datastream->id,'PDF') === 0 || stripos($datastream->mimetype,'/pdf') ) {
+    $pdfa_suffix = variable_get('lib4ridora_extra_pdfa_datastream_suffix','_PDF-A');
+    if ( substr($datastream->id,0-strlen($pdfa_suffix)) != $pdfa_suffix /* skipping PDF/A files at Lib4RI */ ) {
+      module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
+      module_load_include('inc', 'lib4ridora', 'includes/full_text');
+	  $relsUpdate = !isset($object['RELS-INT']);
+	  $values = $relsUpdate ? lib4ridora_multi_pdf_defaults_properties() : lib4ridora_get_embargo_info($datastream);
+      if ( stripos($values['document_version'],'internal') !== false && stripos($values['availability'],'private') === false ) {
+        $values['availability'] = 'private';
+        $relsUpdate = true;
+      }
+      if ( $relsUpdate ) {
+        lib4ridora_update_datastream_relationships($datastream, $values);
+      }
+      lib4ridora_update_full_text($object);
+      lib4ridora_pathauto_create_alias($object, $datastream, 'insert');
     }
-    lib4ridora_update_full_text($object);
-    lib4ridora_pathauto_create_alias($object, $datastream, 'insert');
   }
 }
 
@@ -1553,7 +2022,7 @@ function lib4ridora_islandora_datastream_ingested($object, $datastream) {
  */
 function lib4ridora_islandora_datastream_purged($object, $dsid) {
   // Check if the dsid contains PDF for objects with multiple PDF datastreams.
-  if (strpos($dsid, 'PDF') !== FALSE) {
+  if ( stripos($dsid,'PDF') === 0 ) {
     if (in_array('ir:citationCModel', $object->models)) {
       module_load_include('inc', 'lib4ridora', 'includes/full_text');
       module_load_include('inc', 'lib4ridora', 'includes/embargo.form');
@@ -1723,7 +2192,7 @@ function lib4ridora_pathauto_bulkupdate() {
         $pid = $result['object']['value'];
         $object = islandora_object_load($pid);
         foreach ($object as $dsid => $datastream) {
-          if (strpos($dsid, 'PDF') !== FALSE) {
+          if ( stripos($dsid,'PDF') === 0 || stripos($datastream->mimetype,'/pdf') ) {
             $result = lib4ridora_pathauto_create_alias($object, $datastream, 'bulkupdate');
             if ($result != '') {
               $count += $result;
@@ -1753,11 +2222,16 @@ function lib4ridora_pathauto_bulkupdate() {
  * Implements hook_element_info_alter()
  */
 function lib4ridora_element_info_alter(&$type) {
-  if (module_exists('islandora_authority') && isset($type['islandora_authority_textfield'])) {
-    $type['islandora_authority_textfield']['#attached']['js'][] = drupal_get_path('module', 'lib4ridora') . '/js/lib4ridora_authority.js';
+  if ( module_exists('islandora_authority') ) {
+    if ( isset($type['islandora_authority_textfield']) ) {
+      $type['islandora_authority_textfield']['#attached']['js'][] = drupal_get_path('module', 'lib4ridora') . '/js/lib4ridora_authority.js';
+    }
+    if ( isset($type['islandora_authority_hidden']) ) {
+      $type['islandora_authority_hidden']['#element_validate'][] = 'lib4ridora_authority_hidden_validate';
+    }
   }
-  if (module_exists('islandora_authority') && isset($type['islandora_authority_hidden'])) {
-    $type['islandora_authority_hidden']['#element_validate'][] = 'lib4ridora_authority_hidden_validate';
+  if ( user_is_logged_in() && isset($type['textfield']['#maxlength']) ) {
+    $type['textfield']['#maxlength'] = 192;	// increasing the default size (128) of textfields (for logged-in users)
   }
 }
 
@@ -1805,7 +2279,7 @@ function lib4ridora_authority_hidden_validate($element, &$form_state, $form) {
  */
 function _lib4ridora_target_text_format_to_fully_escaped($element, &$form_state, $form) {
   form_load_include($form_state, 'inc', 'lib4ridora', 'includes/text_format');
-  $value = check_plain(
+  $value = @check_plain(
     _lib4ridora_target_text_format_fetch_markup($element, $form_state, $form)
   );
 
@@ -1834,6 +2308,89 @@ function _lib4ridora_target_text_format_to_plain_text($element, &$form_state, $f
   }
 
   return $element;
+}
+
+/**
+ * Implements hook_solr_query_alter
+ *
+ * Used here to expand the search request on another Solr field when a specific Solr field is given.
+ */
+function lib4ridora_islandora_solr_query_alter($islandora_solr_query) {
+
+	$batch = batch_get();		// right now this is not intended for/when exporting results.
+	if ( !empty($batch) ) { return; }
+
+	if ( @isset($_GET['extension']) ) {
+		$extReq = @trim(strtolower(strip_tags($_GET['extension'])));
+		if ( intval($extReq) < 1 || in_array($extReq,array('false','off','no')) ) {
+			// coming from simple search, so skip because extended author element in MODS also can be respected here:
+			// https://www.dora-dev.lib4ri.ch/admin/islandora/search/islandora_solr/settings ==> Query Defaults
+			return;
+		}
+	}
+	
+	$query = trim( $islandora_solr_query->solrQuery );		// expecting something like: lib4ri_all_authors_mt:(aaa) NOT lib4ri_all_authors_mt:(bbb)
+	if ( !strchr($query,":") || strlen($query) < 4 ) {
+		// This seems ti be a simple search!(?) However let's exclude searches with '*:*' only.s
+		// Our custom author list is an additional element inside the MODS, and the entire MODS content is available via catch_all_MODS_mt.
+		// So as long as the simple search will use catch_all_MODS_mt (...well, we better should ensure this) there is nothing to do here.
+		return;
+	}
+
+	$fieldSearch = trim( strtr( variable_get('lib4ridora_solr_search_extension_field_data','dc.creator|lib4ri_all_authors_mt + mods_extension_originalAuthorList_mt'), "&", "+" ) );
+	if ( substr($fieldSearch,0,1) == "#" || !strchr($fieldSearch,"+") ) { return; }
+
+	$queryNew = $query . " OR " ;		// aux.
+	$matchAry = array();
+	preg_match_all( "/\sNOT\s|\sAND\s|\sOR\s/", $queryNew, $matchAry, PREG_OFFSET_CAPTURE ); // looking for positions of the operators NOT, AND, OR (embraced by a space).
+	$qPartAry = array();
+	$qOffset = 0;
+	foreach( $matchAry[0] as $mAry ) {		// with $mAry[0] as search operator found, and $mAry[1] is its position in the query string
+		$qPartAry[] = array( substr($queryNew,$qOffset,$mAry[1]-$qOffset), trim($mAry[0]) );
+		$qOffset = strlen($mAry[0]) + $mAry[1];
+	}
+	$qPartAry[sizeof($qPartAry)-1][1] = "";		// to clear the aux. ' OR '
+
+	$queryNew = "";
+	$fieldData = explode( ",", strtr( $fieldSearch, "/;", "|," ) );
+	foreach( $fieldData as $fieldSearch ) {
+		$fieldAry = explode("+",trim($fieldSearch),2);
+		$fieldExtra = trim($fieldAry[1]);
+		$fieldAry = explode("|",$fieldAry[0]);
+		foreach( $qPartAry as $qIdx => $qAry ) {
+			$ary = explode(":",$qAry[0],2);
+			foreach( $fieldAry as $fieldOld ) {
+				if ( trim($ary[0]) == trim($fieldOld) ) {
+					$qAry[0] = $ary[0] . ":" . $ary[1] . " OR  " . $fieldExtra . ":" . $ary[1];
+					$qOffset = -1;	// just to state we have found/expanded something.
+				}
+			}
+			$qPartAry[$qIdx] = array( $qAry[0], $qAry[1] );
+		}
+		foreach( $qPartAry as $ary ) { $queryNew .= "(" . trim($ary[0]) . ") " . trim($ary[1]) . " "; }
+	}
+
+	if ( $qOffset < 0 ) { $islandora_solr_query->solrQuery = trim($queryNew); }
+}
+
+/**
+ * Implements hook_init
+ */
+function lib4ridora_init() {
+  if ( !user_is_logged_in() ) {		// no check for registered users.
+    module_load_include('inc', 'lib4ridora', 'includes/utilities');
+    lib4ridora_access_rejection();
+  }
+}
+
+/**
+ * Implements hook_batch_alter
+ */
+function lib4ridora_batch_alter( $batch ) {
+  if ( !user_is_logged_in() ) {
+    module_load_include('inc', 'lib4ridora', 'includes/utilities');
+    lib4ridora_access_rejection( $batch );
+  }
 }
 
 /**

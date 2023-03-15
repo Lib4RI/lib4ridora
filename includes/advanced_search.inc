@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 /**
  * @file
@@ -101,7 +101,7 @@ function lib4ridora_parse_affiliation_fields() {
  */
 function lib4ridora_trim_and_solr_escape($str) {
   module_load_include("inc", "islandora_solr", "includes/utilities");
-  return islandora_solr_lesser_escape(trim($str));
+  return islandora_solr_lesser_escape(trim($str,"'\" \n\r\t\v\0"));
 }
 
 /**
@@ -113,18 +113,16 @@ function lib4ridora_trim_and_solr_escape($str) {
  * @return array
  *   Associative array where key is the facet field and the value is the count.
  */
-function lib4ridora_facet_query(array $facet_fields) {
+function lib4ridora_facet_query(array $facet_fields, $query = '') {
   $qp = new IslandoraSolrQueryProcessor();
-  $query = '*:*';
-  $qp->buildQuery($query);
+  $qp->buildQuery( ( empty($query) ? '*:*' : $query ) );
   $qp->solrParams['fl'] = "PID";
   $qp->solrParams['facet.mincount'] = 1;
   $qp->solrParams['facet.field'] = $facet_fields;
   $qp->solrParams['facet'] = 'true';
-  $qp->solrParams['facet.limit'] = 1000000;
+  $qp->solrParams['facet.limit'] = 98765431;
   $qp->solrLimit = 0;
   $qp->executeQuery();
-
   return $qp->islandoraSolrResult['facet_counts']['facet_fields'];
 }
 
@@ -218,10 +216,9 @@ function lib4ridora_construct_publication_type_filter($form_state) {
  *   Solr query statement
  */
 function lib4ridora_construct_solr_statement($field_name, $field_value) {
-  if ($field_value != "*") {
-    $field_value = '"' . $field_value . '"';
-  }
-  return "$field_name:$field_value";
+  $field_value = trim($field_value,"\"' \n\r\t\v\x00");
+  $quote = ( empty(rtrim($field_value,'*')) || !preg_match('/\s+/',urldecode($field_value)) ) ? '' : '"';
+  return ( $field_name . ':' . $quote . $field_value . $quote );
 }
 
 /**
@@ -299,7 +296,11 @@ function lib4ridora_construct_peer_reviewed_filter(&$form_state) {
     $filters[] = "$peer_review_field:No";
   }
   if ($form_state['values']['peer_review']['not specified']) {
-    $filters[] = "(*:* NOT $peer_review_field:*)";
+	if ( sizeof($filters) ) {
+      $filters[] = "(*:* NOT $peer_review_field:*)"; 	// safer in conjunction with other filters
+	} else {
+      $filters[] = '-' . $peer_review_field . ':*';	// easier to interpret+display for the 'Active Filters' function
+    }
   }
 
   return lib4ridora_construct_filter_string_from_array($filters);
@@ -323,20 +324,57 @@ function lib4ridora_construct_full_text_filter(&$form_state) {
   $open = islandora_solr_lesser_escape('Open Access');
   $restricted = islandora_solr_lesser_escape('Restricted');
   $no_full_text = islandora_solr_lesser_escape('No Full Text');
+  $embargo_restricted = islandora_solr_lesser_escape( variable_get('lib4ridora_term_embargo_restricted', 'Restricted (Embargo)') );
 
   $filters = array();
 
-  if ($form_state['values']['full_text']['open access']) {
-    $filters[] = $availability_field . " : " . $open;
-  }
-
   if ($form_state['values']['full_text']['restricted']) {
     $filters[] = $availability_field . " : " . $restricted;
+  }
+
+  if ($form_state['values']['full_text']['open access']) {
+    $filters[] = $availability_field . " : " . $open;
   }
 
   if ($form_state['values']['full_text']['no full text']) {
     $filters[] = $availability_field . " : " . $no_full_text;
   }
 
+  if ($form_state['values']['full_text']['embargo-restricted']) {
+    $filters[] = $availability_field . " : " . $embargo_restricted;
+  }
+
+  return lib4ridora_construct_filter_string_from_array($filters);
+}
+
+/**
+ * Builds an optional filter query based on research data link.
+ *
+ * @param array $form_state
+ *   Form state.
+ *
+ * @return string
+ *   Solr filter query.
+ */
+function lib4ridora_construct_research_data_filter(&$form_state) {
+  if ( @!isset($form_state['values']['research_data']['yes']) ) {
+	return;
+  }
+  $ary = array_map('trim',explode('|',variable_get('lib4ridora_solr_field_research_data', 'mods_extension_resource_identifier_mt | mods:extension/mods:resource/mods:identifier[@identifierTyp="DOI"]')));
+  if ( @empty($ary[0]) /* at [1] there should be the MODS-X-Path */ ) {
+	return;
+  }
+  module_load_include("inc", "islandora_solr", "includes/utilities");
+
+  // Get field name out of configuration.
+  $solr_field = islandora_solr_lesser_escape( $ary[0] );
+
+  $filters = array();
+  if ( $form_state['values']['research_data']['yes'] ) {
+    $filters[] = $solr_field . ':*';
+  }
+  if ( $form_state['values']['research_data']['no'] ) {
+    $filters[] = '-' . $solr_field . ':*';
+  }
   return lib4ridora_construct_filter_string_from_array($filters);
 }

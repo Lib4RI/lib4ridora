@@ -84,7 +84,7 @@ function lib4ridora_ingest_selector_form(array $form, array &$form_state, $editi
     $form['doi'] = array(
       '#title' => t('Digital Object Identifier'),
       '#type' => 'textfield',
-      '#description' => t('Enter an identifier for which to attempt to acquire metadata, such as: 10.1016/j.jorganchem.2011.11.018, 10.1016/j.tiv.2011.10.017, 10.1111/j.1540-4560.2012.01733.x, http://dx.doi.org/10.1111/eva.12339, or http://doi.org/10.1111/eva.12340'),
+      '#description' => t('Enter an identifier for which to attempt to acquire metadata, such as: 10.1016/j.jorganchem.2011.11.018, 10.1016/j.tiv.2011.10.017, 10.1111/j.1540-4560.2012.01733.x, http://doi.org/10.1111/eva.12339, or http://doi.org/10.1111/eva.12340'),
       '#element_validate' => array('lib4ridora_doi_validate_id'),
       "#default_value" => $default['doi'],
       '#states' => array(
