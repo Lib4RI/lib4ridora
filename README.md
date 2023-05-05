@@ -1,4 +1,4 @@
-# Lib4ridora
+# Lib4RIdora Module
 
 ## Introduction
 
