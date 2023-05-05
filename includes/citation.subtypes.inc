@@ -18,11 +18,11 @@ function lib4ridora_get_citation_mapping_info($metadata_display = FALSE) {
   return array(
     'journal_article' => array(
       'name' => t('Journal Article'),
-      'description' => t('An article in a scientific journal.  Not necessarily peer-reviewed. May be an electronic-only medium such as online journal.'),
+      'description' => t('An article in a scientific journal. Not necessarily peer-reviewed. May be an electronic-only medium such as online journal.'),
     ),
     'journal_issue' => array(
       'name' => t('Journal Issue'),
-      'description' => t(variable_get('lib4ridora_desc_journal_issue','A printed or online available magazine holding articles dedicated to specialized subjects.')),
+      'description' => t(variable_get('lib4ridora_desc_journal_issue','An issue of a printed or online available journal holding articles dedicated to specialized subjects.')),
     ),
     'book_chapter' => array(
       'name' => t('Book Chapter'),
@@ -39,6 +39,10 @@ function lib4ridora_get_citation_mapping_info($metadata_display = FALSE) {
     'edited_book' => array(
       'name' => t('Edited Book'),
       'description' => t('An edited book.'),
+    ),
+    'magazine_issue' => array(
+      'name' => t('Magazine Issue'),
+      'description' => t(variable_get('lib4ridora_desc_magazine_issue','An issue of a printed or online available magazine holding articles dedicdated to specialized subjects.')),
     ),
     'newspaper_or_magazine_article' => array(
       'name' => t('Newspaper or Magazine Article'),
@@ -103,6 +107,7 @@ function lib4ridora_citation_get_genre_map($metadata_display = FALSE) {
     'Book' => 'book',
     'Brochure' => $metadata_display ? 'book' : 'brochure',
     'Edited Book' => $metadata_display ? 'book' : 'edited_book',
+    'Magazine Issue' => 'magazine_issue',
     'Newspaper or Magazine Article' => $metadata_display ? 'journal_article' : 'newspaper_or_magazine_article',
     'Conference Item' => 'conference_object',
     'Proceedings Paper' => $metadata_display ? 'conference_object' : 'proceedings_paper',
@@ -123,11 +128,12 @@ function lib4ridora_citation_get_genre_semantics_map() {
   $head = 'info:eu-repo/semantics/';
   return array(
     'journal_article' => $head . 'article',
-    'journal_issue' => $head . 'contributionToPeriodical',
+    'journal_issue' => $head . 'other',
     'book_chapter' => $head . 'bookPart',
     'book' => $head . 'book',
     'brochure' => $head . 'book',
     'edited_book' => $head . 'book',
+    'magazine_issue' => $head . 'other',
     'newspaper_or_magazine_article' => $head . 'contributionToPeriodical',
     'conference_object' => $head . 'conferenceObject',
     'proceedings_paper' => $head . 'conferenceObject',
