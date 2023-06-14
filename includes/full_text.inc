@@ -9,6 +9,39 @@
 define('LIB4RIDORA_RELS_EXT_NAMESPACE', ISLANDORA_RELS_EXT_URI);
 const LIB4RIDORA_FULL_TEXT_RELATIONSHIP = 'fullText';
 
+/*
+ * function to assing or remove an open access publication
+ * to/from the OA collection (each subsite is itended to have)
+ */
+function lib4ridora_update_oa_collection(AbstractObject $object, $fullTextValue = '', $collectionSuffix = '') {
+	if ( empty($collectionSuffix) ) {
+		$collectionSuffix = variable_get('lib4ridora_oa_collection_suffix','open_access'); // make/keep it empty since on DEV the don't have these collections
+		if ( empty($collectionSuffix) ) {
+			return;
+		}
+	}
+	module_load_include('inc', 'islandora_basic_collection', 'includes/utilities');
+	$idColOA = strtok(strtr(strval($object->id),'-',':'),':') . ':' . $collectionSuffix;
+	$inColOA = in_array($idColOA, islandora_basic_collection_get_parent_pids($object) );
+
+	if ( strlen($fullTextValue) < 2 ) {
+		$relAry = $object->relationships->get(ISLANDORA_RELS_EXT_URI, 'fullText');
+		$fullTextValue = @strval( $relAry[0]['object']['value'] );
+	}
+	if ( $inColOA && $fullTextValue != 'Open Access' ) {
+		// remove from collection, see islandora_basic_collection_remove_from_collection()
+		$object->relationships->autoCommit = FALSE;
+		$object->relationships->remove(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $idColOA );
+		$object->relationships->remove(FEDORA_RELS_EXT_URI, 'isMemberOf', $idColOA );
+		$object->relationships->commitRelationships();
+		drupal_set_message( strval($object->id) . ' is not Open Access anymore, hence removed again from \'' . $idColOA . '\' collection', 'status');
+	}
+	elseif ( !$inColOA && $fullTextValue == 'Open Access' ) {
+		// add to collection, see islandora_basic_collection_add_to_collection()
+		$object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $idColOA );
+		drupal_set_message( strval($object->id) . ' is Open Access and was additionally assigned to the \'' . $idColOA . '\' collection', 'status');
+	}
+}
 
 /**
  * Update an object's full text relationship with the information from RELS-INT.
@@ -61,27 +94,18 @@ function lib4ridora_update_full_text(AbstractObject $object) {
   else {
     $relationship_value = 'Restricted';
   }
-  $current_relationship_triples = $object->relationships->get(
-    LIB4RIDORA_RELS_EXT_NAMESPACE,
-    LIB4RIDORA_FULL_TEXT_RELATIONSHIP
-  );
-  $current_relationship_value = isset($current_relationship_triples[0]['object']['value']) ?
-    $current_relationship_triples[0]['object']['value'] :
-    NULL;
+  
+  $current_relationship_triples = $object->relationships->get(LIB4RIDORA_RELS_EXT_NAMESPACE, LIB4RIDORA_FULL_TEXT_RELATIONSHIP );
+  $current_relationship_value = @strval( $current_relationship_triples[0]['object']['value'] );
+
   if ($relationship_value != $current_relationship_value) {
     $object->relationships->autoCommit = FALSE;
-    $object->relationships->remove(
-      LIB4RIDORA_RELS_EXT_NAMESPACE,
-      LIB4RIDORA_FULL_TEXT_RELATIONSHIP
-    );
-    $object->relationships->add(
-      LIB4RIDORA_RELS_EXT_NAMESPACE,
-      LIB4RIDORA_FULL_TEXT_RELATIONSHIP,
-      $relationship_value,
-      RELS_TYPE_PLAIN_LITERAL
-    );
+    $object->relationships->remove( LIB4RIDORA_RELS_EXT_NAMESPACE, LIB4RIDORA_FULL_TEXT_RELATIONSHIP );
+    $object->relationships->add( LIB4RIDORA_RELS_EXT_NAMESPACE, LIB4RIDORA_FULL_TEXT_RELATIONSHIP, $relationship_value, RELS_TYPE_PLAIN_LITERAL);
     $object->relationships->commitRelationships();
   }
+
+  lib4ridora_update_oa_collection($object, $relationship_value);
 }
 
 /**
