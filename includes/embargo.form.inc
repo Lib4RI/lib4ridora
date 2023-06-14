@@ -707,6 +707,9 @@ function lib4ridora_multi_pdf_get_options($sort = TRUE) {
       'internal document' => t('Internal Document'),
     );
   }
+  if ( !user_is_logged_in() ) {
+    unset( $document_versions['internal document'] ); // don't show option for internal docs if user has no login
+  }
   return array(
     'availability' => array(
       'public' => t('Public'),
