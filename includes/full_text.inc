@@ -47,7 +47,7 @@ function lib4ridora_update_oa_collection(AbstractObject $object, $fullTextValue 
 	elseif ( !$inColOA && $inColMain && $isPubOA ) {
 		// add to collection, see islandora_basic_collection_add_to_collection()
 		$object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $idColOA );
-		drupal_set_message( strval($object->id) . ' from \'' . $inColMain . '\' is Open Access and was additionally assigned to the \'' . $idColOA . '\' collection', 'status');
+		drupal_set_message( strval($object->id) . ' from \'' . $idColMain . '\' is Open Access and was additionally assigned to the \'' . $idColOA . '\' collection', 'status');
 	}
 }
 
