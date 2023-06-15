@@ -13,33 +13,41 @@ const LIB4RIDORA_FULL_TEXT_RELATIONSHIP = 'fullText';
  * function to assing or remove an open access publication
  * to/from the OA collection (each subsite is itended to have)
  */
-function lib4ridora_update_oa_collection(AbstractObject $object, $fullTextValue = '', $collectionSuffix = '') {
-	if ( empty($collectionSuffix) ) {
-		$collectionSuffix = variable_get('lib4ridora_oa_collection_suffix','open_access'); // make/keep it empty since on DEV the don't have these collections
-		if ( empty($collectionSuffix) ) {
+function lib4ridora_update_oa_collection(AbstractObject $object, $fullTextValue = '', $oaColSuffix = '') {
+	if ( empty($oaColSuffix) ) {
+		$oaColSuffix = variable_get('lib4ridora_oa_collection_suffix','open_access'); // make/keep it empty since on DEV the don't have these collections
+		if ( empty($oaColSuffix) ) {
 			return;
 		}
 	}
+
 	module_load_include('inc', 'islandora_basic_collection', 'includes/utilities');
-	$idColOA = strtok(strtr(strval($object->id),'-',':'),':') . ':' . $collectionSuffix;
-	$inColOA = in_array($idColOA, islandora_basic_collection_get_parent_pids($object) );
+	$colAry = islandora_basic_collection_get_parent_pids($object);
+	$inst = strtok(strtr(strval($object->id),'-',':'),':'); // eawag, empa, psi, wsl
+	$idColOA = $inst.':'.$oaColSuffix;
+	$idColMain = $inst.':publications';
+	$inColOA = in_array($idColOA, $colAry);
+	$inColMain = in_array($idColMain, $colAry); // it's a requirement to next to an OA PDF that they are also in the big/main collection of the institute
 
 	if ( strlen($fullTextValue) < 2 ) {
 		$relAry = $object->relationships->get(ISLANDORA_RELS_EXT_URI, 'fullText');
 		$fullTextValue = @strval( $relAry[0]['object']['value'] );
 	}
-	if ( $inColOA && $fullTextValue != 'Open Access' ) {
+	$isPubOA = ( $fullTextValue == 'Open Access' );
+
+	if ( $inColOA && ( !$inColMain || !$isPubOA ) ) {
 		// remove from collection, see islandora_basic_collection_remove_from_collection()
 		$object->relationships->autoCommit = FALSE;
 		$object->relationships->remove(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $idColOA );
 		$object->relationships->remove(FEDORA_RELS_EXT_URI, 'isMemberOf', $idColOA );
 		$object->relationships->commitRelationships();
-		drupal_set_message( strval($object->id) . ' is not Open Access anymore, hence removed again from \'' . $idColOA . '\' collection', 'status');
+		$msgTmp = ( ( !$inColMain && !$isPubOA ) ? 'OA and not in \''.$idColMain.'\'' : ( $isPubOA ? 'in \''.$idColMain.'\'' : 'Open Access' ) );
+		drupal_set_message( strval($object->id) . ' is not ' . $msgTmp . ' anymore, hence removed again from \'' . $idColOA . '\' collection', 'status');
 	}
-	elseif ( !$inColOA && $fullTextValue == 'Open Access' ) {
+	elseif ( !$inColOA && $inColMain && $isPubOA ) {
 		// add to collection, see islandora_basic_collection_add_to_collection()
 		$object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $idColOA );
-		drupal_set_message( strval($object->id) . ' is Open Access and was additionally assigned to the \'' . $idColOA . '\' collection', 'status');
+		drupal_set_message( strval($object->id) . ' from \'' . $inColMain . '\' is Open Access and was additionally assigned to the \'' . $idColOA . '\' collection', 'status');
 	}
 }
 
