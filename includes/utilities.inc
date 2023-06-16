@@ -768,6 +768,15 @@ function lib4ridora_doi_validate($element, &$form_state, $form, $ingesting=FALSE
     return (!$ingesting) ? $doc_url : FALSE;
   }
 
+  //If not ingesting we just check that doi is resovable by doi.org and set a warning in case is not
+  if (!$ingesting){
+      $doc_url = lib4ridora_doi_get_document_url($doi);
+      if ($doc_url !== FALSE) {
+        drupal_set_message($message = 'DOI is not resolved. Please double check it is correct.', $type = 'warning');
+      }
+      return FALSE;
+  }
+  
   $mods = islandora_doi_get_mods($doi);
   if ($mods === FALSE) {
     $doc_url = lib4ridora_doi_get_document_url($doi); 
