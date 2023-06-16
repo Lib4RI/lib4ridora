@@ -13,7 +13,7 @@ const LIB4RIDORA_FULL_TEXT_RELATIONSHIP = 'fullText';
  * function to assing or remove an open access publication
  * to/from the OA collection (each subsite is itended to have)
  */
-function lib4ridora_update_oa_collection(AbstractObject $object, $fullTextValue = '', $oaColSuffix = '') {
+function lib4ridora_update_oa_collection(AbstractObject $object, $fullTextValue = '', $colPidAry = NULL, $oaColSuffix = '') {
 	if ( empty($oaColSuffix) ) {
 		$oaColSuffix = variable_get('lib4ridora_oa_collection_suffix','open_access'); // make/keep it empty since on DEV the don't have these collections
 		if ( empty($oaColSuffix) ) {
@@ -21,19 +21,21 @@ function lib4ridora_update_oa_collection(AbstractObject $object, $fullTextValue 
 		}
 	}
 
-	module_load_include('inc', 'islandora_basic_collection', 'includes/utilities');
-	$colAry = islandora_basic_collection_get_parent_pids($object);
-	$inst = strtok(strtr(strval($object->id),'-',':'),':'); // eawag, empa, psi, wsl
-	$idColOA = $inst.':'.$oaColSuffix;
-	$idColMain = $inst.':publications';
-	$inColOA = in_array($idColOA, $colAry);
-	$inColMain = in_array($idColMain, $colAry); // it's a requirement to next to an OA PDF that they are also in the big/main collection of the institute
-
+	if ( @gettype($colPidAry) != 'array' ) {
+		module_load_include('inc', 'islandora_basic_collection', 'includes/utilities');
+		$colPidAry = islandora_basic_collection_get_parent_pids($object);
+	}
 	if ( strlen($fullTextValue) < 2 ) {
 		$relAry = $object->relationships->get(ISLANDORA_RELS_EXT_URI, 'fullText');
 		$fullTextValue = @strval( $relAry[0]['object']['value'] );
 	}
 	$isPubOA = ( $fullTextValue == 'Open Access' );
+
+	$inst = strtok(strtr(strval($object->id),'-',':'),':'); // eawag, empa, psi, wsl
+	$idColOA = $inst.':'.$oaColSuffix;
+	$idColMain = $inst.':publications';
+	$inColOA = in_array($idColOA, $colPidAry);
+	$inColMain = in_array($idColMain, $colPidAry); // it's a requirement to next to an OA PDF that they are also in the big/main collection of the institute
 
 	if ( $inColOA && ( !$inColMain || !$isPubOA ) ) {
 		// remove from collection, see islandora_basic_collection_remove_from_collection()
@@ -41,13 +43,13 @@ function lib4ridora_update_oa_collection(AbstractObject $object, $fullTextValue 
 		$object->relationships->remove(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $idColOA );
 		$object->relationships->remove(FEDORA_RELS_EXT_URI, 'isMemberOf', $idColOA );
 		$object->relationships->commitRelationships();
-		$msgTmp = ( ( !$inColMain && !$isPubOA ) ? 'OA and not in \''.$idColMain.'\'' : ( $isPubOA ? 'in \''.$idColMain.'\'' : 'Open Access' ) );
-		drupal_set_message( strval($object->id) . ' is not ' . $msgTmp . ' anymore, hence removed again from \'' . $idColOA . '\' collection', 'status');
+		$msgTmp = ( ( !$inColMain && !$isPubOA ) ? 'OA and not part of \''.$idColMain.'\'' : ( $isPubOA ? 'part of \''.$idColMain.'\'' : 'Open Access' ) );
+		drupal_set_message( 'Object \'' . strval($object->id) . '\' is not ' . $msgTmp . ' anymore, hence removed again from \'' . $idColOA . '\' collection', 'status');
 	}
 	elseif ( !$inColOA && $inColMain && $isPubOA ) {
 		// add to collection, see islandora_basic_collection_add_to_collection()
 		$object->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $idColOA );
-		drupal_set_message( strval($object->id) . ' from \'' . $idColMain . '\' is Open Access and was additionally assigned to the \'' . $idColOA . '\' collection', 'status');
+		drupal_set_message( 'Object \'' . strval($object->id) . '\' from \'' . $idColMain . '\' is Open Access and automatically shared with the \'' . $idColOA . '\' collection', 'status');
 	}
 }
 

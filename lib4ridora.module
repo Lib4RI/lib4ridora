@@ -2388,3 +2388,84 @@ function lib4ridora_batch_alter( $batch ) {
     lib4ridora_access_rejection( $batch );
   }
 }
+
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function lib4ridora_form_islandora_basic_collection_migrate_item_form_alter(&$form, &$form_state) {
+  $nameBase = 'basic_collection_migrate_item_form_submit';
+  foreach( $form['#submit'] as $fIdx => $funcName ) {
+    if ( $funcName == 'islandora_'.$nameBase ) {
+      $form['#submit'][$fIdx] = 'lib4ridora_'.$nameBase;
+    }
+  }
+}
+/*
+ * Function to handle OA-collection assignment/removal, aside from standard collection procedure.
+ * Upper part is widely identical with islandora_basic_collection_migrate_item_form_submit()
+ */
+function lib4ridora_basic_collection_migrate_item_form_submit($form, &$form_state) {
+  module_load_include('inc', 'islandora_basic_collection', 'includes/utilities');
+  if ( !( $object = islandora_object_load($form_state['basic_collection_migrate']) ) ) { return; }
+
+  $new_collection = islandora_object_load($form_state['values']['new_collection_name']);
+  $current_parents = islandora_basic_collection_get_parent_pids($object); // returns a simple array like [ 'wsl:publications', 'wsl:open_access' ]
+
+  if ( sizeof($current_parents) != 1 || $current_parents[0] != $new_collection->id ) {
+    $idColOA = strtok(strtr(strval($object->id),'-',':'),':') .':'. variable_get('lib4ridora_oa_collection_suffix','open_access'); // e.g. eawag:open_access
+    foreach ($current_parents as $parent) {
+      if ( $parent != $idColOA ) { // we will deal with the OA collection separately, a matter of the message to send
+        islandora_basic_collection_remove_from_collection($object, $parent);
+      }
+    }
+    islandora_basic_collection_add_to_collection($object, $new_collection);
+
+    $message = t('Object \'@object\' has been added to \'@colId\' (@collection) collection', array(
+               '@object' => $object->id,
+               '@colId' => $new_collection->id,
+               '@collection' => $new_collection->label));
+    drupal_set_message($message);
+  }
+
+  module_load_include('inc', 'lib4ridora', 'includes/full_text');
+  lib4ridora_update_oa_collection( $object );
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function lib4ridora_form_islandora_basic_collection_share_item_form_alter(&$form, &$form_state) {
+  $nameBase = 'basic_collection_share_item_form_submit';
+  foreach( $form['#submit'] as $fIdx => $funcName ) {
+    if ( $funcName == 'islandora_'.$nameBase ) {
+      $form['#submit'][$fIdx] = 'lib4ridora_'.$nameBase;
+    }
+  }
+}
+/*
+ * Function to handle OA-collection assignment/removal, aside from standard collection procedures.
+ * Upper part is widely identical with islandora_basic_collection_share_item_form_submit()
+ */
+function lib4ridora_basic_collection_share_item_form_submit($form, &$form_state) {
+  module_load_include('inc', 'islandora_basic_collection', 'includes/utilities');
+  if( !( $object = islandora_object_load($form_state['basic_collection_share']) ) ) { return; }
+
+  $new_collection = islandora_object_load($form_state['values']['new_collection_name']);
+  $current_parents = islandora_basic_collection_get_parent_pids($object); // for lib4ridora_update_oa_collection, perhaps safer to make the collection list here
+
+  if ( $new_collection ) {
+    if ( !in_array($new_collection->id,$current_parents) ) {
+      islandora_basic_collection_add_to_collection($object, $new_collection);
+      $current_parents[] = $new_collection;
+
+      $message = t('Object \'@object\' has been added to \'@colId\' (@collection) collection', array(
+                 '@object' => $object->id,
+                 '@colId' => $new_collection->id,
+                 '@collection' => $new_collection->label));
+      drupal_set_message($message);
+    }
+  }
+  module_load_include('inc', 'lib4ridora', 'includes/full_text');
+  lib4ridora_update_oa_collection( $object, '', $current_parents );
+}
