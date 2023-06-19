@@ -604,6 +604,30 @@ function lib4ridora_doi_get_document_url($doi) {
   return FALSE;
 }
 
+// Replacement for lib4ridora_doi_get_document_url that doesn't seeem to work anymore (16.6.2023)
+function lib4ridora_doi_resolve_doi($doi) {
+    $url = 'https://doi.org/';
+    
+    $ch = curl_init($url.$doi);
+    curl_setopt($ch, CURLOPT_HEADER, 1);
+    curl_setopt($ch, CURLOPT_NOBODY, 1);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    $headers = curl_exec($ch);
+    curl_close($ch);
+    
+    preg_match('/^HTTP.* 302/', $headers, $matches_http_code);
+    
+    //var_dump($matches_http_code);
+    
+    
+    if (preg_match('/^HTTP.* 302/', $headers, $matches_http_code) && preg_match('/^Location: (.+)$/im', $headers, $matches)){
+        return TRUE;
+    }
+    
+    if (preg_match('/^HTTP.* 400/', $headers, $matches_http_code) || preg_match('/^HTTP.* 404/', $headers, $matches_http_code)){
+        return FALSE;
+    }
+}
 /*
  * function to check if a given was assigned by Lib4RI
  * resp. if a DOI has the same DOI-suffix as those DOIs given by Lib4RI
@@ -768,6 +792,15 @@ function lib4ridora_doi_validate($element, &$form_state, $form, $ingesting=FALSE
     return (!$ingesting) ? $doc_url : FALSE;
   }
 
+  //If not ingesting we just check that doi is resovable by doi.org and set a warning in case is not
+  if (!$ingesting){
+      $resolved = lib4ridora_doi_resolve_doi($doi);
+      if ($resolved == FALSE) {
+        drupal_set_message($message = 'DOI is not resolved. Please double check it is correct.', $type = 'warning');
+      }
+      return FALSE;
+  }
+  
   $mods = islandora_doi_get_mods($doi);
   if ($mods === FALSE) {
     $doc_url = lib4ridora_doi_get_document_url($doi); 
