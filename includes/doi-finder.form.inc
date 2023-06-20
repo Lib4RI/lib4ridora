@@ -32,7 +32,8 @@ function lib4ridora_doi_finder_form(array $form, array &$form_state) {
   }
 
   foreach ($doilist as $doi => $val) {
-    $doilist[$doi]['isvalid'] = (lib4ridora_doi_get_document_url($doi) !== FALSE);
+//    $doilist[$doi]['isvalid'] = (lib4ridora_doi_get_document_url($doi) !== FALSE);
+    $doilist[$doi]['isvalid'] = (lib4ridora_doi_resolve_doi($doi) !== FALSE);
     $doilist[$doi]['hasmods'] = (islandora_doi_get_mods($doi) !== FALSE);
   }
   

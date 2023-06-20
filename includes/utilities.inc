@@ -621,7 +621,7 @@ function lib4ridora_doi_resolve_doi($doi) {
     
     
     if (preg_match('/^HTTP.* 302/', $headers, $matches_http_code) && preg_match('/^Location: (.+)$/im', $headers, $matches)){
-        return TRUE;
+        return substr($matches[0], 10);
     }
     
     if (preg_match('/^HTTP.* 400/', $headers, $matches_http_code) || preg_match('/^HTTP.* 404/', $headers, $matches_http_code)){
