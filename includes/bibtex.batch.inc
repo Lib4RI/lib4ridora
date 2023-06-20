@@ -91,6 +91,7 @@ function lib4ridora_batch_append_citations_to_file($set_id, $total, $text_filena
         // When this is encountered log the error the watchdog and do not
         // include it in the output.
         $xml_to_test = "<div>$text</div>";
+//dsm($xml_to_test, 'output');
         if (!@simplexml_load_string($xml_to_test)) {
           watchdog('lib4ridora', 'Unable to process BiBTeX output for @pid, encountered invalid values.', ['@pid' => $object->id]);
           continue;
