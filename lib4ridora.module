@@ -1394,7 +1394,7 @@ function lib4ridora_form_islandora_scholar_citation_select_form_alter(&$form, &$
  *	Matter: it may be that deleting the RELS-INT datastream *plus* its derivatives will also delete RELS-EXT, which however is required to re-edit the object/publication.
  *	Work-around: Let's show a red warning.
  *	Example/test: https://www.dora-dev.lib4ri.ch/eawag/islandora/object/eawag%3A9334/manage/datastreams
- */ 
+ */
 function lib4ridora_page_alter(&$page) {
 
   $url = strtolower( strtok(strtok($_SERVER['REQUEST_URI']."?","?")."#","#") );
@@ -1885,6 +1885,10 @@ function lib4ridora_form_islandora_bookmark_results_form_alter(&$form, &$form_st
     // Get rid of the 'Bibliography' entry and move its contents up one.
     $options = array_merge($options, $options['Bibliography']);
     unset($options['Bibliography']);
+  }
+  if (isset($options['lib4ridora']) && is_array($options['lib4ridora'])) {
+    $options = array_merge($options, $options['lib4ridora']);
+    unset($options['lib4ridora']);
   }
 }
 
@@ -2389,6 +2393,7 @@ function lib4ridora_batch_alter( $batch ) {
   }
 }
 
+//<<<<<<< HEAD
 
 /**
  * Implements hook_form_FORM_ID_alter().
@@ -2468,4 +2473,42 @@ function lib4ridora_basic_collection_share_item_form_submit($form, &$form_state)
   }
   module_load_include('inc', 'lib4ridora', 'includes/full_text');
   lib4ridora_update_oa_collection( $object, '', $current_parents );
+}
+//=======
+/**
+ * Implements islandora_bookmark_export_handler().
+ *
+ * @return array
+ *   The BibTeX export option implemented for LIB4RI.
+ */
+function lib4ridora_islandora_bookmark_export_handler() {
+  return [
+    'lib4ridora' => [
+      'bibtex' => [
+        'human_readable' => 'BiBTeX',
+        'callable' => 'lib4ridora_bibtex_batch_export',
+      ],
+    ],
+  ];
+}
+
+/**
+ * Export handler for BiBTeX.
+ *
+ * @param array $pids
+ *   The PIDs to be processed.
+ */
+function lib4ridora_bibtex_batch_export(array $pids) {
+  module_load_include('inc', 'lib4ridora', 'includes/bibtex.batch');
+  $operations = lib4ridora_bibtex_batch_export_operations($pids);
+  $batch = [
+    'title' => t('Exporting Citations to File'),
+    'operations' => $operations,
+    'init_message' => 'Preparing to Export Citations',
+    'progress_message' => 'Exporting Citations',
+    'finished' => 'citation_exporter_batch_finished',
+    'file' => drupal_get_path('module', 'lib4ridora') . '/includes/bibtex.batch.inc',
+  ];
+  batch_set($batch);
+//>>>>>>> 221a7d1d96d7f1e9ed257e2a8050edbcde8612b4
 }
