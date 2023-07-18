@@ -140,6 +140,15 @@ function lib4ridora_replace_to_bibtex($value) {
     '<i>' => '\emph{',
     '</i>' => '}',
 
+    '&lt;sub&gt;' => '\textsubscript{',
+    '&lt;/sub&gt;' => '}',
+    '&lt;sup&gt;' => '\textsuperscript{',
+    '&lt;/sup&gt;' => '}',
+    '&lt;em&gt;' => '\emph{',
+    '&lt;/em&gt;' => '}',
+    '&lt;i&gt;' => '\emph{',
+    '&lt;/i&gt;' => '}',
+
     // Entities.
     '&Alpha;' => '$Α$',
     '&Beta;' => '$Β$',
@@ -426,6 +435,8 @@ function lib4ridora_replace_to_bibtex($value) {
     '&#x2287;' => '$\supseteq$',
     '&#x2295;' => '$\oplus$',
     '&#x2297;' => '$\otimes$',
+    '&#x2013;' => '--',
+    '&ndash;' => '--',
     '&Aacute;' => "\'{A}",
     '&aacute;' => "\'{a}",
     '&Agrave;' => '\`{A}',
@@ -541,7 +552,7 @@ function lib4ridora_convert_citeproc_array_to_object($in) {
     // XXX: SimpleXML likes to replace already encoded entities earlier up in
     // the Citeproc chain back to their unencoded values. Once again encode
     // them.
-    return lib4ridora_replace_to_bibtex(htmlentities($in));
+      return lib4ridora_replace_to_bibtex(htmlentities(html_entity_decode($in)));
   }
   elseif (count($in) > 0 && count(array_filter(array_keys($in), 'is_int')) == count($in)) {
     foreach ($in as &$value) {
