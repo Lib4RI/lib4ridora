@@ -94,23 +94,23 @@
   <macro name="container-title">
     <choose>
       <if type="chapter paper-conference" match="any">
-        <text variable="container-title" prefix=' booktitle="' suffix='"'/>
+        <text variable="container-title" prefix=' booktitle={' suffix='}'/>
       </if>
       <else>
-        <text variable="container-title" prefix=' journal="' suffix='"'/>
+        <text variable="container-title" prefix=' journal={' suffix='}'/>
       </else>
     </choose>
   </macro>
   <macro name="publisher">
     <choose>
       <if type="thesis">
-        <text variable="publisher" prefix=' school="' suffix='"'/>
+        <text variable="publisher" prefix=' school={' suffix='}'/>
       </if>
       <else-if type="report">
-        <text variable="publisher" prefix=' institution="' suffix='"'/>
+        <text variable="publisher" prefix=' institution={' suffix='}'/>
       </else-if>
       <else>
-        <text variable="publisher" prefix=' publisher="' suffix='"'/>
+        <text variable="publisher" prefix=' publisher={' suffix='}'/>
       </else>
     </choose>
   </macro>
@@ -140,7 +140,7 @@
         <text macro="citeKey"/>
         <text variable="publisher-place" prefix=' place={' suffix='}'/>
         <text variable="chapter-number" prefix=' chapter={' suffix='}'/>
-        <text macro="edition" prefix=' edition={' suffix='"'/>
+        <text macro="edition" prefix=' edition={' suffix='}'/>
         <text variable="collection-title" prefix=' series={' suffix='}'/>
         <text macro="title" prefix=' title={' suffix='}'/>
         <text variable="volume" prefix=' volume={' suffix='}'/>
