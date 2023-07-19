@@ -151,7 +151,7 @@ function lib4ridora_replace_to_bibtex($value) {
 
     '&lt;SUB&gt;' => '\textsubscript{',
     '&lt;/SUB&gt;' => '}',
-    '&lt;SIP&gt;' => '\textsuperscript{',
+    '&lt;SUP&gt;' => '\textsuperscript{',
     '&lt;/SUP&gt;' => '}',
     '&lt;EM&gt;' => '\emph{',
     '&lt;/EM&gt;' => '}',
