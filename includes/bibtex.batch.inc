@@ -159,8 +159,12 @@ function lib4ridora_replace_to_bibtex($value) {
     '&lt;/I&gt;' => '}',
       
     // Entities.
+    '&prime;' => '{\prime}',
+    '&Prime;' => '{\second}',
     '&deg;' => '{\textdegree}',
     '&nbsp;' => '~',
+    '&raquo;' => '{\guillemotright}',
+    '&laquo;' => '{\guillemotleft}',
     '&rdquo;' => '{\textquotedblright}',
     '&ldquo;' => '{\textquotedblleft}',
     '&rsquo;' => '{\textquoteright}',
@@ -214,6 +218,7 @@ function lib4ridora_replace_to_bibtex($value) {
     '&chi;' => '$\chi$',
     '&psi;' => '$\psi$',
     '&omega;' => '$\omega$',
+    '&micro;' => '$\mathrm{\mu}$',
     '&thetasym;' => '$\vartheta$',
     '&upsih;' => '$\Upsilon$',
     '&#913;' => '$Α$',
@@ -451,7 +456,8 @@ function lib4ridora_replace_to_bibtex($value) {
     '&#x2295;' => '$\oplus$',
     '&#x2297;' => '$\otimes$',
     '&#x2013;' => '--',
-    '&ndash;' => '--',
+    '&ndash;' => '{\textendash}',
+    '&mdash;' => '{\textemdash}',
     '&shy;' => '\-',  
     '&Aacute;' => "\'{A}",
     '&aacute;' => "\'{a}",
@@ -515,6 +521,7 @@ function lib4ridora_replace_to_bibtex($value) {
     '&yuml;' => '\"{y}',
     '&scaron;' => '\u{s}',
     '&Scaron;' => '\u{S}',
+    '&reg;' => '{\textregistered}',
 
     // Special cases.
     '&' => '\&',
