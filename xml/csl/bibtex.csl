@@ -94,23 +94,23 @@
   <macro name="container-title">
     <choose>
       <if type="chapter paper-conference" match="any">
-        <text variable="container-title" prefix=' booktitle={' suffix='}'/>
+        <text variable="container-title" prefix=' booktitle=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
       </if>
       <else>
-        <text variable="container-title" prefix=' journal={' suffix='}'/>
+        <text variable="container-title" prefix=' journal=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
       </else>
     </choose>
   </macro>
   <macro name="publisher">
     <choose>
       <if type="thesis">
-        <text variable="publisher" prefix=' school={' suffix='}'/>
+        <text variable="publisher" prefix=' school=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
       </if>
       <else-if type="report">
-        <text variable="publisher" prefix=' institution={' suffix='}'/>
+        <text variable="publisher" prefix=' institution=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
       </else-if>
       <else>
-        <text variable="publisher" prefix=' publisher={' suffix='}'/>
+        <text variable="publisher" prefix=' publisher=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
       </else>
     </choose>
   </macro>
@@ -138,25 +138,25 @@
       <text macro="zotero2bibtexType" prefix="@"/>
       <group prefix="{" suffix="}&#10;" delimiter=",&#10;&#032;&#032;&#032;">
         <text macro="citeKey"/>
-        <text variable="publisher-place" prefix=' place={' suffix='}'/>
-        <text variable="chapter-number" prefix=' chapter={' suffix='}'/>
-        <text macro="edition" prefix=' edition={' suffix='}'/>
-        <text variable="collection-title" prefix=' series={' suffix='}'/>
-        <text macro="title" prefix=' title={' suffix='}'/>
-        <text variable="volume" prefix=' volume={' suffix='}'/>
-        <text variable="ISBN" prefix=' ISBN={' suffix='}'/>
-        <text variable="ISSN" prefix=' ISSN={' suffix='}'/>
-        <text variable="archive_location" prefix=' archiveLocation={' suffix='}'/>
-        <text variable="URL" prefix=' url={' suffix='}'/>
-        <text variable="DOI" prefix=' DOI={' suffix='}'/>
-        <text macro="number" prefix=' number={' suffix='}'/>
+        <text variable="publisher-place" prefix=' place=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text variable="chapter-number" prefix=' chapter=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text macro="edition" prefix=' edition=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text variable="collection-title" prefix=' series=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text macro="title" prefix=' title=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text variable="volume" prefix=' volume=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text variable="ISBN" prefix=' ISBN=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text variable="ISSN" prefix=' ISSN=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text variable="archive_location" prefix=' archiveLocation=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text variable="URL" prefix=' url=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text variable="DOI" prefix=' DOI=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text macro="number" prefix=' number=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
         <text macro="container-title"/>
         <text macro="publisher"/>
-        <text macro="author" prefix=' author={' suffix='}'/>
-        <text macro="editor-translator" prefix=' editor={' suffix='}'/>
-        <text macro="issued-year" prefix=' year={' suffix='}'/>
-        <text macro="pages" prefix=' pages={' suffix='}'/>
-        <text variable="collection-title" prefix=' collection={' suffix='}'/>
+        <text macro="author" prefix=' author=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text macro="editor-translator" prefix=' editor=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text macro="issued-year" prefix=' year=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text macro="pages" prefix=' pages=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
+        <text variable="collection-title" prefix=' collection=_attribute_left_delimiter_' suffix='_attribute_right_delimiter_'/>
       </group>
     </layout>
   </bibliography>

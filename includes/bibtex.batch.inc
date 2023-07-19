@@ -688,6 +688,8 @@ function lib4ridora_convert_txt_to_bib($filename, array &$context) {
   $parsed_text = implode("\n", $entries);
   $temp_file_dir = file_directory_temp();
   $temp_file_name = file_create_filename("BiBTeX_export.bib", $temp_file_dir);
+  $parsed_text = str_replace('_attribute_left_delimiter_', '{', $parsed_text);
+  $parsed_text = str_replace('_attribute_right_delimiter_', '}', $parsed_text);
   file_put_contents($temp_file_name, $parsed_text);
   $context['results']['filename'] = $temp_file_name;
   $context['results']['download_filename'] = 'export.bib';
