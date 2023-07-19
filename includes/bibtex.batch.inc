@@ -159,8 +159,8 @@ function lib4ridora_replace_to_bibtex($value) {
     '&lt;/I&gt;' => '}',
       
     // Entities.
-    '&prime;' => '{\prime}',
-    '&Prime;' => '{\second}',
+    '&prime;' => '{$\prime$}',
+    '&Prime;' => '{$\second$}',
     '&deg;' => '{\textdegree}',
     '&nbsp;' => '~',
     '&raquo;' => '{\guillemotright}',
