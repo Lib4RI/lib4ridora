@@ -138,25 +138,25 @@
       <text macro="zotero2bibtexType" prefix="@"/>
       <group prefix="{" suffix="}&#10;" delimiter=",&#10;&#032;&#032;&#032;">
         <text macro="citeKey"/>
-        <text variable="publisher-place" prefix=' place="' suffix='"'/>
-        <text variable="chapter-number" prefix=' chapter="' suffix='"'/>
-        <text macro="edition" prefix=' edition="' suffix='"'/>
-        <text variable="collection-title" prefix=' series="' suffix='"'/>
-        <text macro="title" prefix=' title="' suffix='"'/>
-        <text variable="volume" prefix=' volume="' suffix='"'/>
-        <text variable="ISBN" prefix=' ISBN="' suffix='"'/>
-        <text variable="ISSN" prefix=' ISSN="' suffix='"'/>
-        <text variable="archive_location" prefix=' archiveLocation="' suffix='"'/>
-        <text variable="URL" prefix=' url="' suffix='"'/>
-        <text variable="DOI" prefix=' DOI="' suffix='"'/>
-        <text macro="number" prefix=' number="' suffix='"'/>
+        <text variable="publisher-place" prefix=' place={' suffix='}'/>
+        <text variable="chapter-number" prefix=' chapter={' suffix='}'/>
+        <text macro="edition" prefix=' edition={' suffix='"'/>
+        <text variable="collection-title" prefix=' series={' suffix='}'/>
+        <text macro="title" prefix=' title={' suffix='}'/>
+        <text variable="volume" prefix=' volume={' suffix='}'/>
+        <text variable="ISBN" prefix=' ISBN={' suffix='}'/>
+        <text variable="ISSN" prefix=' ISSN={' suffix='}'/>
+        <text variable="archive_location" prefix=' archiveLocation={' suffix='}'/>
+        <text variable="URL" prefix=' url={' suffix='}'/>
+        <text variable="DOI" prefix=' DOI={' suffix='}'/>
+        <text macro="number" prefix=' number={' suffix='}'/>
         <text macro="container-title"/>
         <text macro="publisher"/>
-        <text macro="author" prefix=' author="' suffix='"'/>
-        <text macro="editor-translator" prefix=' editor="' suffix='"'/>
-        <text macro="issued-year" prefix=' year="' suffix='"'/>
-        <text macro="pages" prefix=' pages="' suffix='"'/>
-        <text variable="collection-title" prefix=' collection="' suffix='"'/>
+        <text macro="author" prefix=' author={' suffix='}'/>
+        <text macro="editor-translator" prefix=' editor={' suffix='}'/>
+        <text macro="issued-year" prefix=' year={' suffix='}'/>
+        <text macro="pages" prefix=' pages={' suffix='}'/>
+        <text variable="collection-title" prefix=' collection={' suffix='}'/>
       </group>
     </layout>
   </bibliography>
