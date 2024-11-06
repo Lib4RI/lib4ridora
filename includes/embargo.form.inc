@@ -838,6 +838,9 @@ function lib4ridora_append_document_information($files, &$form ) {
  *   An array representing the form to be rendered.
  */
 function lib4ridora_append_romeo_information(&$form, &$form_state) {
+
+  if ( !variable_get('islandora_scholar_romeo_enable', FALSE) ) { return; }
+
   $object = lib4ridora_multi_embargo_get_object($form_state);
   // SHERPA RoMEO.
   if (isset($object['MODS'])) {
