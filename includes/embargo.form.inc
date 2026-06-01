@@ -166,29 +166,14 @@ function lib4ridora_get_pdfa_label_helper( $label_pdf_orig, $parent_dsid, $fileP
 	return lib4ridora_get_pdfa_label( $label_pdf_orig, $parent_dsid );
 }
 
-/*
-	Function to help expanding the	CC license string with JavaScript
-    Code is very specific to ccLicenseComposer() in lib4ridora/js/lib4ridora.pdf_support.js
-
-	Via PHP we are going to add/replace some selection options stored in system variables: 
-	sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_pdf_cc_version","4.0,---,1.0,2.0,2.5,3.0")'
-	sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_pdf_cc_country","---,IGO,UK")'
-*/
-function lib4ridora_cc_license_helper($jsCode = '') {
-  $ccVersion = variable_get("lib4ridora_pdf_cc_version","4.0,---,1.0,2.0,2.5,3.0");
-  $ccVersion = "'" . str_replace(',',"','",str_replace(' ','',$ccVersion)) . "'";
-  $jsCode = str_replace("'---','0.0'",$ccVersion,$jsCode);
-  $ccCountry = variable_get("lib4ridora_pdf_cc_country","---,IGO,UK");
-  $ccCountry = "'" . str_replace(',',"','",str_replace(' ','',$ccCountry)) . "'";
-  return str_replace("'---','XYZ'",$ccCountry,$jsCode);
-}
-
 /**
  * Form building function; build multi-PDF embargo form.
  */
 function lib4ridora_multi_embargo_form($form, &$form_state) {
   form_load_include($form_state, 'inc', 'lib4ridora', 'includes/embargo.form');
   module_load_include('inc', 'islandora', 'includes/ingest.form');
+  module_load_include('inc', 'lib4ridora', 'includes/license.form');
+
   $step_storage = islandora_ingest_form_get_step_storage($form_state, 'lib4ridora_multi_pdf_upload');
 
   $form['#tree'] = TRUE;
@@ -204,7 +189,7 @@ function lib4ridora_multi_embargo_form($form, &$form_state) {
   if ( $jsCode = file_get_contents( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.pdf_support.js' ) ) {
     if ( $jsCode = strchr(substr($jsCode,strpos($jsCode,'<script')),'>') ) {
       if ( $jsCode = trim(substr($jsCode,0,strpos($jsCode,'</script>'))," </-!>\t") ) {
-        drupal_add_js( lib4ridora_cc_license_helper($jsCode), 'inline' );		// This is less 'caching-resistent', also a reset of ['#attached']['js'] cannot drop it.
+        drupal_add_js( lib4ridora_pdf_cc_license_helper($jsCode), 'inline' ); // This is less 'caching-resistent', also a reset of ['#attached']['js'] cannot drop it.
       }
     }
   }
@@ -232,6 +217,8 @@ function lib4ridora_multi_embargo_form($form, &$form_state) {
  *   An array representing the form to be rendered.
  */
 function lib4ridora_multi_embargo_edit_form($form, &$form_state) {
+  module_load_include('inc', 'lib4ridora', 'includes/license.form');
+
   $form['#tree'] = TRUE;
   $form['files'] = array(
     '#type' => 'markup',
@@ -256,7 +243,7 @@ function lib4ridora_multi_embargo_edit_form($form, &$form_state) {
   if ( $jsCode = file_get_contents( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.pdf_support.js' ) ) {
     if ( $jsCode = strchr(substr($jsCode,strpos($jsCode,'<script')),'>') ) {
       if ( $jsCode = trim(substr($jsCode,0,strpos($jsCode,'</script>'))," </-!>\t") ) {
-        drupal_add_js( lib4ridora_cc_license_helper($jsCode), 'inline' );		// This is less 'caching-resistent', also a reset of ['#attached']['js'] cannot drop it.
+        drupal_add_js( lib4ridora_pdf_cc_license_helper($jsCode), 'inline' );		// This is less 'caching-resistent', also a reset of ['#attached']['js'] cannot drop it.
       }
     }
   }
@@ -702,6 +689,7 @@ function lib4ridora_pdfa_availability_default( $help_with_pdf_default = TRUE ) {
  *   An array containing the options used in the form.
  */
 function lib4ridora_multi_pdf_get_options($sort = TRUE) {
+  module_load_include('inc', 'lib4ridora', 'includes/license.form');
   if ($sort) {
     $document_versions = array(
       'published version' => t('Published Version'),
@@ -727,7 +715,7 @@ function lib4ridora_multi_pdf_get_options($sort = TRUE) {
   if ( !user_is_logged_in() ) {
     unset( $document_versions['internal document'] ); // don't show option for internal docs if user has no login
   }
-  $retAry = array(
+  return array(
     'availability' => array(
       'public' => t('Public'),
       'intranet' => t('Intranet'),
@@ -735,43 +723,8 @@ function lib4ridora_multi_pdf_get_options($sort = TRUE) {
       'private' => t('Private'),
     ),
     'document_version' => $document_versions,
-    'use_permission' => array(
-      NULL => t('Unspecified'),
-      'CC BY' => t('Creative Commons: Attribution'),
-      'CC BY-SA' => t('Creative Commons: Attribution-ShareAlike'),
-      'CC BY-ND' => t('Creative Commons: Attribution-NoDerivs'),
-      'CC BY-NC' => t('Creative Commons: Attribution-NonCommercial'),
-      'CC BY-NC-SA' => t('Creative Commons: Attribution-NonCommercial-ShareAlike'),
-      'CC BY-NC-ND' => t('Creative Commons: Attribution-NonCommercial-NoDerivs'),
-      'CC0' => t('Creative Commons: Zero (CC0)'),
-    ),
+    'use_permission' => lib4ridora_pdf_use_permission_helper(),
   );
-  // We must compose+add all allowed/possible CC license strings to the form,
-  // otherwise Drupal will not accept new JS-created terms:
-  $ccVersion = variable_get("lib4ridora_pdf_cc_version","4.0,---,1.0,2.0,2.5,3.0");
-  $ccVerAry = array_map('trim',explode(',',$ccVersion));
-  $ccCountry = variable_get("lib4ridora_pdf_cc_country","---,IGO,UK");
-  $ccLocAry = array_map('trim',explode(',',$ccCountry));
-  $permAry = $retAry['use_permission'];
-  foreach( $permAry as $cc => $desc ) {
-	if ( !$cc ) { continue; }  
-    foreach( $ccVerAry as $ccVer ) {
-      if ( substr($ccVer,0,2) == '--' ) { continue; }
-      $key = $cc . ' ' . $ccVer;
-      $retAry['use_permission'][$key] = $key;
-      foreach( $ccLocAry as $ccLoc ) {
-        if ( substr($ccLoc,0,2) == '--' ) { continue; }
-        $key = $cc . ' ' . $ccVer . ' ' . $ccLoc;
-        $retAry['use_permission'][$key] = $key;
-      }
-    }
-    foreach( $ccLocAry as $ccLoc ) { // no version but with country/localization 'deed'
-      if ( substr($ccLoc,0,2) == '--' ) { continue; }
-      $key = $cc . ' ' . $ccLoc;
-      $retAry['use_permission'][$key] = $key;
-    }
-  }
-  return $retAry;
 }
 
 /**

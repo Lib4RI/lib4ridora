@@ -8,7 +8,7 @@
 <script type='text/javascript'><!--
 
 // Automatical switching internal documents to 'private' availability
-function PdfInternalAsPrivate(uuOrPdfId) {
+function PdfInternalAsPrivate(uuOrPdfId = null) {
 	var expId = ( uuOrPdfId != null && uuOrPdfId != '' ) ? ( 's-' + uuOrPdfId ) : '';
 	var docVer = document.getElementById('edit-file' + expId + '-document-version');
 	var avail = document.getElementById('edit-file' + expId + '-availability');

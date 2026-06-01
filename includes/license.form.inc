@@ -64,3 +64,65 @@ function lib4ridora_license_form($form, &$form_state) {
   );
   return $form;
 }
+
+
+/*
+	Function to return and array with all possibe CC license terms (='use permissions)
+ */ 
+function lib4ridora_pdf_use_permission_helper( $ccTermAry = null ) {
+  if ( $ccTermAry === null || !is_array($ccTermAry) ) {
+	$ccTermAry = array(
+      NULL => t('Unspecified'),
+      'CC BY' => t('Creative Commons: Attribution'),
+      'CC BY-SA' => t('Creative Commons: Attribution-ShareAlike'),
+      'CC BY-ND' => t('Creative Commons: Attribution-NoDerivs'),
+      'CC BY-NC' => t('Creative Commons: Attribution-NonCommercial'),
+      'CC BY-NC-SA' => t('Creative Commons: Attribution-NonCommercial-ShareAlike'),
+      'CC BY-NC-ND' => t('Creative Commons: Attribution-NonCommercial-NoDerivs'),
+      'CC0' => t('Creative Commons: Zero (CC0)'),
+    );
+  }
+  // We must compose+add all allowed/possible CC license strings to the form,
+  // otherwise Drupal will not accept new JS-created terms:
+  $usePermAry = $ccTermAry;
+  $ccVersion = variable_get("lib4ridora_pdf_cc_version","4.0,---,1.0,2.0,2.5,3.0");
+  $ccVerAry = array_map('trim',explode(',',$ccVersion));
+  $ccCountry = variable_get("lib4ridora_pdf_cc_country","---,IGO,UK");
+  $ccLocAry = array_map('trim',explode(',',$ccCountry));
+  foreach( $ccTermAry as $cc => $desc ) {
+	if ( !$cc ) { continue; }  
+    foreach( $ccVerAry as $ccVer ) {
+      if ( substr($ccVer,0,2) == '--' ) { continue; }
+      $key = $cc . ' ' . $ccVer;
+      $usePermAry[$key] = $key;
+      foreach( $ccLocAry as $ccLoc ) {
+        if ( substr($ccLoc,0,2) == '--' ) { continue; }
+        $key = $cc . ' ' . $ccVer . ' ' . $ccLoc;
+        $usePermAry[$key] = $key;
+      }
+    }
+    foreach( $ccLocAry as $ccLoc ) { // no version but with country/localization 'deed'
+      if ( substr($ccLoc,0,2) == '--' ) { continue; }
+      $key = $cc . ' ' . $ccLoc;
+      $usePermAry[$key] = $key;
+    }
+  }	
+  return $usePermAry;
+}
+
+/*
+	Function to help expanding the	CC license string with JavaScript
+	Code is very specific to ccLicenseComposer() in lib4ridora/js/lib4ridora.pdf_support.js
+
+	Via PHP we are going to add/replace some selection options stored in system variables: 
+	sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_pdf_cc_version","4.0,---,1.0,2.0,2.5,3.0")'
+	sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_pdf_cc_country","---,IGO,UK")'
+*/
+function lib4ridora_pdf_cc_license_helper($jsCode = '') {
+  $ccVersion = variable_get("lib4ridora_pdf_cc_version","4.0,---,1.0,2.0,2.5,3.0");
+  $ccVersion = "'" . str_replace(',',"','",str_replace(' ','',$ccVersion)) . "'";
+  $jsCode = str_replace("'---','0.0'",$ccVersion,$jsCode);
+  $ccCountry = variable_get("lib4ridora_pdf_cc_country","---,IGO,UK");
+  $ccCountry = "'" . str_replace(',',"','",str_replace(' ','',$ccCountry)) . "'";
+  return str_replace("'---','XYZ'",$ccCountry,$jsCode);
+}

@@ -11,6 +11,8 @@
 function lib4ridora_single_pdf_upload_form($form, &$form_state, AbstractObject $object) {
   form_load_include($form_state, 'inc', 'lib4ridora', 'includes/pdf-upload.form');
   form_load_include($form_state, 'inc', 'lib4ridora', 'includes/embargo.form');
+  module_load_include('inc', 'lib4ridora', 'includes/license.form');
+
   $options = lib4ridora_multi_pdf_get_options();
   $defaults = lib4ridora_multi_pdf_defaults_properties(TRUE);
 
@@ -73,15 +75,20 @@ function lib4ridora_single_pdf_upload_form($form, &$form_state, AbstractObject $
   
   // Adding a JS function to switch the availability to 'private' for 'internal documents'.
   // This shall assist the work-flow, but to enforce 'private' in DORA we better should use a valiation or submit hook.
-  // drupal_add_js( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.js', 'file' );
-  if ( $jsCode = file_get_contents( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.internal_as_private.js' ) ) {
+  // drupal_add_js( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.pdf_support.js', 'file' );
+  if ( $jsCode = file_get_contents( drupal_get_path('module','lib4ridora') . '/js/lib4ridora.pdf_support.js' ) ) {
     if ( $jsCode = strchr(substr($jsCode,strpos($jsCode,'<script')),'>') ) {
       if ( $jsCode = trim(substr($jsCode,0,strpos($jsCode,'</script>'))," </-!>\t") ) {
-        drupal_add_js( $jsCode, 'inline' );		// This is less 'caching-resistent', also a reset of ['#attached']['js'] cannot drop it.
+        drupal_add_js( lib4ridora_pdf_cc_license_helper($jsCode), 'inline' ); // This is less 'caching-resistent', also a reset of ['#attached']['js'] cannot drop it.
       }
     }
   }
-  $form['file']['document_version']['#attributes']['onchange'] = "PdfInternalAsPrivate('');"; // here we not need an UUID or a PDF-ID
+  if ( @is_array($form['file']['document_version']) ) {
+    $form['file']['document_version']['#attributes']['onchange'] = "PdfInternalAsPrivate();"; // here we not need an UUID or a PDF-ID
+  }
+  if ( @is_array($form['file']['availability']) ) {
+    $form['file']['availability']['#attributes']['onchange'] = "PdfInternalAsPrivate();"; // here we not need an UUID or a PDF-ID
+  }
 
   return $form;
 }
