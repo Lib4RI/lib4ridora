@@ -737,13 +737,13 @@ function lib4ridora_multi_pdf_get_options($sort = TRUE) {
     'document_version' => $document_versions,
     'use_permission' => array(
       NULL => t('Unspecified'),
-      'CC0' => t('Creative Commons: Zero (CC0)'),
       'CC BY' => t('Creative Commons: Attribution'),
       'CC BY-SA' => t('Creative Commons: Attribution-ShareAlike'),
       'CC BY-ND' => t('Creative Commons: Attribution-NoDerivs'),
       'CC BY-NC' => t('Creative Commons: Attribution-NonCommercial'),
       'CC BY-NC-SA' => t('Creative Commons: Attribution-NonCommercial-ShareAlike'),
       'CC BY-NC-ND' => t('Creative Commons: Attribution-NonCommercial-NoDerivs'),
+      'CC0' => t('Creative Commons: Zero (CC0)'),
     ),
   );
   // We must compose+add all allowed/possible CC license strings to the form,
