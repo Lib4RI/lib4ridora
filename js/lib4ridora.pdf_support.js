@@ -50,9 +50,11 @@ function ccLicenseComposer() {
 	].join('\n');
 	document.head.appendChild(style);
 
-	var usePermSelects = document.querySelectorAll('select[id$="-use-permission"]');
+	var usePermSelects = document.querySelectorAll('select[id*="-use-permission"]');
 
 	usePermSelects.forEach(function(sel) {
+		if (sel.dataset.ccEnhanced) return;
+		sel.dataset.ccEnhanced = '1'; // not to enhance it 2x
 		// Store each option's original value so we can rebase cleanly on every change
 		var ccFull = sel.options[sel.selectedIndex].value;
 		var ccBase = ccFull.split(' ').slice(0,2).join(' ');
@@ -191,6 +193,30 @@ function ccLicenseComposer() {
 	});
 }
 
-document.addEventListener('DOMContentLoaded',ccLicenseComposer);
+document.addEventListener('DOMContentLoaded', function() {
+        ccLicenseComposer();
+        // extended form+event handling for the PDF upload within the ingestion form: 
+        var observer = new MutationObserver(function(mutations) {
+                for (var i = 0; i < mutations.length; i++) {
+                        for (var j = 0; j < mutations[i].addedNodes.length; j++) {
+                                var node = mutations[i].addedNodes[j];
+                                if (node.nodeType !== 1) continue;
+                                if (node.querySelector('select[id*="-use-permission"]')) {
+                                       	ccLicenseComposer();
+                                        // Initialize embargo date visibility for each new fieldset:
+                                        node.querySelectorAll('fieldset[id^="edit-files-"]').forEach(function(fs) {
+                                                var avail = fs.querySelector('select[id*="-availability"]');
+                                               	var embargoDiv = fs.querySelector('div[id*="-embargo-date"]');
+                                               	if (avail && embargoDiv) {
+                                                        embargoDiv.style.display = (avail.value === 'date') ? 'block' : 'none';
+                                                }
+                                        });
+                                       	return;
+                                }
+                        }
+                }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+});
 	
 //--></script>
