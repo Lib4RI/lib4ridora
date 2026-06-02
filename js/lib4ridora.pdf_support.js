@@ -182,7 +182,15 @@ function ccLicenseComposer() {
 			console.log('[use-permission] ' + pdfId + ': "' + sel.value + '"');
 		}
 
+		function updateVersion() {
+			var v = cloneSel.value;
+			if      (v === '') { verSel.value = '---'; deedSel.value = '---'; }
+			else if (v === 'CC0') { verSel.value = '1.0'; deedSel.value = '---'; }
+			else if (verSel.value === '---') { verSel.value = '4.0'; }
+		}
+
 		if (cloneSel) {
+			cloneSel.addEventListener('change', updateVersion);
 			cloneSel.addEventListener('change', composeLicense);
 			verSel.addEventListener('change', composeLicense);
 			deedSel.addEventListener('change', composeLicense);

@@ -85,7 +85,7 @@ function lib4ridora_pdf_use_permission_helper( $ccTermAry = null ) {
   // We must compose+add all allowed/possible CC license strings to the form,
   // otherwise Drupal will not accept new JS-created terms:
   $usePermAry = $ccTermAry;
-  $ccVersion = variable_get("lib4ridora_pdf_cc_version","4.0,---,1.0,2.0,2.5,3.0");
+  $ccVersion = variable_get("lib4ridora_pdf_cc_version","---,1.0,2.0,2.5,3.0,4.0");
   $ccVerAry = array_map('trim',explode(',',$ccVersion));
   $ccCountry = variable_get("lib4ridora_pdf_cc_country","---,IGO,UK");
   $ccLocAry = array_map('trim',explode(',',$ccCountry));
@@ -119,7 +119,7 @@ function lib4ridora_pdf_use_permission_helper( $ccTermAry = null ) {
 	sudo drush -r /var/www/html -y @sites php-eval 'variable_set("lib4ridora_pdf_cc_country","---,IGO,UK")'
 */
 function lib4ridora_pdf_cc_license_helper($jsCode = '') {
-  $ccVersion = variable_get("lib4ridora_pdf_cc_version","4.0,---,1.0,2.0,2.5,3.0");
+  $ccVersion = variable_get("lib4ridora_pdf_cc_version","---,1.0,2.0,2.5,3.0,4.0");
   $ccVersion = "'" . str_replace(',',"','",str_replace(' ','',$ccVersion)) . "'";
   $jsCode = str_replace("'---','0.0'",$ccVersion,$jsCode);
   $ccCountry = variable_get("lib4ridora_pdf_cc_country","---,IGO,UK");
