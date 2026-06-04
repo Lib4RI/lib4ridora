@@ -173,24 +173,29 @@ function ccLicenseComposer() {
 		usePermDiv.style.display = 'none';
 
 		function composeLicense() {
-			if (!cloneSel || !cloneSel.value) return;
-			var parts = [cloneSel.value];
-			if (verSel.value !== '---') parts.push(verSel.value);
-			if (deedSel.value !== '---') parts.push(deedSel.value);
-			sel.value = parts.join(' ');
+			if ( !cloneSel ) return;
+			if ( cloneSel.value && cloneSel.value !== '---' ) {
+				let parts = [cloneSel.value];
+				if (verSel.value !== '---') parts.push(verSel.value);
+				if (deedSel.value !== '---') parts.push(deedSel.value);
+				sel.value = parts.join(' ');
+			} else { // reset:
+				cloneSel.value = '';
+				sel.value = ''; // !
+			}
 			var pdfId = sel.id.replace('edit-files-', '').replace('-use-permission', '').toUpperCase();
 			console.log('[use-permission] ' + pdfId + ': "' + sel.value + '"');
 		}
 
-		function updateVersion() {
-			var v = cloneSel.value;
-			if      (v === '') { verSel.value = '---'; deedSel.value = '---'; }
-			else if (v === 'CC0') { verSel.value = '1.0'; deedSel.value = '---'; }
+		function updateVersionDeed() {
+			if ( !cloneSel ) return;
+			if ( !cloneSel.value || cloneSel.value === '---' ) { verSel.value = '---'; deedSel.value = '---'; }
+			else if (cloneSel.value === 'CC0') { verSel.value = '1.0'; deedSel.value = '---'; }
 			else if (verSel.value === '---') { verSel.value = '4.0'; }
 		}
 
 		if (cloneSel) {
-			cloneSel.addEventListener('change', updateVersion);
+			cloneSel.addEventListener('change', updateVersionDeed);
 			cloneSel.addEventListener('change', composeLicense);
 			verSel.addEventListener('change', composeLicense);
 			deedSel.addEventListener('change', composeLicense);
